@@ -10,7 +10,7 @@
 | --- | --- |
 | WASD or arrow keys | Move and face a direction |
 | E | Use the interaction shown above the knight. At home this includes opening the chest and workbench. |
-| Tab or B | Open the inventory. Tab / Shift+Tab move focus through an open panel. |
+| Tab or B | Open the inventory. Tab / Shift+Tab move focus through the panel. Use the arrow keys within a slot grid. |
 | Esc or B | Close the open panel. E also closes the chest and workbench. |
 | 1–9 or wheel over the playfield | Select a hotbar slot |
 | F | Place the selected fence, floor tile, or torch |

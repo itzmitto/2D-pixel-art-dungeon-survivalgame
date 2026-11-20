@@ -166,7 +166,7 @@ function slotAction(target, single = false) {
 }
 
 function quickTransfer(source) {
-  if (progress.panelMode !== "chest" || progress.held || !["bag", "hotbar", "chest"].includes(source.area)) return;
+  if (progress.panelMode !== "chest" || !["bag", "hotbar", "chest"].includes(source.area)) return;
   const stack = getSlot(source);
   if (!stack) return;
   const grids = source.area === "chest" ? playerGrids() : [progress.chest];
@@ -490,9 +490,18 @@ function registerSlot(parent, target, label, options = {}) {
       act(true);
     });
     button.addEventListener("keydown", event => {
-      if (event.key.toLowerCase() !== "r" || event.repeat) return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (event.key.toLowerCase() === "r" && !event.repeat) {
+        event.preventDefault();
+        act(true);
+      }
+      if (!parent.classList.contains("slot-grid")) return;
+      const columns = Number(parent.dataset.size) || HOTBAR_SLOTS;
+      const delta = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -columns, ArrowDown: columns }[event.key];
+      if (!delta) return;
       event.preventDefault();
-      act(true);
+      const next = parent.children[target.index + delta];
+      if (next && !next.hidden) next.focus();
     });
   }
   slotViews.push({ button, target, label, number, hud, crafting });
