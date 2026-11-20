@@ -339,7 +339,9 @@ function interact() {
       progress.trees[id] = hits;
       axeTime = 0.2;
       if (hits === 3) progress.wood += 3;
-      showFeedback(hits === 3 ? "Boom geveld · 0 slagen over · +3 hout" : (3 - hits) + " slagen over");
+      const remaining = 3 - hits;
+      if (remaining === 0) showFeedback("Boom geveld · 0 slagen over · +3 hout");
+      else showFeedback(remaining === 1 ? "1 slag over" : "2 slagen over");
       storeProgress();
       updateInventory();
       break;
@@ -588,6 +590,99 @@ function drawRoom(time) {
   }
 }
 
+function drawCabin() {
+  rect("#1f352c", 60, 63, 137, 100);
+  rect("#683e2d", 64, 83, 128, 77);
+  for (let y = 93; y < 160; y += 10) {
+    rect("#a96841", 66, y, 124, 8);
+    rect("#ce8e56", 66, y, 124, 2);
+  }
+  for (let row = 0; row < 5; row++) {
+    const inset = (4 - row) * 9;
+    rect("#4c2e32", 59 + inset, 55 + row * 8, 138 - inset * 2, 11);
+    rect(row % 2 ? "#a05a43" : "#b76b4b", 61 + inset, 55 + row * 8, 134 - inset * 2, 5);
+  }
+  rect("#593732", 59, 94, 138, 6);
+  for (const x of [83, 166]) {
+    rect("#5d372b", x - 3, 107, 22, 20);
+    rect("#ffd18a", x, 110, 16, 14);
+    rect("#8c533b", x + 7, 110, 2, 14);
+    rect("#8c533b", x, 116, 16, 2);
+  }
+  drawHouseDoor(128, 128, progress.repaired);
+}
+
+function drawHouseDoor(x, y, intact) {
+  rect("#53342b", x + 3, y + 1, 26, 31);
+  rect(intact ? "#a96b43" : "#382b2e", x + 7, y + 4, 18, 28);
+  if (intact) {
+    rect("#76432f", x + 13, y + 4, 2, 28);
+    rect("#76432f", x + 20, y + 4, 2, 28);
+    rect("#ffd18a", x + 20, y + 19, 3, 3);
+  } else {
+    rect("#a96b43", x + 7, y + 4, 5, 18);
+    rect("#a96b43", x + 20, y + 11, 5, 21);
+    rect("#da9862", x + 9, y + 23, 14, 5);
+  }
+}
+
+function drawOverworld() {
+  const outside = area === "forest";
+  room.forEach((row, j) => {
+    [...row].forEach((tile, i) => {
+      const x = i * TILE;
+      const y = j * TILE;
+      const variant = (i * 19 + j * 11) % 4;
+      if (outside) {
+        const path = "=PR".includes(tile);
+        rect(path ? "#9b7751" : ["#385c40", "#3d6342", "#436846", "#3b6142"][variant], x, y, TILE, TILE);
+        if (path) {
+          rect("#ac895d", x + 5 + variant * 4, y + 9, 6, 2);
+          rect("#806345", x + 12, y + 23 - variant * 3, 4, 2);
+        } else {
+          rect("#55764a", x + 4 + variant * 4, y + 12, 2, 4);
+          rect("#55764a", x + 6 + variant * 4, y + 15, 3, 2);
+        }
+        if (tile === "#" || tile === "Y") {
+          sprite(tile === "Y" && treeCut(i, j) ? "stump" : "tree",
+            x + 16, y + 21);
+        }
+        if (tile === "G") {
+          rect("#777c76", x + 2, y + 8, 28, 24);
+          rect("#93938a", x + 7, y + 3, 18, 7);
+          rect("#3a4140", x + 8, y + 12, 16, 20);
+          rect("#f6bc65", x + 3, y + 16, 3, 5);
+          rect("#f6bc65", x + 26, y + 16, 3, 5);
+        }
+        const building = progress.buildings[tileId(i, j)];
+        if (building) sprite(building, x + 16, y + 19);
+      } else {
+        rect(tile === "#" ? "#3c292b" : "#805536", x, y, TILE, TILE);
+        if (tile !== "#") {
+          rect("#9d6b43", x + 1, y + 1, 30, 14);
+          rect("#95613e", x + 1, y + 17, 30, 14);
+        }
+        if (tile === "U") drawHouseDoor(x, y, true);
+        if (tile === "B") {
+          rect("#59352e", x + 5, y + 1, 22, 30);
+          rect("#e5cfaa", x + 8, y + 4, 16, 7);
+          rect("#9f4950", x + 8, y + 12, 16, 15);
+          rect("#d0766d", x + 8, y + 12, 16, 3);
+        }
+      }
+    });
+  });
+  if (outside) drawCabin();
+  if (outside && buildItem) {
+    const site = buildSite();
+    const x = site.x * TILE;
+    const y = site.y * TILE;
+    rect(site.allowed ? "#89df8d66" : "#f4777466", x + 1, y + 1, 30, 30);
+    ctx.strokeStyle = site.allowed ? "#a2f5a5" : "#ff9390";
+    ctx.strokeRect(x + 1.5, y + 1.5, 29, 29);
+  }
+}
+
 function draw(time) {
   if (exit) drawRoom(time);
   else drawOverworld();
@@ -606,6 +701,62 @@ function draw(time) {
   }
   if (axeTime > 0) sprite("axe", player.x + facingTile.x * 10 + 6, player.y + facingTile.y * 10);
   for (const ball of fireballs) sprite("fireball", ball.x, ball.y - 2);
+}
+
+const SAVE_KEY = "vonkje-survival-v1";
+
+function newProgress() {
+  return {
+    wood: 0, items: { fence: 0, floor: 0 }, trees: {}, buildings: {},
+    repaired: false, dungeonCompleted: false,
+  };
+}
+
+// Houd de voortgang ook in het geheugen als localStorage ontbreekt of een schrijffout geeft.
+function loadProgress() {
+  const loaded = newProgress();
+  try {
+    const saved = JSON.parse(localStorage.getItem(SAVE_KEY));
+    if (!saved) return loaded;
+    if (Number.isSafeInteger(saved.wood) && saved.wood >= 0) loaded.wood = saved.wood;
+    for (const item of Object.keys(RECIPES)) {
+      const count = saved.items?.[item];
+      if (Number.isSafeInteger(count) && count >= 0) loaded.items[item] = count;
+    }
+    FOREST.forEach((row, y) => {
+      [...row].forEach((tile, x) => {
+        const id = tileId(x, y);
+        const hits = saved.trees?.[id];
+        const building = saved.buildings?.[id];
+        if (tile === "Y" && Number.isInteger(hits) && hits > 0 && hits <= 3) {
+          loaded.trees[id] = hits;
+        }
+        if (tile === "." && (building === "fence" || building === "floor")) {
+          loaded.buildings[id] = building;
+        }
+      });
+    });
+    loaded.repaired = saved.repaired === true;
+    loaded.dungeonCompleted = saved.dungeonCompleted === true;
+  } catch {
+    // Een ontbrekende of onleesbare save begint met een lege inventaris.
+  }
+  return loaded;
+}
+
+function storeProgress() {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(progress));
+  } catch {
+    // De huidige sessie blijft speelbaar.
+  }
+}
+
+function completeDungeon() {
+  if (progress.dungeonCompleted) return;
+  progress.dungeonCompleted = true;
+  storeProgress();
+  showFeedback("Dungeon voltooid");
 }
 
 window.addEventListener("keydown", (event) => {
@@ -636,7 +787,21 @@ window.addEventListener("keydown", (event) => {
 window.addEventListener("keyup", (event) => pressed.delete(event.key.toLowerCase()));
 window.addEventListener("blur", () => pressed.clear());
 respawnButton.addEventListener("click", reset);
+for (const [item, { button }] of Object.entries(RECIPES)) {
+  button.addEventListener("click", () => craft(item));
+}
+document.querySelector("#new-game").addEventListener("click", () => {
+  if (!window.confirm("Nieuw spel starten? Je opgeslagen voortgang wordt gewist.")) return;
+  progress = newProgress();
+  try {
+    localStorage.removeItem(SAVE_KEY);
+  } catch {
+    storeProgress();
+  }
+  reset();
+});
 
+progress = loadProgress();
 reset();
 let previousTime;
 // De game loop begrenst de tijdstap zodat een gepauzeerd tabblad geen sprong veroorzaakt.
