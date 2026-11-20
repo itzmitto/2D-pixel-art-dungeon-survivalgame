@@ -5,22 +5,9 @@
   background: #15141b;
 }
 * { box-sizing: border-box; }
-body {
-  margin: 0;
-  display: grid;
-  place-items: center;
-  min-height: 100vh;
-  padding: 24px 16px;
-  background: radial-gradient(ellipse at 50% 15%, #3a2829, #15141b 68%);
-}
-main { width: min(100%, 820px); }
-header { margin-bottom: 24px; text-align: center; }
-h1 {
-  font: bold clamp(2.5rem, 8vw, 4.5rem)/1 Georgia, serif;
-  margin: 0;
-  color: #ffd18a;
-  text-shadow: 0 4px #663b36;
-}
+html, body { height: 100%; overflow: hidden; }
+body { margin: 0; }
+main { height: 100%; }
 p { margin: 10px 0 0; color: #c9b8aa; }
 kbd { color: #f4e6ca; }
 button {

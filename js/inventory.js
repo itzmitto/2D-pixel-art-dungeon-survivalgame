@@ -94,6 +94,7 @@ function closeHousePanel() {
   if (housePanel.hidden) return;
   houseMode = undefined;
   housePanel.hidden = true;
+  updateBuildControls();
   backpackToggle.focus();
 }
 
@@ -120,11 +121,11 @@ function describeItem(item) {
 
 function updateInventory() {
   document.querySelector("#wood").textContent = "Hout " + itemCount("wood");
-  const selection = document.querySelector("#build-selection");
-  selection.textContent = buildItem
-    ? ITEMS[buildItem].label + " geselecteerd · F om te plaatsen · Esc om te stoppen"
-    : "1 — Hek · 2 — Vloer · 3 — Fakkel";
-  selection.hidden = area !== "forest";
+  updateBuildControls();
+  for (const [hand, shortcut] of [["left", "J"], ["right", "K"]]) {
+    const item = progress.hands[hand];
+    document.querySelector("#hud-" + hand + "-hand").textContent = shortcut + " · " + (ITEMS[item]?.label || "Leeg");
+  }
   for (const [item, button] of Object.entries(recipeButtons)) {
     const ingredients = Object.entries(RECIPES[item]);
     button.textContent = "Maak " + describeItem(item) + " · " +

@@ -199,7 +199,7 @@ function buildSite() {
 }
 
 function build() {
-  if (!buildItem || area !== "forest") return;
+  if (phase !== "playing" || inventoryOpen() || !buildItem || area !== "forest") return;
   const site = buildSite();
   if (!site.allowed) {
     showFeedback(itemCount(buildItem) ? "Hier kun je niet bouwen." : "Maak eerst dit bouwitem.");
@@ -304,17 +304,26 @@ function pickUp(drop) {
 function updateAction() {
   const action = getAction();
   const hint = {
-    pickup: "E — Pak op", dungeon: "E — Ga de grot in", chop: "E — Hak boom", mine: "E — Delf erts of steen",
+    dungeon: "E — Ga de grot in", chop: "E — Hak boom",
     inspect: "E — Bekijk kapotte deur", repair: "E — Repareer de deur (6 hout)",
     enter: "E — Ga naar binnen",
     leave: "E — Ga naar buiten", rest: "E — Rust uit",
     workbench: "E — Open werkbank", chest: "E — Open opbergkist",
   }[action];
-  const text = hint || "";
+  let text = hint || "";
+  if (action === "pickup") {
+    const { item, count } = nearbyLoot();
+    text = "E — Pak op · " + ITEMS[item].label + " × " + count;
+  }
+  if (action === "mine") {
+    const { x, y } = targetTile();
+    text = "E — Delf " + ITEMS[RESOURCES[room[y][x]].item].label.toLowerCase();
+  }
   if (actionLabel.textContent !== text) actionLabel.textContent = text;
-  actionLabel.hidden = !hint;
-  actionLabel.style.left = Math.min(81, Math.max(19, player.x / 4.8)) + "%";
-  actionLabel.style.top = Math.max(13, (player.y - 22) / 3.2) + "%";
+  actionLabel.hidden = !text;
+  if (!text) return;
+  actionLabel.style.setProperty("--action-x", (player.x / canvas.width) * 100 + "%");
+  actionLabel.style.setProperty("--action-y", ((player.y - 20) / canvas.height) * 100 + "%");
 }
 
 function followDragon(dt) {

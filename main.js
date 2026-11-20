@@ -44,6 +44,7 @@ function updateHud() {
     return heart;
   }));
   hearts.setAttribute("aria-label", formatNumber(player.hearts) + " van 3 hartjes");
+  game.dataset.area = area;
   roomNumber.textContent = {
     forest: "Bos", house: "Huis", dungeon1: "Kamer 1 van 2", dungeon2: "Kamer 2 van 2",
   }[area];

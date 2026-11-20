@@ -131,6 +131,12 @@ const SPRITES = {
   wood: ["..nnnn...", ".acccnn..", "xnnnaacx.", "xaccnncx.", ".xxxxxx.."],
   gel: ["..bb...", ".bTTb..", "bTttbb.", ".bbbb.."],
   sword: ["......nn.", ".....ncn.", "....ncn..", ".a.ncn...", "..ncn....", "..na.....", ".a..a...."],
+  stone: ["..sss..", ".slzsx.", "xssusux", "xuusuxx", ".xxxxx."],
+  copper: ["..ccc..", ".cggnx.", "xnncngx", "xanannx", ".xxxxx."],
+  pickaxe: ["..ccn...", ".cc..n..", ".....an.", "....a..n", "...a....", "..a.....", ".a......"],
+  stoneSword: ["......zz.", ".....zsz.", "....zsu..", ".a.zsu...", "..zsu....", "..na.....", ".a..a...."],
+  copperSword: ["......gc.", ".....gcn.", "....gcn..", ".a.gcn...", "..gcn....", "..na.....", ".a..a...."],
+  copperSpear: ["..........ccg", ".........cgn.", "........cgn..", ".......ncn...", "......an.....", ".....an......", "....an.......", "...an........", "..an.........", ".an..........", "an..........."],
   slime: [
     "...xxxx...", "..xwwppx..", ".xwpppppx.", "xppxppxppx",
     "xppppppppx", "xddppppddx", ".xxxxxxxx.",
@@ -374,6 +380,66 @@ function drawBuiltTorch(x, y) {
   rect("#ffd386", x - 2, y - 8, 4, 7);
 }
 
+function drawDeposit(tile, x, y, variant, spent) {
+  if (spent) {
+    rect("#3d4c42", x + 6, y + 17, 21, 9);
+    rect("#6a6b58", x + 8, y + 18, 5, 3);
+    rect("#7d7963", x + 19, y + 22, 6, 3);
+    return;
+  }
+  drawRock(x, y, variant);
+  if (tile === "N") {
+    rect("#8b4a37", x + 7, y + 12, 16, 6);
+    rect("#db9259", x + 9, y + 12, 9, 3);
+    rect("#edb477", x + 17, y + 16, 6, 2);
+  }
+}
+
+function drawHarvestEffects() {
+  for (const effect of harvestEffects) {
+    const age = elapsed - effect.started;
+    const { x, y, tool } = effect;
+    sprite(tool, x - 10 + age * 40, y + 2);
+    for (let i = 0; i < 7; i++) {
+      const angle = i * 2.4;
+      const reach = 6 + age * (22 + 3 * i);
+      const color = tool === "axe" ? (i % 2 ? "#e3b477" : "#ab6941") : (i % 2 ? "#b9b6a4" : "#e4a56d");
+      rect(color, Math.round(x + Math.cos(angle) * reach),
+        Math.round(y - 4 + Math.sin(angle) * reach + age * age * 55), 2 + i % 2, 2);
+    }
+  }
+}
+
+function drawArmor(x, y, row, column) {
+  const { helmet, chestplate, boots } = progress.armor;
+  x = Math.round(x);
+  y = Math.round(y);
+  const walking = player.walking && !inventoryOpen() && phase === "playing";
+  const bob = [2, 3, 5].includes(column) ? 1 : 0;
+  if (chestplate) {
+    const offset = [0, -3, 3, 0][row];
+    if (row === 3) {
+      // Het rugzakprofiel blijft zichtbaar tussen de koperen schouderplaten.
+      rect("#ba683f", x - 8, y - 3 + bob, 3, 5);
+      rect("#ba683f", x + 5, y - 3 + bob, 3, 5);
+    } else {
+      rect("#743e37", x - 6 + offset, y - 4 + bob, 12, 7);
+      rect("#bf744a", x - 5 + offset, y - 4 + bob, 10, 5);
+      rect("#efaa65", x - 4 + offset, y - 3 + bob, 8, 2);
+      rect("#975039", x - 3 + offset, y + 1 + bob, 6, 1);
+    }
+  }
+  if (helmet) {
+    rect("#8e4938", x - 6, y - 13 + bob, 12, 3);
+    rect("#db9357", x - 5, y - 14 + bob, 10, 3);
+    rect("#f3c182", x - 4, y - 14 + bob, 6, 1);
+  }
+  if (boots && !walking) {
+    rect("#bf744a", x - 5, y + 5, 3, 2);
+    rect("#bf744a", x + 2, y + 5, 3, 2);
+  }
+}
+
 function drawOverworld() {
   const builtTorches = [];
   const outside = area === "forest";
@@ -386,9 +452,10 @@ function drawOverworld() {
         drawGrass(i, j, variant);
         if ("=PR".includes(tile)) drawPath(i, j, variant);
         if (tile === "#" || tile === "Y") {
-          sprite(tile === "Y" && treeCut(i, j) ? "stump" : "tree", x + 16, y + 21);
+          sprite(tile === "Y" && exhausted(RESOURCES.Y, i, j) ? "stump" : "tree", x + 16, y + 21);
         }
         if (tile === "Q") drawRock(x, y, variant);
+        if (tile === "M" || tile === "N") drawDeposit(tile, x, y, variant, exhausted(RESOURCES[tile], i, j));
 
         const building = progress.buildings[tileId(i, j)];
         if (building === "floor") drawPlanks(x, y, variant);
@@ -443,6 +510,7 @@ function draw(time) {
         const fallback = ["knight", "knightStepA", "knightStepA", "knight", "knightStepB", "knightStepB"];
         sprite(fallback[column % fallback.length], actor.x, actor.y, actor.facing);
       }
+      drawArmor(actor.x, actor.y, row, column);
     } else if (actor === dragon) {
       const column = dragonFrame(time);
       if (!drawPng("dragon", actor.x, actor.y - 2, column, 0, actor.facing, 25, 20)) {
@@ -453,7 +521,7 @@ function draw(time) {
     }
   }
   if (swing) drawSwing();
-  if (axeTime > 0) sprite("axe", player.x + facingTile.x * 10 + 6, player.y + facingTile.y * 10);
+  drawHarvestEffects();
   for (const ball of fireballs) sprite("fireball", ball.x, ball.y - 2);
 }
 
@@ -461,17 +529,18 @@ function draw(time) {
 function drawSwing() {
   const angle = Math.atan2(swing.y, swing.x);
   const phase = 1 - swing.time / SWING_TIME;
-  const start = angle + (swing.hand === "left" ? -0.8 : 0.8) * (1 - phase * 2);
+  const spear = swing.weapon === "copperSpear";
+  const start = angle + (spear ? 0.15 : 0.8) * (swing.hand === "left" ? -1 : 1) * (1 - phase * 2);
   const weaponPosition = {
     x: player.x + Math.cos(start) * 15,
     y: player.y + Math.sin(start) * 15,
   };
   if (clearAttackPath(player, weaponPosition)) {
-    sprite(swing.weapon, weaponPosition.x, weaponPosition.y, swing.x < 0 ? -1 : 1);
+    sprite(WEAPONS[swing.weapon].sprite, weaponPosition.x, weaponPosition.y, swing.x < 0 ? -1 : 1);
   }
   for (let i = 0; i < 5; i++) {
     const offset = i * 0.14 - 0.28;
-    const tip = swing.weapon === "sword" ? 21 : 18;
+    const tip = WEAPONS[swing.weapon].range * 0.7;
     const point = {
       x: player.x + Math.cos(start + offset) * tip,
       y: player.y + Math.sin(start + offset) * tip,

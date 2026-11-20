@@ -1,16 +1,26 @@
-.inventory { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
 .inventory {
-  background: #19171e;
-  padding: 10px;
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  pointer-events: none;
 }
 .inventory button { font-size: 0.85rem; padding: 4px 8px; }
-#build-selection { flex-basis: 100%; color: #c9b8aa; }
-
-#backpack {
-  flex-basis: 100%;
+#backpack, #house-panel {
+  width: min(100%, 49rem);
+  max-height: 100%;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
   padding: 10px;
-  border: 1px solid #64504c;
+  border: 1px solid #927060;
+  background: #241e28;
+  box-shadow: 0 8px 24px #120e14aa;
 }
+
 #bag-items, #equip-choices {
   display: flex;
   flex-wrap: wrap;
@@ -21,11 +31,6 @@
 #bag-items span { padding: 4px 8px; background: #302633; }
 #bag-items button[aria-pressed="true"] { outline: 2px solid #9ae1ac; }
 
-#house-panel {
-  flex-basis: 100%;
-  padding: 10px;
-  border: 1px solid #64504c;
-}
 .panel-actions, .panel-heading, .storage-slots {
   display: flex;
   flex-wrap: wrap;

@@ -10,7 +10,7 @@ function newProgress() {
   };
 }
 
-// Oude bouwsels op het nieuwe pad of grot krijgen de dichtstbijzijnde vrije grastegel.
+// Verplaats oude bouwsels op gereserveerde tegels naar de dichtstbijzijnde vrije grastegel.
 function loadBuildings(saved, loaded) {
   const displaced = [];
   const empty = [];

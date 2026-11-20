@@ -1,63 +1,101 @@
 .game {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+  height: 100dvh;
   background: #221e26;
-  border: 1px solid #64504c;
-  padding: 12px;
-  box-shadow: 0 16px 48px #100c13aa;
 }
+.game:fullscreen { width: 100%; height: 100%; }
+
 .hud, .controls {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 6px 16px;
+  padding: 6px 12px;
+  background: #221e26;
+  font-size: 0.875rem;
 }
-.hud { padding: 0 4px 10px; }
-#room-number { font-weight: bold; }
-#hearts { color: #ff8187; font-size: 1.35rem; }
-#key, #fireball-status { color: #ffd18a; }
-.controls { padding-top: 12px; }
-.controls p { margin: 0; }
-.room { position: relative; }
-canvas { display: block; width: 100%; image-rendering: pixelated; }
-.ending {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  padding: 12px;
-  background: #15141bd9;
-  text-align: center;
-  font: bold clamp(1.3rem, 5vw, 2.6rem) Georgia, serif;
+.hud { border-bottom: 1px solid #64504c; }
+.hud h1 {
+  margin: 0;
+  color: #ffd18a;
+  font: bold 1.3rem/1 Georgia, serif;
 }
-.activity {
+.hud-status, .hud-hands, .hud-actions, .build-tools, .game-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 16px;
   align-items: center;
-  padding: 10px 4px;
+  gap: 4px 8px;
 }
-.activity { min-height: 42px; }
-.activity p { margin: 0; }
-#action { color: #f4e6ca; }
-#feedback { color: #ffd18a; }
-
-#action {
-  position: absolute;
-  z-index: 1;
-  margin: 0;
-  padding: 4px 8px;
-  transform: translate(-50%, -100%);
-  border: 1px solid #c29b62;
-  background: #1f2223ee;
-  font-size: clamp(0.64rem, 1.7vw, 0.85rem);
-  text-align: center;
-  white-space: nowrap;
-  pointer-events: none;
+.hud-status { gap: 4px 12px; }
+.hud-hands span {
+  padding: 3px 7px;
+  border: 1px solid #64504c;
+  background: #302633;
 }
-#hearts span { margin-right: 4px; }
-#hearts span:last-child { margin-right: 0; }
+.hud-actions, .game-actions { margin-inline-start: auto; }
+.hud button, .controls button { padding: 4px 8px; font-size: inherit; }
+#hearts { display: inline-flex; gap: 4px; font-size: 1.25rem; }
 #hearts span {
   background: linear-gradient(90deg, #ff8187 var(--heart-fill), #9d7e83 var(--heart-fill));
   background-clip: text;
   color: transparent;
 }
+#key, #fireball-status, #feedback { color: #ffd18a; }
+
+.stage {
+  position: relative;
+  container-type: size;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(ellipse, #334c39, #223529);
+}
+.game[data-area="house"] .stage { background: radial-gradient(ellipse, #594133, #382822); }
+.game[data-area^="dungeon"] .stage { background: radial-gradient(ellipse, #383440, #26242e); }
+.room {
+  position: relative;
+  width: min(100cqw, 150cqh);
+}
+canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; }
+
+#action {
+  position: absolute;
+  z-index: 1;
+  left: clamp(min(8rem, 40%), var(--action-x), max(calc(100% - 8rem), 60%));
+  top: max(2.25rem, var(--action-y));
+  width: max-content;
+  max-width: min(16rem, 80%);
+  margin: 0;
+  padding: 4px 8px;
+  transform: translate(-50%, -100%);
+  border: 1px solid #c29b62;
+  background: #1f2223ee;
+  color: #f4e6ca;
+  font-size: 0.85rem;
+  text-align: center;
+  pointer-events: none;
+}
+.ending {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max-content;
+  max-width: 95%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border: 1px solid #c29b62;
+  background: #241e28;
+  text-align: center;
+}
+
+.controls {
+  min-height: 2.5rem;
+  border-top: 1px solid #64504c;
+}
+.controls p { margin: 0; }
+#feedback:empty { display: none; }
+.build-tools button[aria-pressed="true"] { outline: 2px solid #9ae1ac; outline-offset: 1px; }
