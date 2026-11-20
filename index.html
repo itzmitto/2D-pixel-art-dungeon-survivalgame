@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vonkje • Dungeon Survival</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="main.js" defer></script>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Vonkje</h1>
+      <p>Vind de sleutel en ontsnap met je babydraak.</p>
+    </header>
+    <section class="game" aria-label="Dungeon">
+      <div class="hud">
+        <span id="hearts" role="img" aria-label="3 van 3 hartjes">♥ ♥ ♥</span>
+        <span id="key">Sleutel ontbreekt</span>
+      </div>
+      <div class="room">
+        <canvas id="dungeon" width="480" height="320" aria-label="Dungeon met ridder, babydraak, slime, sleutel en uitgang"></canvas>
+        <div id="ending" class="ending" hidden><strong id="result"></strong></div>
+      </div>
+      <div class="controls">
+        <p><kbd>WASD</kbd> of <kbd>↑ ← ↓ →</kbd> om te lopen</p>
+        <button id="restart" type="button">Opnieuw spelen</button>
+      </div>
+    </section>
+    <p id="status" class="visually-hidden" role="status"></p>
+  </main>
+</body>
+</html>
