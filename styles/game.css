@@ -3,26 +3,28 @@
   grid-template-rows: auto minmax(0, 1fr) auto;
   height: 100%;
   height: 100dvh;
-  background: #221e26;
+  background: #211915;
 }
 .game:fullscreen { width: 100%; height: 100%; }
 
 .hud, .controls {
+  background: linear-gradient(#35251e, #261c18);
+  font-size: 0.875rem;
+}
+.hud {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 16px;
   padding: 6px 12px;
-  background: #221e26;
-  font-size: 0.875rem;
+  border-bottom: 1px solid var(--copper);
 }
-.hud { border-bottom: 1px solid #64504c; }
 .hud h1 {
   margin: 0;
-  color: #ffd18a;
-  font: bold 1.3rem/1 Georgia, serif;
+  color: var(--copper-light);
+  font: bold 1.45rem/1 Georgia, serif;
 }
-.hud-status, .hud-hands, .hud-actions, .build-tools, .game-actions {
+.hud-status, .hud-hands, .hud-actions, .game-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -31,11 +33,16 @@
 .hud-status { gap: 4px 12px; }
 .hud-hands span {
   padding: 3px 7px;
-  border: 1px solid #64504c;
-  background: #302633;
+  border: 1px solid #754b35;
+  background: #382821;
 }
-.hud-actions, .game-actions { margin-inline-start: auto; }
-.hud button, .controls button { padding: 4px 8px; font-size: inherit; }
+.hud-actions { margin-inline-start: auto; }
+.hud button, .game-actions button { padding: 4px 8px; font-size: inherit; }
+.hud button kbd, .game-actions button kbd {
+  margin-inline-start: 3px;
+  color: #ffd194;
+  font-size: 0.75rem;
+}
 #hearts { display: inline-flex; gap: 4px; font-size: 1.25rem; }
 #hearts span {
   background: linear-gradient(90deg, #ff8187 var(--heart-fill), #9d7e83 var(--heart-fill));
@@ -93,9 +100,50 @@ canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; 
 }
 
 .controls {
-  min-height: 2.5rem;
-  border-top: 1px solid #64504c;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 12px;
+  padding: 5px 12px;
+  border-top: 1px solid var(--copper);
+  position: relative;
 }
-.controls p { margin: 0; }
-#feedback:empty { display: none; }
-.build-tools button[aria-pressed="true"] { outline: 2px solid #9ae1ac; outline-offset: 1px; }
+.play-hints {
+  min-width: 0;
+  font-size: 0.8rem;
+}
+.game-actions { justify-content: end; }
+#feedback:empty, #hotbar-name:empty { display: none; }
+.hotbar {
+  width: min(27.5rem, 55vw);
+  position: relative;
+}
+#hotbar-name {
+  position: absolute;
+  z-index: 1;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  width: max-content;
+  max-width: 85vw;
+  transform: translateX(-50%);
+  padding: 4px 10px;
+  color: var(--parchment);
+  border: 1px solid var(--copper);
+  background: #211713;
+  box-shadow: 0 2px 0 #110e0c;
+  pointer-events: none;
+}
+@media (max-width: 43rem) {
+  .controls {
+    grid-template-columns: 1fr auto;
+  }
+  .hotbar {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    justify-self: center;
+    width: min(25rem, 100%);
+  }
+  .play-hints {
+    line-height: 1.25;
+  }
+}

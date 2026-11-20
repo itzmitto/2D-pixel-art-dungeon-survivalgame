@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="nl">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,95 +18,116 @@
 </head>
 <body>
   <main>
-    <section class="game" id="game" aria-label="Vonkje speelveld" data-area="forest">
+    <section class="game" id="game" aria-label="Vonkje playfield" data-area="forest">
       <header class="hud">
         <h1>Vonkje</h1>
-        <div class="hud-status" aria-label="Spelstatus">
-          <strong id="room-number">Bos</strong>
-          <span id="hearts" role="img" aria-label="3 van 3 hartjes">♥ ♥ ♥</span>
-          <span id="fireball-status">Vuurbal klaar</span>
-          <span id="wood">Hout 0</span>
-          <span id="key" hidden>Sleutel ontbreekt</span>
+        <div class="hud-status" aria-label="Game status">
+          <strong id="room-number">Forest</strong>
+          <span id="hearts" role="img" aria-label="3 of 3 hearts">♥ ♥ ♥</span>
+          <span id="fireball-status">Fireball ready</span>
+          <span id="wood">Wood 0</span>
+          <span id="key" hidden>Key missing</span>
         </div>
-        <div class="hud-hands" aria-label="Handen">
-          <span id="hud-left-hand">J · Leeg</span>
-          <span id="hud-right-hand">K · Leeg</span>
+        <div class="hud-hands" aria-label="Equipped weapons">
+          <span id="hud-left-hand">J · Empty</span>
+          <span id="hud-right-hand">K · Empty</span>
         </div>
         <div class="hud-actions">
-          <button id="backpack-toggle" type="button" aria-controls="backpack" aria-expanded="false">Inventaris · Tab / B</button>
-          <button id="fullscreen-toggle" type="button" aria-pressed="false">Volledig scherm</button>
+          <button id="backpack-toggle" type="button" aria-controls="backpack" aria-expanded="false">Inventory <kbd>Tab</kbd></button>
+          <button id="fullscreen-toggle" type="button" aria-pressed="false">Full screen</button>
         </div>
       </header>
+
       <div class="stage">
         <div class="room">
           <p id="action" hidden></p>
-          <canvas id="dungeon" width="480" height="320" aria-label="Pixelwereld met ridder en babydraak"></canvas>
+          <canvas id="dungeon" width="480" height="320" aria-label="Pixel world with a knight and a baby dragon"></canvas>
           <div id="ending" class="ending" hidden>
             <strong id="result"></strong>
-            <button id="respawn" type="button" hidden>Terug naar huis</button>
+            <button id="respawn" type="button" hidden>Return home</button>
           </div>
         </div>
-        <aside class="inventory" aria-label="Inventaris">
-          <section id="backpack" aria-label="Rugzak" hidden>
-            <div class="panel-heading">
-              <strong id="bag-capacity"></strong>
-              <button id="close-backpack" type="button">Sluiten · Esc</button>
+
+        <aside class="inventory" aria-label="Inventory and storage">
+          <section id="backpack" aria-labelledby="panel-title" hidden>
+            <header class="panel-heading">
+              <h2 id="panel-title">Inventory</h2>
+              <button id="close-backpack" type="button">Close <kbd>Esc</kbd></button>
+            </header>
+
+            <div class="panel-body">
+              <div class="panel-storage">
+                <section class="inventory-section" id="chest-section" aria-labelledby="chest-label" hidden>
+                  <h3 id="chest-label">Chest</h3>
+                  <div id="chest-slots" class="slot-grid"></div>
+                </section>
+                <section class="inventory-section" aria-labelledby="bag-label">
+                  <div class="section-heading">
+                    <h3 id="bag-label">Backpack</h3>
+                    <span id="bag-capacity"></span>
+                  </div>
+                  <div id="bag-items" class="slot-grid"></div>
+                </section>
+                <section class="inventory-section" aria-labelledby="inventory-hotbar-label">
+                  <h3 id="inventory-hotbar-label">Hotbar</h3>
+                  <div id="inventory-hotbar" class="slot-grid"></div>
+                </section>
+                <button id="recover-overflow" type="button" hidden>Recover saved items</button>
+              </div>
+
+              <div class="panel-tools">
+                <section class="inventory-section" aria-labelledby="equipment-label">
+                  <h3 id="equipment-label">Equipment</h3>
+                  <div class="equipment">
+                    <div class="knight-portrait">
+                      <canvas id="knight-preview" width="40" height="40" aria-label="Equipped knight preview"></canvas>
+                    </div>
+                    <div id="equipment-slots"></div>
+                  </div>
+                  <div class="equipment-stats">
+                    <span id="armor-total"></span>
+                    <span id="pet-recharge"></span>
+                  </div>
+                </section>
+
+                <section class="inventory-section" id="craft-section" aria-labelledby="craft-title">
+                  <h3 id="craft-title">Crafting</h3>
+                  <div class="craft-workspace">
+                    <div id="craft-grid" class="slot-grid" data-size="2"></div>
+                    <span class="craft-arrow" aria-hidden="true">→</span>
+                    <div class="craft-result">
+                      <button type="button" id="craft-output" class="slot" aria-label="Crafting output" disabled></button>
+                      <span>Output</span>
+                    </div>
+                  </div>
+                  <details id="recipe-guide">
+                    <summary>Recipe guide</summary>
+                    <div id="recipe-list" class="recipe-list"></div>
+                  </details>
+                </section>
+              </div>
             </div>
-            <div id="bag-items"></div>
-            <div id="equip-choices" class="panel-actions" hidden>
-              <button type="button" id="equip-left">Naar linkerhand</button>
-              <button type="button" id="equip-right">Naar rechterhand</button>
-            </div>
-            <div class="equipment">
-              <section aria-label="Handen">
-                <strong>Handen</strong>
-                <button type="button" id="left-hand"></button>
-                <button type="button" id="right-hand"></button>
-              </section>
-              <section aria-label="Pantser">
-                <strong id="armor-total"></strong>
-                <button type="button" id="helmet"></button>
-                <button type="button" id="chestplate"></button>
-                <button type="button" id="boots"></button>
-              </section>
-              <section aria-label="Vonkje">
-                <strong id="pet-recharge"></strong>
-                <button type="button" id="pet-slot"></button>
-              </section>
-            </div>
-            <div id="bag-recipes" class="panel-actions" aria-label="Rugzakrecepten"></div>
-          </section>
-          <section id="house-panel" aria-labelledby="house-title" hidden>
-            <div class="panel-heading">
-              <strong id="house-title"></strong>
-              <button id="close-house-panel" type="button">Sluiten · E / Esc</button>
-            </div>
-            <div id="workbench-recipes" class="panel-actions" aria-label="Werkbankrecepten" hidden></div>
-            <div id="chest-contents" hidden>
-              <p>Uitwisseling per stapel. Klik op een item om het te verplaatsen.</p>
-              <section aria-labelledby="chest-bag-title">
-                <strong id="chest-bag-title"></strong>
-                <div id="chest-bag-items" class="storage-slots"></div>
-              </section>
-              <section aria-labelledby="chest-slots-title">
-                <strong id="chest-slots-title"></strong>
-                <div id="chest-slots" class="storage-slots"></div>
-              </section>
-            </div>
+            <footer class="panel-footer">
+              <button id="drink-potion" type="button">Drink potion</button>
+              <p id="panel-feedback" role="status"></p>
+            </footer>
           </section>
         </aside>
+        <div id="held-stack" aria-hidden="true" hidden></div>
       </div>
+
       <footer class="controls">
-        <div class="build-tools" id="build-selection" role="group" aria-label="Bouwen">
-          <button id="build-fence" type="button" aria-pressed="false">1 · Hek</button>
-          <button id="build-floor" type="button" aria-pressed="false">2 · Vloer</button>
-          <button id="build-torch" type="button" aria-pressed="false">3 · Fakkel</button>
-          <button id="build-place" type="button" disabled>F · Plaatsen</button>
+        <div class="play-hints">
+          <p><kbd>WASD</kbd> Move · <kbd>E</kbd> Interact · <kbd>Space</kbd> Fireball</p>
+          <p id="feedback" role="status"></p>
         </div>
-        <p id="feedback" role="status"></p>
+        <div class="hotbar">
+          <p id="hotbar-name" role="status" hidden></p>
+          <div id="hud-hotbar" class="slot-grid" role="group" aria-label="Hotbar"></div>
+        </div>
         <div class="game-actions">
-          <p><kbd>WASD</kbd> Lopen · <kbd>E</kbd> Interactie · <kbd>Spatie</kbd> Vuurbal</p>
-          <button id="new-game" type="button">Nieuw spel</button>
+          <button id="build-place" type="button" disabled><kbd>F</kbd> Place</button>
+          <button id="new-game" type="button">New game</button>
         </div>
       </footer>
       <p id="status" class="visually-hidden" role="status"></p>
