@@ -4,7 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Vonkje • Dungeon Survival</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles/base.css">
+  <link rel="stylesheet" href="styles/game.css">
+  <link rel="stylesheet" href="styles/inventory.css">
+  <script src="js/world.js" defer></script>
+  <script src="js/render.js" defer></script>
+  <script src="js/inventory.js" defer></script>
+  <script src="js/combat.js" defer></script>
+  <script src="js/save.js" defer></script>
+  <script src="js/input.js" defer></script>
   <script src="main.js" defer></script>
 </head>
 <body>
@@ -21,23 +29,33 @@
         <span id="key">Sleutel ontbreekt</span>
       </div>
       <div class="room">
+        <p id="action"></p>
         <canvas id="dungeon" width="480" height="320" aria-label="Pixelwereld met ridder en babydraak"></canvas>
         <div id="ending" class="ending" hidden><strong id="result"></strong></div>
       </div>
       <div class="activity">
-        <p id="action"></p>
         <p id="feedback" role="status"></p>
       </div>
       <aside class="inventory" aria-label="Inventaris">
-        <strong>Inventaris</strong>
-        <span>Bijl</span>
+        <button id="backpack-toggle" type="button" aria-controls="backpack" aria-expanded="false">Rugzak · B</button>
+        <span class="hand" id="left-hand">Linkerhand leeg</span>
+        <span class="hand" id="right-hand">Rechterhand leeg</span>
         <span id="wood">Hout 0</span>
         <button id="craft-fence" type="button">Maak hek · 4 hout</button>
         <button id="craft-floor" type="button">Maak vloer · 2 hout</button>
         <span id="build-selection">Kies 1 voor hek of 2 voor vloer</span>
+        <section id="backpack" aria-label="Rugzak" hidden>
+          <strong id="bag-capacity"></strong>
+          <div id="bag-items"></div>
+          <div id="weapon-controls" hidden>
+            <button type="button" id="equip-left">Naar linkerhand</button>
+            <button type="button" id="equip-right">Naar rechterhand</button>
+            <button type="button" id="unequip">Terug in rugzak</button>
+          </div>
+        </section>
       </aside>
       <div class="controls">
-        <p><kbd>WASD</kbd> of <kbd>↑ ← ↓ →</kbd> om te lopen · <kbd>Spatie</kbd> om te schieten</p>
+        <p><kbd>WASD</kbd> of <kbd>↑ ← ↓ →</kbd> om te lopen · <kbd>Spatie</kbd> voor vuurbal · <kbd>J</kbd> / <kbd>K</kbd> voor linkse / rechtse slag</p>
         <button id="respawn" type="button" hidden>Terug naar huis</button>
         <button id="new-game" type="button">Nieuw spel</button>
       </div>

@@ -1,0 +1,42 @@
+.game {
+  background: #221e26;
+  border: 1px solid #64504c;
+  padding: 12px;
+  box-shadow: 0 16px 48px #100c13aa;
+}
+.hud, .controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.hud { padding: 0 4px 10px; }
+#room-number { font-weight: bold; }
+#hearts { color: #ff8187; font-size: 1.35rem; }
+#key, #fireball-status { color: #ffd18a; }
+.controls { padding-top: 12px; }
+.controls p { margin: 0; }
+.room { position: relative; }
+canvas { display: block; width: 100%; image-rendering: pixelated; }
+.ending {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  background: #15141bd9;
+  text-align: center;
+  font: bold clamp(1.3rem, 5vw, 2.6rem) Georgia, serif;
+}
+.activity {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  padding: 10px 4px;
+}
+.activity { min-height: 42px; }
+.activity p { margin: 0; }
+#action { color: #f4e6ca; }
+#feedback { color: #ffd18a; }

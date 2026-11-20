@@ -1,0 +1,7 @@
+.inventory { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.inventory {
+  background: #19171e;
+  padding: 10px;
+}
+.inventory button { font-size: 0.85rem; padding: 4px 8px; }
+#build-selection { flex-basis: 100%; color: #c9b8aa; }
