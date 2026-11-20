@@ -173,15 +173,16 @@ function loadProgress() {
     loadBuildings(saved, loaded);
     loaded.repaired = saved.repaired === true;
     loaded.dungeonCompleted = saved.dungeonCompleted === true;
+    if (!(saved.version >= SAVE_VERSION)) storeProgress(loaded);
   } catch {
     // Local storage may be blocked when opening index.html directly.
   }
   return loaded;
 }
 
-function storeProgress() {
+function storeProgress(state = progress) {
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify({ version: SAVE_VERSION, ...progress }));
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ version: SAVE_VERSION, ...state }));
   } catch {
     // The game can continue with progress held in memory.
   }

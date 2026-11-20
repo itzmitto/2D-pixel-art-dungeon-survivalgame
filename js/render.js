@@ -150,12 +150,12 @@ const SPRITES = {
   ],
 };
 
-function rect(color, x, y, width, height) {
-  ctx.fillStyle = color;
-  ctx.fillRect(x, y, width, height);
+function rect(color, x, y, width, height, context = ctx) {
+  context.fillStyle = color;
+  context.fillRect(x, y, width, height);
 }
 
-function sprite(name, x, y, facing = 1, flash = false) {
+function sprite(name, x, y, facing = 1, flash = false, context = ctx) {
   const pixels = SPRITES[name];
   // De nieuwe acteurs gebruiken één Canvas-pixel per rastercel; de oude sprites gebruiken twee.
   const scale = name.startsWith("knight") || name.startsWith("dragon") ? 1 : 2;
@@ -166,7 +166,7 @@ function sprite(name, x, y, facing = 1, flash = false) {
     [...row].forEach((pixel, i) => {
       if (pixel !== ".") {
         const column = facing > 0 ? i : row.length - 1 - i;
-        rect(flash && pixel !== "x" ? "#fff2b7" : PALETTE[pixel], left + column * scale, top + j * scale, scale, scale);
+        rect(flash && pixel !== "x" ? "#fff2b7" : PALETTE[pixel], left + column * scale, top + j * scale, scale, scale, context);
       }
     });
   });
@@ -410,33 +410,59 @@ function drawHarvestEffects() {
   }
 }
 
-function drawArmor(x, y, row, column) {
+function drawArmor(x, y, row, column, context = ctx) {
   const { helmet, chestplate, boots } = progress.armor;
   x = Math.round(x);
   y = Math.round(y);
-  const walking = player.walking && !inventoryOpen() && phase === "playing";
+  const walking = context === ctx && player.walking && !inventoryOpen() && phase === "playing";
   const bob = [2, 3, 5].includes(column) ? 1 : 0;
   if (chestplate) {
     const offset = [0, -3, 3, 0][row];
     if (row === 3) {
       // Het rugzakprofiel blijft zichtbaar tussen de koperen schouderplaten.
-      rect("#ba683f", x - 8, y - 3 + bob, 3, 5);
-      rect("#ba683f", x + 5, y - 3 + bob, 3, 5);
+      rect("#ba683f", x - 8, y - 3 + bob, 3, 5, context);
+      rect("#ba683f", x + 5, y - 3 + bob, 3, 5, context);
     } else {
-      rect("#743e37", x - 6 + offset, y - 4 + bob, 12, 7);
-      rect("#bf744a", x - 5 + offset, y - 4 + bob, 10, 5);
-      rect("#efaa65", x - 4 + offset, y - 3 + bob, 8, 2);
-      rect("#975039", x - 3 + offset, y + 1 + bob, 6, 1);
+      rect("#743e37", x - 6 + offset, y - 4 + bob, 12, 7, context);
+      rect("#bf744a", x - 5 + offset, y - 4 + bob, 10, 5, context);
+      rect("#efaa65", x - 4 + offset, y - 3 + bob, 8, 2, context);
+      rect("#975039", x - 3 + offset, y + 1 + bob, 6, 1, context);
     }
   }
   if (helmet) {
-    rect("#8e4938", x - 6, y - 13 + bob, 12, 3);
-    rect("#db9357", x - 5, y - 14 + bob, 10, 3);
-    rect("#f3c182", x - 4, y - 14 + bob, 6, 1);
+    rect("#8e4938", x - 6, y - 13 + bob, 12, 3, context);
+    rect("#db9357", x - 5, y - 14 + bob, 10, 3, context);
+    rect("#f3c182", x - 4, y - 14 + bob, 6, 1, context);
   }
   if (boots && !walking) {
-    rect("#bf744a", x - 5, y + 5, 3, 2);
-    rect("#bf744a", x + 2, y + 5, 3, 2);
+    rect("#bf744a", x - 5, y + 5, 3, 2, context);
+    rect("#bf744a", x + 2, y + 5, 3, 2, context);
+  }
+}
+
+const knightPreview = document.querySelector("#knight-preview");
+const previewContext = knightPreview.getContext("2d");
+let lastPreviewEquipment, lastPreviewImage;
+
+function drawKnightPreview() {
+  if (!inventoryOpen() || !previewContext) return;
+  const signature = [...Object.values(progress.armor), ...Object.values(progress.hands)].join("|");
+  if (signature === lastPreviewEquipment && PNG_SPRITES.knight.image === lastPreviewImage) return;
+  lastPreviewEquipment = signature;
+  lastPreviewImage = PNG_SPRITES.knight.image;
+  previewContext.clearRect(0, 0, knightPreview.width, knightPreview.height);
+  if (!drawPng("knight", 20, 21, 0, 0, 1, 28, 28, previewContext)) {
+    sprite("knight", 20, 25, 1, false, previewContext);
+  }
+  drawArmor(20, 25, 0, 0, previewContext);
+  for (const [hand, x, facing] of [["left", 8, -1], ["right", 32, 1]]) {
+    const weapon = WEAPONS[progress.hands[hand]];
+    if (!weapon) continue;
+    previewContext.save();
+    previewContext.translate(x, 26);
+    previewContext.scale(0.5, 0.5);
+    sprite(weapon.sprite, 0, 0, facing, false, previewContext);
+    previewContext.restore();
   }
 }
 
@@ -482,7 +508,7 @@ function drawOverworld() {
     drawCave(cave.x - 16, cave.y - 16);
     for (const { x, y } of builtTorches) drawBuiltTorch(x, y);
   }
-  if (outside && buildItem) {
+  if (outside && !inventoryOpen() && selectedBuildItem()) {
     const site = buildSite();
     const x = site.x * TILE;
     const y = site.y * TILE;
@@ -493,6 +519,7 @@ function drawOverworld() {
 }
 
 function draw(time) {
+  drawKnightPreview();
   if (exit) drawRoom(time);
   else drawOverworld();
   if (key && !hasKey) sprite("key", key.x, key.y + Math.round(Math.sin(time * 5) * 2));
