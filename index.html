@@ -11,21 +11,35 @@
   <main>
     <header>
       <h1>Vonkje</h1>
-      <p>Vind de sleutel en ontsnap met je babydraak.</p>
+      <p>Verzamel hout, bouw bij je huis en trek met Vonkje de dungeon in.</p>
     </header>
-    <section class="game" aria-label="Dungeon">
+    <section class="game" aria-label="Vonkje speelveld">
       <div class="hud">
-        <span id="room-number">Kamer 1 van 2</span>
+        <span id="room-number">Bos</span>
         <span id="hearts" role="img" aria-label="3 van 3 hartjes">♥ ♥ ♥</span>
+        <span id="fireball-status">Vuurbal klaar</span>
         <span id="key">Sleutel ontbreekt</span>
       </div>
       <div class="room">
-        <canvas id="dungeon" width="480" height="320" aria-label="Dungeon met ridder, babydraak, slimes, voorwerpen en uitgang"></canvas>
+        <canvas id="dungeon" width="480" height="320" aria-label="Pixelwereld met ridder en babydraak"></canvas>
         <div id="ending" class="ending" hidden><strong id="result"></strong></div>
       </div>
+      <div class="activity">
+        <p id="action"></p>
+        <p id="feedback" role="status"></p>
+      </div>
+      <aside class="inventory" aria-label="Inventaris">
+        <strong>Inventaris</strong>
+        <span>Bijl</span>
+        <span id="wood">Hout 0</span>
+        <button id="craft-fence" type="button">Maak hek · 4 hout</button>
+        <button id="craft-floor" type="button">Maak vloer · 2 hout</button>
+        <span id="build-selection">Kies 1 voor hek of 2 voor vloer</span>
+      </aside>
       <div class="controls">
-        <p><kbd>WASD</kbd> of <kbd>↑ ← ↓ →</kbd> om te lopen</p>
-        <button id="restart" type="button">Opnieuw spelen</button>
+        <p><kbd>WASD</kbd> of <kbd>↑ ← ↓ →</kbd> om te lopen · <kbd>Spatie</kbd> om te schieten</p>
+        <button id="respawn" type="button" hidden>Terug naar huis</button>
+        <button id="new-game" type="button">Nieuw spel</button>
       </div>
     </section>
     <p id="status" class="visually-hidden" role="status"></p>

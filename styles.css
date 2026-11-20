@@ -38,7 +38,7 @@ p { margin: 10px 0 0; color: #c9b8aa; }
 .hud { padding: 0 4px 10px; }
 #room-number { font-weight: bold; }
 #hearts { color: #ff8187; font-size: 1.35rem; }
-#key { color: #ffd18a; }
+#key, #fireball-status { color: #ffd18a; }
 .controls { padding-top: 12px; }
 .controls p { margin: 0; }
 kbd { color: #f4e6ca; }
@@ -72,3 +72,22 @@ canvas { display: block; width: 100%; image-rendering: pixelated; }
   overflow: hidden;
   clip-path: inset(50%);
 }
+
+.activity, .inventory {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  padding: 10px 4px;
+}
+.activity { min-height: 42px; }
+.activity p { margin: 0; }
+#action { color: #f4e6ca; }
+#feedback { color: #ffd18a; }
+.inventory {
+  background: #19171e;
+  padding: 10px;
+}
+.inventory button { font-size: 0.85rem; padding: 4px 8px; }
+button:disabled { opacity: 0.55; cursor: default; }
+#build-selection { flex-basis: 100%; color: #c9b8aa; }
