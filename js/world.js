@@ -35,16 +35,16 @@ const FOREST = [
   "#.HHHH....==R.#",
   "#.HHUH..===...#",
   "#...P====.....#",
-  "#..Y.Y..Y.Y...#",
-  "#.Y...Y.......#",
-  "#...Y....Y.Y..#",
+  "#..Y.Y..Y.Y.MN#",
+  "#.Y...Y...N..N#",
+  "#...Y....YMYN.#",
   "###############",
 ];
 const HOUSE = [
   "###############",
   "###############",
   "##...........##",
-  "##.....B.....##",
+  "##..W..B..O..##",
   "##...........##",
   "##...........##",
   "##...........##",
@@ -69,6 +69,30 @@ const FOLLOW_DISTANCE = 23;
 let area, room, key, exit, potion;
 let player, dragon, slimes, trail, elapsed, hasKey, protection, phase;
 let groundLoot = [];
+let harvestEffects = [];
+const RESOURCES = {
+  Y: { action: "chop", tool: "axe", state: "trees", hits: 3, item: "wood", count: 3 },
+  M: { action: "mine", tool: "pickaxe", state: "mines", hits: 2, item: "stone", count: 3 },
+  N: { action: "mine", tool: "pickaxe", state: "mines", hits: 3, item: "copper", count: 3 },
+};
+
+function resourceDrop(resource, x, y) {
+  return {
+    id: "resource:" + tileId(x, y),
+    item: resource.item, count: resource.count, ...centerOf({ x, y }),
+  };
+}
+
+function forestLoot() {
+  const drops = [...FOREST_LOOT];
+  FOREST.forEach((row, y) => {
+    [...row].forEach((tile, x) => {
+      const resource = RESOURCES[tile];
+      if (resource && exhausted(resource, x, y)) drops.push(resourceDrop(resource, x, y));
+    });
+  });
+  return drops.filter(drop => !progress.collected[drop.id]);
+}
 const FOREST_LOOT = [
   { id: "trail-wood", item: "wood", count: 2, ...centerOf({ x: 6, y: 5 }) },
   { id: "trail-potion", item: "potion", count: 1, ...centerOf({ x: 9, y: 4 }) },
@@ -77,11 +101,12 @@ const FOREST_LOOT = [
 function enterArea(nextArea, health, arrival = "P") {
   area = nextArea;
   room = AREAS[area];
-  groundLoot = area === "forest" ? FOREST_LOOT.filter(drop => !progress.collected[drop.id]) : [];
+  groundLoot = area === "forest" ? forestLoot() : [];
+  harvestEffects = [];
   swing = undefined;
   const [spawn] = markers(arrival);
   facingTile = { x: 0, y: 1 };
-  player = { ...spawn, radius: 8, facing: 1, hearts: health };
+  player = { ...spawn, radius: 8, facing: 1, hearts: health, walkTime: 0 };
   dragon = { x: spawn.x - FOLLOW_DISTANCE, y: spawn.y, facing: 1 };
   if (blocked(dragon.x, dragon.y, 8, false)) dragon.x = spawn.x + FOLLOW_DISTANCE;
   slimes = markers("S").map(position => ({
@@ -93,7 +118,6 @@ function enterArea(nextArea, health, arrival = "P") {
   [exit] = markers("E");
   trail = [{ ...dragon, time: 0 }, { ...spawn, time: 0 }];
   elapsed = 0;
-  axeTime = 0;
   hasKey = false;
   updateHud();
 }
@@ -109,9 +133,10 @@ function blocked(x, y, radius, doorOpen) {
       const column = Math.floor(edgeX / TILE);
       const row = Math.floor(edgeY / TILE);
       const tile = room[row]?.[column];
-      if (area === "forest" && ((tile === "Y" && !treeCut(column, row)) ||
+      const resource = area === "forest" && RESOURCES[tile];
+      if (area === "forest" && ((resource && !exhausted(resource, column, row)) ||
           progress.buildings[tileId(column, row)] === "fence")) return true;
-      if (!tile || "#TCHUGBQ".includes(tile) || (tile === "E" && !doorOpen)) return true;
+      if (!tile || "#TCHUGBQWO".includes(tile) || (tile === "E" && !doorOpen)) return true;
     }
   }
   return false;
@@ -126,8 +151,29 @@ function tileId(x, y) {
   return x + "," + y;
 }
 
-function treeCut(x, y) {
-  return progress.trees[tileId(x, y)] === 3;
+function exhausted(resource, x, y) {
+  return progress[resource.state][tileId(x, y)] === resource.hits;
+}
+
+function harvest(x, y) {
+  const resource = RESOURCES[room[y][x]];
+  const id = tileId(x, y);
+  const counts = progress[resource.state];
+  counts[id] = (counts[id] || 0) + 1;
+  const center = centerOf({ x, y });
+  harvestEffects.push({ ...center, tool: resource.tool, started: elapsed });
+  const remaining = resource.hits - counts[id];
+  if (remaining === 0) {
+    groundLoot.push(resourceDrop(resource, x, y));
+    showFeedback(ITEMS[resource.item].label + " gevallen · pak op met E.");
+  } else {
+    showFeedback(remaining === 1 ? "1 slag over" : remaining + " slagen over");
+  }
+  storeProgress();
+}
+
+function updateHarvestEffects() {
+  harvestEffects = harvestEffects.filter(effect => elapsed - effect.started < 0.32);
 }
 
 function targetTile() {
@@ -171,7 +217,7 @@ function nearby(symbol) {
 }
 
 function getAction() {
-  if (phase !== "playing" || !backpack.hidden) return "";
+  if (phase !== "playing" || inventoryOpen()) return "";
   if (nearbyLoot()) return "pickup";
   if (area === "forest") {
     if (nearby("G")) return "dungeon";
@@ -180,40 +226,34 @@ function getAction() {
       return itemCount("wood") >= 6 ? "repair" : "inspect";
     }
     const { x, y } = targetTile();
-    if (room[y]?.[x] === "Y" && !treeCut(x, y) &&
-        distance(player, centerOf({ x, y })) < 42 && itemCount("axe")) return "chop";
+    const resource = RESOURCES[room[y]?.[x]];
+    if (resource && !exhausted(resource, x, y) && distance(player, centerOf({ x, y })) < 42 &&
+        (itemCount(resource.tool) || Object.values(progress.hands).includes(resource.tool))) {
+      return resource.action;
+    }
   }
   if (area === "house") {
     if (nearby("U")) return "leave";
+    if (nearby("W")) return "workbench";
+    if (nearby("O")) return "chest";
     if (nearby("B") && player.hearts < 3) return "rest";
   }
   return "";
 }
 
 function interact() {
-  switch (getAction()) {
+  const action = getAction();
+  switch (action) {
     case "pickup":
       pickUp(nearbyLoot());
       break;
     case "dungeon":
       enterArea("dungeon1", player.hearts);
       break;
-    case "chop": {
+    case "chop":
+    case "mine": {
       const { x, y } = targetTile();
-      const id = tileId(x, y);
-      const hits = (progress.trees[id] || 0) + 1;
-      if (hits === 3 && !addItem("wood", 3)) {
-        showFeedback("Rugzak vol · maak ruimte voor hout.");
-        return;
-      }
-      progress.trees[id] = hits;
-      axeTime = 0.2;
-
-      const remaining = 3 - hits;
-      if (remaining === 0) showFeedback("Boom geveld · 0 slagen over · +3 hout");
-      else showFeedback(remaining === 1 ? "1 slag over" : "2 slagen over");
-      storeProgress();
-      updateInventory();
+      harvest(x, y);
       break;
     }
     case "inspect":
@@ -231,6 +271,10 @@ function interact() {
       break;
     case "leave":
       enterArea("forest", player.hearts);
+      break;
+    case "workbench":
+    case "chest":
+      openHousePanel(action);
       break;
     case "rest":
       player.hearts = 3;
@@ -260,10 +304,11 @@ function pickUp(drop) {
 function updateAction() {
   const action = getAction();
   const hint = {
-    pickup: "E — Pak op", dungeon: "E — Ga de grot in", chop: "E — Hak boom",
+    pickup: "E — Pak op", dungeon: "E — Ga de grot in", chop: "E — Hak boom", mine: "E — Delf erts of steen",
     inspect: "E — Bekijk kapotte deur", repair: "E — Repareer de deur (6 hout)",
     enter: "E — Ga naar binnen",
     leave: "E — Ga naar buiten", rest: "E — Rust uit",
+    workbench: "E — Open werkbank", chest: "E — Open opbergkist",
   }[action];
   const text = hint || "";
   if (actionLabel.textContent !== text) actionLabel.textContent = text;
@@ -321,7 +366,7 @@ function updateDungeon() {
 
   if (potion && player.hearts < 3 && distance(player, potion) < 16) {
     potion = undefined;
-    player.hearts++;
+    player.hearts = Math.min(3, player.hearts + 1);
     updateHud();
     status.textContent = "Potion gebruikt. " + player.hearts + " van 3 hartjes.";
   }

@@ -5,7 +5,8 @@ const SAVE_KEY = "vonkje-survival-v1";
 function newProgress() {
   return {
     bag: { sword: 1, axe: 1 }, hands: { left: null, right: null },
-    trees: {}, buildings: {}, collected: {}, repaired: false, dungeonCompleted: false,
+    armor: { helmet: null, chestplate: null, boots: null }, pet: { pet: null },
+    chest: {}, trees: {}, mines: {}, buildings: {}, collected: {}, repaired: false, dungeonCompleted: false,
   };
 }
 
@@ -17,14 +18,22 @@ function loadBuildings(saved, loaded) {
     [...row].forEach((tile, x) => {
       const id = tileId(x, y);
       const building = saved.buildings?.[id];
-      if (building === "fence" || building === "floor") {
+      if (building === "fence" || building === "floor" || building === "torch") {
         if (tile === ".") loaded.buildings[id] = building;
         else displaced.push({ x, y, building });
       } else if (tile === ".") {
         empty.push({ x, y, id });
       }
-      const hits = saved.trees?.[id];
-      if (tile === "Y" && Number.isInteger(hits) && hits > 0 && hits <= 3) loaded.trees[id] = hits;
+      const resource = RESOURCES[tile];
+      if (!resource) return;
+      const hits = saved[resource.state]?.[id];
+      if (Number.isInteger(hits) && hits > 0 && hits <= resource.hits) {
+        loaded[resource.state][id] = hits;
+        // Oude saves gaven hout bij de laatste slag direct aan de speler.
+        if (hits === resource.hits && (!(saved.version >= 4) || saved.collected?.["resource:" + id] === true)) {
+          loaded.collected["resource:" + id] = true;
+        }
+      }
     });
   });
   for (const { x, y, building } of displaced) {
@@ -43,18 +52,24 @@ function loadProgress() {
     if (!saved) return loaded;
 
     // De vorige versie bewaarde hout en bouwitems buiten de rugzak.
-    const bag = saved.version === 2 ? saved.bag : {
+    const bag = saved.version >= 2 ? saved.bag : {
       wood: saved.wood, fence: saved.items?.fence, floor: saved.items?.floor,
     };
-    for (const [item, definition] of Object.entries(ITEMS)) {
+    if (saved.version >= 3) loaded.bag = {};
+    for (const item of Object.keys(ITEMS)) {
+      const stored = saved.version >= 3 ? saved.chest?.[item] : undefined;
+      if (Number.isSafeInteger(stored) && stored > 0) loaded.chest[item] = stored;
       const count = bag?.[item];
-      if (Number.isSafeInteger(count) && count > 0) loaded.bag[item] = definition.weapon ? 1 : count;
+      if (Number.isSafeInteger(count) && count > 0) loaded.bag[item] = count;
     }
-    for (const hand of ["left", "right"]) {
-      const item = saved.hands?.[hand];
-      if (ITEMS[item]?.weapon && loaded.bag[item] && !Object.values(loaded.hands).includes(item)) {
-        loaded.hands[hand] = item;
+    for (const [slot, { group }] of Object.entries(EQUIPMENT_SLOTS)) {
+      const item = saved[group]?.[slot];
+      if (!ITEMS[item] || (group === "hands" ? !ITEMS[item].weapon : ITEMS[item].slot !== slot)) continue;
+      if (!(saved.version >= 4)) {
+        if (group !== "hands" || !loaded.bag[item] || Object.values(loaded.hands).includes(item)) continue;
+        changeItem(item, -1, loaded.bag);
       }
+      loaded[group][slot] = item;
     }
     for (const drop of FOREST_LOOT) {
       if (saved.collected?.[drop.id] === true) loaded.collected[drop.id] = true;
@@ -70,7 +85,7 @@ function loadProgress() {
 
 function storeProgress() {
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify({ version: 2, ...progress }));
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ version: 4, ...progress }));
   } catch {
     // Doorspelen blijft mogelijk met voortgang in het geheugen.
   }

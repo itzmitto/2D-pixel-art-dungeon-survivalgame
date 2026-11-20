@@ -5,21 +5,29 @@ const movementKeys = ["w", "a", "s", "d", "arrowup", "arrowleft", "arrowdown", "
 window.addEventListener("keydown", (event) => {
   if (event.ctrlKey || event.metaKey || event.altKey) return;
   const key = event.key.toLowerCase();
-  if (key === "b" || (key === "escape" && !backpack.hidden)) {
+  if (key === "tab") {
+    if (phase !== "playing" && !inventoryOpen()) return;
     event.preventDefault();
-    if (!event.repeat) {
-      toggleBackpack(key === "escape" ? false : backpack.hidden);
-      if (backpack.hidden) backpackToggle.focus();
-    }
+    if (!event.repeat) navigateInventory(event.shiftKey);
     return;
   }
-  if (!backpack.hidden) return;
+  if (!housePanel.hidden && ["e", "escape", "b"].includes(key)) {
+    event.preventDefault();
+    if (!event.repeat) closeHousePanel();
+    return;
+  }
+  if (key === "b" || (key === "escape" && !backpack.hidden)) {
+    event.preventDefault();
+    if (!event.repeat) toggleBackpack(key !== "escape" && backpack.hidden);
+    return;
+  }
+  if (inventoryOpen()) return;
   if (event.key === " " && phase === "playing") {
     event.preventDefault();
     if (!event.repeat) shootFireball();
     return;
   }
-  if (phase === "playing" && ["e", "f", "1", "2", "escape", "j", "k"].includes(key)) {
+  if (phase === "playing" && ["e", "f", "1", "2", "3", "escape", "j", "k"].includes(key)) {
     event.preventDefault();
     if (event.repeat) return;
     if (key === "e") interact();
@@ -28,6 +36,7 @@ window.addEventListener("keydown", (event) => {
       if (key === "f") build();
       if (key === "1") buildItem = "fence";
       if (key === "2") buildItem = "floor";
+      if (key === "3") buildItem = "torch";
       if (key === "escape") buildItem = undefined;
       updateInventory();
     }
@@ -39,6 +48,23 @@ window.addEventListener("keydown", (event) => {
 });
 window.addEventListener("keyup", (event) => pressed.delete(event.key.toLowerCase()));
 window.addEventListener("blur", () => pressed.clear());
+function navigateInventory(reverse) {
+  if (!inventoryOpen()) {
+    toggleBackpack(true);
+    return;
+  }
+  const panel = backpack.hidden ? housePanel : backpack;
+  const buttons = [...panel.querySelectorAll("button:enabled")].filter(button => !button.closest("[hidden]"));
+  const current = buttons.indexOf(document.activeElement);
+  const next = current === -1 && reverse ? buttons.length - 1 : current + (reverse ? -1 : 1);
+  if (next < 0 || next >= buttons.length) {
+    if (panel === backpack) toggleBackpack(false);
+    else buttons[reverse ? buttons.length - 1 : 0]?.focus();
+    return;
+  }
+  buttons[next].focus();
+}
+
 function bindInput() {
   respawnButton.addEventListener("click", reset);
   document.querySelector("#new-game").addEventListener("click", () => {

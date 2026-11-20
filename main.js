@@ -13,7 +13,7 @@ const actionLabel = document.querySelector("#action");
 const feedback = document.querySelector("#feedback");
 const status = document.querySelector("#status");
 
-let buildItem, facingTile, feedbackTime, axeTime;
+let buildItem, facingTile, feedbackTime;
 let progress;
 
 function reset() {
@@ -31,12 +31,19 @@ function reset() {
   pressed.clear();
   status.textContent = "";
   enterArea("forest", 3);
-  toggleBackpack(false);
+  closeHousePanel();
+  toggleBackpack(false, false);
 }
 
 function updateHud() {
-  hearts.textContent = Array.from({ length: 3 }, (_, i) => i < player.hearts ? "♥" : "♡").join(" ");
-  hearts.setAttribute("aria-label", player.hearts + " van 3 hartjes");
+  hearts.replaceChildren(...Array.from({ length: 3 }, (_, i) => {
+    const heart = document.createElement("span");
+    const fill = Math.max(0, Math.min(1, player.hearts - i));
+    heart.textContent = fill === 0 ? "♡" : "♥";
+    heart.style.setProperty("--heart-fill", fill * 100 + "%");
+    return heart;
+  }));
+  hearts.setAttribute("aria-label", formatNumber(player.hearts) + " van 3 hartjes");
   roomNumber.textContent = {
     forest: "Bos", house: "Huis", dungeon1: "Kamer 1 van 2", dungeon2: "Kamer 2 van 2",
   }[area];
@@ -78,14 +85,10 @@ function update(dt) {
   move(player, dx * step, dy * step, !key || hasKey);
   const traveled = Math.hypot(player.x - x, player.y - y);
   player.walking = traveled > 0;
+  player.walkTime = player.walking ? player.walkTime + dt : 0;
   if (traveled > 0) aim = { x: (player.x - x) / traveled, y: (player.y - y) / traveled };
   followDragon(dt);
-  axeTime = Math.max(0, axeTime - dt);
-  if (feedbackTime > 0) {
-    feedbackTime -= dt;
-    if (feedbackTime <= 0) feedback.textContent = "";
-  }
-
+  updateHarvestEffects();
   if (!updateDungeon()) updateSlimes(dt);
 }
 
@@ -98,7 +101,11 @@ let previousTime;
 function frame(now) {
   const dt = Math.min(0.033, (now - (previousTime ?? now)) / 1000);
   previousTime = now;
-  if (phase === "playing" && backpack.hidden) update(dt);
+  if (feedbackTime > 0) {
+    feedbackTime -= dt;
+    if (feedbackTime <= 0) feedback.textContent = "";
+  }
+  if (phase === "playing" && !inventoryOpen()) update(dt);
   updateAction();
   draw(now / 1000);
   requestAnimationFrame(frame);

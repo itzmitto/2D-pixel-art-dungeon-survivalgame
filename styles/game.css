@@ -54,3 +54,10 @@ canvas { display: block; width: 100%; image-rendering: pixelated; }
   white-space: nowrap;
   pointer-events: none;
 }
+#hearts span { margin-right: 4px; }
+#hearts span:last-child { margin-right: 0; }
+#hearts span {
+  background: linear-gradient(90deg, #ff8187 var(--heart-fill), #9d7e83 var(--heart-fill));
+  background-clip: text;
+  color: transparent;
+}

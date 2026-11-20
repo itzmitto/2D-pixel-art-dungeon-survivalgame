@@ -346,7 +346,36 @@ function drawCave(x, y) {
   }
 }
 
+function drawFurniture(name, x, y) {
+  if (drawPng(name, x + 16, y + 16)) return;
+  if (name === "chest") {
+    rect("#251d28", x + 3, y + 8, 26, 18);
+    rect("#ac6f43", x + 5, y + 9, 22, 8);
+    rect("#694035", x + 5, y + 18, 22, 6);
+    rect("#f6bc65", x + 14, y + 16, 4, 5);
+  } else {
+    rect("#59352e", x + 5, y + 12, 5, 16);
+    rect("#59352e", x + 22, y + 12, 5, 16);
+    rect("#ac6f43", x + 2, y + 7, 28, 9);
+    rect("#e5b376", x + 3, y + 8, 26, 2);
+    rect("#819cb0", x + 17, y + 8, 7, 4);
+  }
+}
+
+function drawBuiltTorch(x, y) {
+  const flameY = y - 6;
+  const glow = ctx.createRadialGradient(x, flameY, 1, x, flameY, 24);
+  glow.addColorStop(0, "#ffc07a77");
+  glow.addColorStop(1, "#ff933600");
+  rect(glow, x - 24, flameY - 24, 48, 48);
+  if (drawPng("torch", x, y)) return;
+  rect("#ac6f43", x - 2, y, 4, 11);
+  rect("#e3734d", x - 4, y - 6, 8, 8);
+  rect("#ffd386", x - 2, y - 8, 4, 7);
+}
+
 function drawOverworld() {
+  const builtTorches = [];
   const outside = area === "forest";
   room.forEach((row, j) => {
     [...row].forEach((tile, i) => {
@@ -364,10 +393,13 @@ function drawOverworld() {
         const building = progress.buildings[tileId(i, j)];
         if (building === "floor") drawPlanks(x, y, variant);
         if (building === "fence") sprite(building, x + 16, y + 19);
+        if (building === "torch") builtTorches.push({ x: x + 16, y: y + 16 });
       } else {
         rect(tile === "#" ? "#3c292b" : "#805536", x, y, TILE, TILE);
         if (tile !== "#") drawPlanks(x, y, variant);
         if (tile === "U") drawHouseDoor(x, y, true);
+        if (tile === "W") drawFurniture("workbench", x, y);
+        if (tile === "O") drawFurniture("chest", x, y);
         if (tile === "B") {
           rect("#59352e", x + 5, y + 1, 22, 30);
           rect("#e5cfaa", x + 8, y + 4, 16, 7);
@@ -381,6 +413,7 @@ function drawOverworld() {
     drawCabin();
     const [cave] = markers("G");
     drawCave(cave.x - 16, cave.y - 16);
+    for (const { x, y } of builtTorches) drawBuiltTorch(x, y);
   }
   if (outside && buildItem) {
     const site = buildSite();
@@ -400,20 +433,24 @@ function draw(time) {
   for (const drop of groundLoot) {
     sprite(drop.item, drop.x, drop.y + Math.round(Math.sin(time * 4) * 2));
   }
-  const step = Math.floor(elapsed * 11) % 4;
-  const knightFrame = player.walking && backpack.hidden
-    ? ["knight", "knightStepA", "knight", "knightStepB"][step] : "knight";
-  const dragonFrame = Math.floor(time * 3) % 3 === 1 ? "dragonFlap" : "dragon";
-  const actors = [
-    { ...player, name: knightFrame },
-    { ...dragon, name: dragonFrame },
-    ...slimes,
-  ];
-  actors.sort((a, b) => a.y - b.y);
+  const actors = [player, dragon, ...slimes].sort((a, b) => a.y - b.y);
   for (const actor of actors) {
     rect("#1d1926aa", Math.round(actor.x - 9), Math.round(actor.y + 4), 18, 4);
-    if (actor.name === knightFrame && protection > 0 && Math.floor(time * 18) % 2) continue;
-    sprite(actor.name, actor.x, actor.y, actor.facing, actor.flash > 0);
+    if (actor === player) {
+      if (protection > 0 && Math.floor(time * 18) % 2) continue;
+      const { row, column } = knightFrame();
+      if (!drawPng("knight", actor.x, actor.y - 4, column, row, 1, 28, 28)) {
+        const fallback = ["knight", "knightStepA", "knightStepA", "knight", "knightStepB", "knightStepB"];
+        sprite(fallback[column % fallback.length], actor.x, actor.y, actor.facing);
+      }
+    } else if (actor === dragon) {
+      const column = dragonFrame(time);
+      if (!drawPng("dragon", actor.x, actor.y - 2, column, 0, actor.facing, 25, 20)) {
+        sprite(column === 1 ? "dragonFlap" : "dragon", actor.x, actor.y, actor.facing);
+      }
+    } else {
+      sprite(actor.name, actor.x, actor.y, actor.facing, actor.flash > 0);
+    }
   }
   if (swing) drawSwing();
   if (axeTime > 0) sprite("axe", player.x + facingTile.x * 10 + 6, player.y + facingTile.y * 10);

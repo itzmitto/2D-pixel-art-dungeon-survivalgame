@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="styles/game.css">
   <link rel="stylesheet" href="styles/inventory.css">
   <script src="js/world.js" defer></script>
+  <script src="js/sprites.js" defer></script>
   <script src="js/render.js" defer></script>
   <script src="js/inventory.js" defer></script>
   <script src="js/combat.js" defer></script>
@@ -37,20 +38,54 @@
         <p id="feedback" role="status"></p>
       </div>
       <aside class="inventory" aria-label="Inventaris">
-        <button id="backpack-toggle" type="button" aria-controls="backpack" aria-expanded="false">Rugzak · B</button>
-        <span class="hand" id="left-hand">Linkerhand leeg</span>
-        <span class="hand" id="right-hand">Rechterhand leeg</span>
+        <button id="backpack-toggle" type="button" aria-controls="backpack" aria-expanded="false">Inventaris · Tab / B</button>
         <span id="wood">Hout 0</span>
-        <button id="craft-fence" type="button">Maak hek · 4 hout</button>
-        <button id="craft-floor" type="button">Maak vloer · 2 hout</button>
-        <span id="build-selection">Kies 1 voor hek of 2 voor vloer</span>
+        <span id="build-selection">Kies 1 voor hek, 2 voor vloer of 3 voor fakkel</span>
         <section id="backpack" aria-label="Rugzak" hidden>
-          <strong id="bag-capacity"></strong>
+          <div class="panel-heading">
+            <strong id="bag-capacity"></strong>
+            <button id="close-backpack" type="button">Sluiten · Esc</button>
+          </div>
           <div id="bag-items"></div>
-          <div id="weapon-controls" hidden>
+          <div id="equip-choices" class="panel-actions" hidden>
             <button type="button" id="equip-left">Naar linkerhand</button>
             <button type="button" id="equip-right">Naar rechterhand</button>
-            <button type="button" id="unequip">Terug in rugzak</button>
+          </div>
+          <div class="equipment">
+            <section aria-label="Handen">
+              <strong>Handen</strong>
+              <button type="button" id="left-hand"></button>
+              <button type="button" id="right-hand"></button>
+            </section>
+            <section aria-label="Pantser">
+              <strong id="armor-total"></strong>
+              <button type="button" id="helmet"></button>
+              <button type="button" id="chestplate"></button>
+              <button type="button" id="boots"></button>
+            </section>
+            <section aria-label="Vonkje">
+              <strong id="pet-recharge"></strong>
+              <button type="button" id="pet-slot"></button>
+            </section>
+          </div>
+          <div id="bag-recipes" class="panel-actions" aria-label="Rugzakrecepten"></div>
+        </section>
+        <section id="house-panel" aria-labelledby="house-title" hidden>
+          <div class="panel-heading">
+            <strong id="house-title"></strong>
+            <button id="close-house-panel" type="button">Sluiten · E / Esc</button>
+          </div>
+          <div id="workbench-recipes" class="panel-actions" aria-label="Werkbankrecepten" hidden></div>
+          <div id="chest-contents" hidden>
+            <p>Uitwisseling per stapel. Klik op een item om het te verplaatsen.</p>
+            <section aria-labelledby="chest-bag-title">
+              <strong id="chest-bag-title"></strong>
+              <div id="chest-bag-items" class="storage-slots"></div>
+            </section>
+            <section aria-labelledby="chest-slots-title">
+              <strong id="chest-slots-title"></strong>
+              <div id="chest-slots" class="storage-slots"></div>
+            </section>
           </div>
         </section>
       </aside>
