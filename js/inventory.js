@@ -214,7 +214,7 @@ function takeCraftOutput() {
   inventoryChanged();
 }
 
-function returnPendingItems() {
+function planReturnedItems(preferSource) {
   const state = { ...progress };
   for (const key of ["bag", "hotbar", "chest", "hands", "armor", "pet"]) {
     state[key] = Array.isArray(progress[key]) ? progress[key].slice() : { ...progress[key] };
@@ -225,7 +225,7 @@ function returnPendingItems() {
     let remaining = held.count;
     const source = held.source;
     const storageSource = source && !["bagCraft", "benchCraft"].includes(source.area);
-    if (storageSource && acceptsSlot(source, held.item)) {
+    if (storageSource && (preferSource || source.area === "equipment") && acceptsSlot(source, held.item)) {
       const current = getSlot(source, state);
       if (!current || current.item === held.item) {
         const existing = current?.count || 0;
@@ -245,6 +245,12 @@ function returnPendingItems() {
     }
     state[key] = Array(progress[key].length).fill(null);
   }
+  return state;
+}
+
+function returnPendingItems() {
+  const state = planReturnedItems(true) || planReturnedItems(false);
+  if (!state) return false;
   Object.assign(progress, state, { held: null, panelMode: null });
   return true;
 }
@@ -360,7 +366,7 @@ function stackIcon(item) {
   return icon;
 }
 
-function paintStack(element, stack, number = "", label = "Slot") {
+function paintStack(element, stack, number = "", label = "Slot", showQuantity = false) {
   const tag = stack ? stack.item + ":" + stack.count : "";
   if (element.dataset.stack !== tag) {
     element.dataset.stack = tag;
@@ -373,7 +379,7 @@ function paintStack(element, stack, number = "", label = "Slot") {
     }
     if (stack) {
       element.append(stackIcon(stack.item));
-      if (stack.count > 1) {
+      if (showQuantity || stack.count > 1) {
         const quantity = document.createElement("span");
         quantity.className = "slot-count";
         quantity.textContent = stack.count;
@@ -381,7 +387,7 @@ function paintStack(element, stack, number = "", label = "Slot") {
       }
     }
   }
-  element.title = stack ? describeItem(stack.item) + (stack.count > 1 ? " × " + stack.count : "") : label + " · Empty";
+  element.title = stack ? describeItem(stack.item) + (showQuantity || stack.count > 1 ? " × " + stack.count : "") : label + " · Empty";
   element.setAttribute("aria-label", label + (stack ? " · " + element.title : " · Empty"));
 }
 
@@ -399,7 +405,7 @@ function renderRecipeGuide(area) {
     rows.flat().forEach((cell, index) => {
       const square = document.createElement("span");
       square.className = "recipe-cell";
-      paintStack(square, cell ? { item: cell[0], count: cell[1] } : null, "", "Cell " + (index + 1));
+      paintStack(square, cell ? { item: cell[0], count: cell[1] } : null, "", "Cell " + (index + 1), true);
       pattern.append(square);
     });
     card.append(name, pattern);

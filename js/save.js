@@ -2,7 +2,7 @@
 
 const SAVE_KEY = "vonkje-survival-v1";
 const SAVE_VERSION = 5;
-const SAVED_SLOT_COUNTS = { bag: 27, hotbar: 9, chest: 27, bagCraft: 4, benchCraft: 9 };
+const SAVED_SLOT_COUNTS = { bag: BAG_SLOTS, hotbar: HOTBAR_SLOTS, chest: CHEST_SLOTS, bagCraft: 4, benchCraft: 9 };
 
 function newProgress() {
   return {

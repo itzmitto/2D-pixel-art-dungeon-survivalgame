@@ -53,6 +53,8 @@ const HOUSE = [
   "###############",
 ];
 const AREAS = { forest: FOREST, house: HOUSE, dungeon1: ROOM_ONE, dungeon2: ROOM_TWO };
+const WORLD_WIDTH = FOREST[0].length * TILE;
+const WORLD_HEIGHT = FOREST.length * TILE;
 
 function markers(symbol) {
   const positions = [];
@@ -327,8 +329,8 @@ function updateAction() {
   if (actionLabel.textContent !== text) actionLabel.textContent = text;
   actionLabel.hidden = !text;
   if (!text) return;
-  actionLabel.style.setProperty("--action-x", (player.x / canvas.width) * 100 + "%");
-  actionLabel.style.setProperty("--action-y", ((player.y - 20) / canvas.height) * 100 + "%");
+  actionLabel.style.setProperty("--action-x", (player.x / WORLD_WIDTH) * 100 + "%");
+  actionLabel.style.setProperty("--action-y", ((player.y - 20) / WORLD_HEIGHT) * 100 + "%");
 }
 
 function followDragon(dt) {

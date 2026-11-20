@@ -1,55 +1,59 @@
 # Vonkje
 
-## Lokaal starten
+## Run locally
 
-1. Open de projectmap `dungeon-survival` en open `index.html` rechtstreeks in Chrome. Op Kubuntu kun je vanuit die map ook `xdg-open ./index.html` uitvoeren. Dat gebruikt je standaardbrowser.
-2. De game draait direct met lokale bestanden. Je hebt geen `npm install`, build of lokale server nodig.
-3. Klik op **Volledig scherm** om de browserbalk te verbergen. Klik op **Volledig scherm verlaten** of druk op **Esc** om terug te gaan.
-4. Herlaad na een codewijziging hetzelfde tabblad met **Ctrl+R**. Gebruik **Ctrl+Shift+R** als Chrome nog oude scripts of sprites toont.
+1. Open the `dungeon-survival` project folder and open `index.html` directly in Chrome. On Kubuntu, run `xdg-open ./index.html` from the project folder to use your default browser.
+2. The game uses local files and ordinary scripts. No server, build, or `npm install` is required.
+3. Click **Full screen** to hide the browser bar. Click **Exit full screen** or press **Esc** to return. Reload the same tab with **Ctrl+R** after changing the code.
 
-| Bediening | Actie |
+| Control | Action |
 | --- | --- |
-| WASD of pijltjes | Lopen en richten |
-| E | De actie uitvoeren die boven de speler staat |
-| Tab / B | Inventaris openen. Tab doorloopt de knoppen en sluit na de laatste knop. B en Esc sluiten direct. |
-| J / K | Slaan met de linkerhand / rechterhand |
-| Spatie | Vonkje een vuurbal laten schieten |
-| 1 / 2 / 3, daarna F | Buiten hek, vloer of houten fakkel selecteren en plaatsen. Esc wist de selectie. De bouwknoppen doen hetzelfde. |
+| WASD or arrow keys | Move and face a direction |
+| E | Use the interaction shown above the knight. At home this includes opening the chest and workbench. |
+| Tab or B | Open the inventory. Tab / Shift+Tab move focus through an open panel. |
+| Esc or B | Close the open panel. E also closes the chest and workbench. |
+| 1–9 or wheel over the playfield | Select a hotbar slot |
+| F | Place the selected fence, floor tile, or torch |
+| J / K | Attack with the equipped left / right hand |
+| Space | Fire Vonkje’s fireball |
 
-Kies een wapen in de rugzak en wijs het toe aan een hand. Klik op pantser of op de drakenhanger om die direct uit te rusten. Klik op een gevuld uitrustingsslot om het item terug te leggen. Uitrusting neemt een eigen slot in. In de rugzak deelt een stapel van hetzelfde itemtype één plek. Klik op een potion om maximaal één hartje te herstellen. De genezende potion in de dungeon werkt bij aanraking.
+## Inventory, chest, and crafting
 
-Pantser vermindert de schade van slimes met ⅛ hart per punt verdediging, tot minimaal een half hart schade per treffer. De koperen speer reikt verder en heeft een langere afkoeltijd dan een zwaard. De koperen drakenhanger verlaagt Vonkjes oplaadtijd van 1 naar 0,8 seconde.
+The backpack and house chest each have 27 slots. The nine-slot hotbar is separate and uses the same stacks in the HUD and in the panel. Equip a weapon by putting it in a hand slot. Selecting it in the hotbar leaves both hands as they were.
 
-## Hout en mijnbouw
+- **Left click** picks up or places the whole stack. Matching stacks merge up to their limit. A different item swaps if both slots can accept the items.
+- **Right click** picks up half, rounded up, or places one from the held stack. A focused slot also supports **R** for this action and **Enter** for a normal click.
+- **Shift + left click** moves a stack between the chest and player storage while the chest is open. Any amount that does not fit stays in its original slot.
+- Materials and supplies stack up to 64. Weapons, tools, armor, and charms take one slot each. Use **Drink potion** to heal up to one heart.
+- Use the **Recipe guide** in the 2×2 backpack grid or 3×3 workbench grid. Match the exact pattern, leaving blank cells empty. Larger ingredient stacks can make multiple batches. Each click on the output takes one batch into the held stack.
 
-Kijk naar een boom en gebruik **E** drie keer met een bijl in je rugzak of hand. Pak het gevallen hout op met **E**. Maak bij de werkbank voor 4 hout een houten houweel en draag het in je rugzak. In de open plek ten zuiden van het grottenpad kun je grijze stenen en koperaders op dezelfde manier delven. Een volle rugzak laat de stapel liggen. Ook na herladen blijft niet-opgepakte buit buiten op dezelfde plek liggen.
+Closing a panel returns the held stack and unused ingredients to available slots. If they do not fit, the panel stays open. Reloading restores an unfinished panel and its items. Items from old saves that exceed the new capacity are available through **Recover saved items** when there is space. Chest overflow is recoverable from the chest panel.
 
-## Werkbank en opbergkist
+## Gathering and equipment
 
-Repareer de huisdeur met 6 hout. Binnen staat de werkbank links van het bed en de opbergkist rechts. Open ze met **E** en sluit ze met **E** of **Esc**. De fakkel kost 2 hout bij de werkbank. Buiten plaats je hem op een vrije grastegel. Hekken en vloeren maak je in de rugzak. Bij de werkbank maak je ook het houweel, stenen en koperen wapens, koperen pantser en de drakenhanger. De recepten tonen je voorraad en de vereiste hoeveelheid per ingrediënt.
+Face a tree and press **E** three times with an axe in the backpack, hotbar, or either hand. Pick up the dropped wood with **E**. Repair the house door for six wood, then use the workbench to make a wooden pickaxe for four wood. Carry it to mine stone and copper ore in the clearing south of the cave path. Uncollected resources outdoors survive a reload.
 
-Klik in de kist op een item om de hele stapel naar de andere kant te verplaatsen. Een stapel gebruikt één vak per itemtype. De rugzak heeft zes vakken en de kist acht. De kistinhoud en geplaatste fakkels worden bewaard samen met je eerdere voortgang.
+Armor reduces slime damage by one eighth of a heart per point of defense, to a minimum of half a heart per hit. The copper spear reaches farther and recovers more slowly than a sword. Vonkje’s copper dragon charm reduces fireball recharge from 1 second to 0.8 seconds.
 
-## Sprites vervangen
+## Local sprites
 
-Vervang een PNG op hetzelfde pad en exporteer met een transparante achtergrond. Zet de frames direct tegen elkaar en houd de positie van het personage binnen elke cel gelijk.
+Use transparent PNGs and keep frame registration consistent when replacing sprites.
 
-| Bestand | Indeling |
+| File | Layout |
 | --- | --- |
-| `images/characters/knight-walk.png` | 240×160 pixels. Vier rijen in de volgorde beneden, links, rechts, boven. Elke rij bevat zes frames van 40×40. Het eerste frame is ook de stilstandpose. |
-| `images/pets/vonkje-fly.png` | 160×32 pixels. Vier frames van 40×32 op één rij, met de snuit naar rechts. Het spel spiegelt de hele pose voor links. |
-| `images/objects/workbench.png`, `chest.png` en `torch.png` | Elk één frame van 32×32 pixels. |
+| `images/characters/knight-walk.png` | 240×160 sheet. Six 40×40 frames per row, ordered down, left, right, up. The first frame in each row doubles as the idle pose. |
+| `images/pets/vonkje-fly.png` | 320×64 sheet. Four 80×64 frames in one row facing right. The renderer mirrors the pose when Vonkje turns left. |
+| `images/objects/` | The workbench, chest, and torch each use a 32×32 PNG. |
+| `images/items/` | One 24×24 icon per item ID. |
 
-Pas bij een nieuwe celmaat of een ander aantal frames de waarden in `PNG_SPRITES` aan. In `js/sprites.js` staan ook de richtingsvolgorde en de snelheden in frames per seconde. De getekende grootte staat in `js/render.js`. Bij een ontbrekende PNG of onjuiste afmetingen tekent het spel de Canvas-variant.
+`js/sprites.js` defines frame dimensions and playback. The render buffer uses three pixels per world unit so the larger dragon sheet can show more detail. The dragon retains its 25×20 world-unit footprint, and missing or mismatched sheets still fall back to Canvas sprites.
 
 ## Code
 
-- `main.js` bestuurt de game loop, HUD en de toestand van de speler.
-- `js/input.js` koppelt de toetsen en de knoppen voor bouwen, volledig scherm, nieuw spel en respawn.
-- `js/world.js` bevat de kaarten, gebiedsovergangen, botsingen, bouwtegels en E-acties.
-- `js/sprites.js` laadt de PNG’s en kiest de animatieframes.
-- `js/render.js` tekent de wereld en bevat de Canvas-reservesprites.
-- `js/inventory.js` beheert de rugzak, houtvoorraad, recepten in `RECIPES`, uitrustingsslots en de opbergkist.
-- `js/combat.js` regelt vuurbal, melee, schade en slijmloot. Pas wapenwaarden aan in `WEAPONS`, verdediging in `ARMOR` en de oplaadbonus in `PET_UPGRADES`.
-- `js/save.js` leest oude saves en bewaart de nieuwe. Bouwwerken op gereserveerde tegels, zoals de nieuwe ertsplekken, schuiven op naar vrije grastegels.
-- `styles/base.css`, `styles/game.css` en `styles/inventory.css` bevatten de algemene stijl, speelveld en rugzak.
+- `js/inventory.js` handles slots, transfers, equipment, and the `RECIPES` patterns for both grids.
+- `js/input.js` handles controls, hotbar selection, and full screen.
+- `js/world.js` handles maps, interactions, gathering, and building.
+- `js/combat.js` holds weapon, armor, and charm stats.
+- `js/sprites.js` and `js/render.js` load sprites and draw the world and preview.
+- `js/save.js` migrates older saves and stores slot positions, crafting ingredients, held stacks, and world progress.
+- `main.js` runs the game loop and HUD. The `styles/` folder controls the fullscreen layout and inventory panels.
