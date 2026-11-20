@@ -4,16 +4,26 @@ const pressed = new Set();
 const movementKeys = ["w", "a", "s", "d", "arrowup", "arrowleft", "arrowdown", "arrowright"];
 window.addEventListener("keydown", (event) => {
   if (event.ctrlKey || event.metaKey || event.altKey) return;
+  const key = event.key.toLowerCase();
+  if (key === "b" || (key === "escape" && !backpack.hidden)) {
+    event.preventDefault();
+    if (!event.repeat) {
+      toggleBackpack(key === "escape" ? false : backpack.hidden);
+      if (backpack.hidden) backpackToggle.focus();
+    }
+    return;
+  }
+  if (!backpack.hidden) return;
   if (event.key === " " && phase === "playing") {
     event.preventDefault();
     if (!event.repeat) shootFireball();
     return;
   }
-  const key = event.key.toLowerCase();
-  if (phase === "playing" && ["e", "f", "1", "2", "escape"].includes(key)) {
+  if (phase === "playing" && ["e", "f", "1", "2", "escape", "j", "k"].includes(key)) {
     event.preventDefault();
     if (event.repeat) return;
     if (key === "e") interact();
+    if (key === "j" || key === "k") melee(key === "j" ? "left" : "right");
     if (area === "forest") {
       if (key === "f") build();
       if (key === "1") buildItem = "fence";
@@ -29,17 +39,11 @@ window.addEventListener("keydown", (event) => {
 });
 window.addEventListener("keyup", (event) => pressed.delete(event.key.toLowerCase()));
 window.addEventListener("blur", () => pressed.clear());
-respawnButton.addEventListener("click", reset);
-for (const [item, { button }] of Object.entries(RECIPES)) {
-  button.addEventListener("click", () => craft(item));
+function bindInput() {
+  respawnButton.addEventListener("click", reset);
+  document.querySelector("#new-game").addEventListener("click", () => {
+    if (!window.confirm("Nieuw spel starten? Je opgeslagen voortgang wordt gewist.")) return;
+    clearProgress();
+    reset();
+  });
 }
-document.querySelector("#new-game").addEventListener("click", () => {
-  if (!window.confirm("Nieuw spel starten? Je opgeslagen voortgang wordt gewist.")) return;
-  progress = newProgress();
-  try {
-    localStorage.removeItem(SAVE_KEY);
-  } catch {
-    storeProgress();
-  }
-  reset();
-});

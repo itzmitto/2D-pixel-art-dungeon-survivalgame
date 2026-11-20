@@ -11,8 +11,6 @@ const result = document.querySelector("#result");
 const respawnButton = document.querySelector("#respawn");
 const actionLabel = document.querySelector("#action");
 const feedback = document.querySelector("#feedback");
-const woodLabel = document.querySelector("#wood");
-const buildSelection = document.querySelector("#build-selection");
 const status = document.querySelector("#status");
 
 let buildItem, facingTile, feedbackTime, axeTime;
@@ -20,6 +18,8 @@ let progress;
 
 function reset() {
   fireballCooldown = 0;
+  meleeCooldown = 0;
+  selectedWeapon = undefined;
   aim = { x: 0, y: 1 };
   updateFireballStatus();
   protection = 0;
@@ -31,6 +31,7 @@ function reset() {
   pressed.clear();
   status.textContent = "";
   enterArea("forest", 3);
+  toggleBackpack(false);
 }
 
 function updateHud() {
@@ -60,7 +61,7 @@ function showFeedback(message) {
 }
 
 function update(dt) {
-  updateFireballs(dt);
+  updateCombat(dt);
   elapsed += dt;
   protection = Math.max(0, protection - dt);
 
@@ -76,6 +77,7 @@ function update(dt) {
   const { x, y } = player;
   move(player, dx * step, dy * step, !key || hasKey);
   const traveled = Math.hypot(player.x - x, player.y - y);
+  player.walking = traveled > 0;
   if (traveled > 0) aim = { x: (player.x - x) / traveled, y: (player.y - y) / traveled };
   followDragon(dt);
   axeTime = Math.max(0, axeTime - dt);
@@ -106,26 +108,11 @@ function update(dt) {
     status.textContent = "Potion gebruikt. " + player.hearts + " van 3 hartjes.";
   }
 
-  for (const slime of slimes) {
-    if (slime.health === 0) continue;
-    const gap = distance(slime, player);
-    if (gap > 0) {
-      const chase = Math.min(gap, 53 * dt) / gap;
-      move(slime, (player.x - slime.x) * chase, (player.y - slime.y) * chase);
-    }
-    if (distance(player, slime) < 16 && protection === 0) {
-      player.hearts--;
-      protection = 1.1;
-      updateHud();
-      status.textContent = player.hearts + " hartjes over.";
-      if (player.hearts === 0) {
-        finish("lost", "Je hartjes zijn op");
-        break;
-      }
-    }
-  }
+  updateSlimes(dt);
 }
 
+bindInput();
+bindInventory();
 progress = loadProgress();
 reset();
 let previousTime;
@@ -133,7 +120,7 @@ let previousTime;
 function frame(now) {
   const dt = Math.min(0.033, (now - (previousTime ?? now)) / 1000);
   previousTime = now;
-  if (phase === "playing") update(dt);
+  if (phase === "playing" && backpack.hidden) update(dt);
   updateAction();
   draw(now / 1000);
   requestAnimationFrame(frame);
