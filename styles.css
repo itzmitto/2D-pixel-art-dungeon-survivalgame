@@ -36,6 +36,7 @@ p { margin: 10px 0 0; color: #c9b8aa; }
   gap: 10px;
 }
 .hud { padding: 0 4px 10px; }
+#room-number { font-weight: bold; }
 #hearts { color: #ff8187; font-size: 1.35rem; }
 #key { color: #ffd18a; }
 .controls { padding-top: 12px; }

@@ -2,6 +2,7 @@
 
 const canvas = document.querySelector("#dungeon");
 const ctx = canvas.getContext("2d");
+const roomNumber = document.querySelector("#room-number");
 const hearts = document.querySelector("#hearts");
 const keyLabel = document.querySelector("#key");
 const ending = document.querySelector("#ending");
@@ -9,8 +10,8 @@ const result = document.querySelector("#result");
 const status = document.querySelector("#status");
 
 const TILE = 32;
-// # muur, T fakkel op muur, P ridder, D draak, S slime, K sleutel, E uitgang, C kist.
-const ROOM = [
+// # muur, T fakkel, P ridder, D draak, S slime, K sleutel, E uitgang, C kist, V potion.
+const ROOM_ONE = [
   "###T#######T###",
   "#.............#",
   "#.....T.....K.#",
@@ -23,10 +24,25 @@ const ROOM = [
   "###T#######T###",
 ];
 
+const ROOM_TWO = [
+  "###T#######T###",
+  "#.....#.......E",
+  "#.##..#..###..#",
+  "#.S...#.......#",
+  "####.T#..##...#",
+  "##V#.....C....#",
+  "##.#.####.....#",
+  "##.#......S...#",
+  "#P............#",
+  "###T#######T###",
+];
+const ROOMS = [ROOM_ONE, ROOM_TWO];
+
 const PALETTE = {
   x: "#24202f", s: "#8096ac", l: "#e1e9e1", g: "#f6bc65",
   r: "#b75362", t: "#54bfa2", b: "#2c786d", y: "#f8e59b",
   p: "#a8c85c", d: "#5b803d", w: "#e1ef99",
+  m: "#a94fb4", h: "#f39ce3",
 };
 
 const SPRITES = {
@@ -45,42 +61,60 @@ const SPRITES = {
   ],
   key: ["..gg......", ".gyyg.....", "gy..yg....", "gy..yg....",
     ".gyyggggg.", "..gg..g.g."],
+  potion: [
+    "..ggg..", "..xgx..", "..xlx..", ".xlllx.",
+    "xlhmmlx", "xhmmmmx", "xmmmmmx", ".xxxxx.",
+  ],
 };
 
-function marker(symbol) {
-  for (const [row, tiles] of ROOM.entries()) {
-    const column = tiles.indexOf(symbol);
-    if (column !== -1) return { x: (column + 0.5) * TILE, y: (row + 0.5) * TILE };
-  }
-  throw new Error("Ontbrekend teken in ROOM: " + symbol);
+function markers(symbol) {
+  const positions = [];
+  room.forEach((row, y) => {
+    [...row].forEach((tile, x) => {
+      if (tile === symbol) positions.push({ x: (x + 0.5) * TILE, y: (y + 0.5) * TILE });
+    });
+  });
+  return positions;
 }
 
-const key = marker("K");
-const exit = marker("E");
 const pressed = new Set();
 const movementKeys = ["w", "a", "s", "d", "arrowup", "arrowleft", "arrowdown", "arrowright"];
 const FOLLOW_DELAY = 0.28;
 const FOLLOW_DISTANCE = 23;
-let player, dragon, slime, trail, elapsed, hasKey, protection, phase;
+let roomIndex, room, key, exit, potion;
+let player, dragon, slimes, trail, elapsed, hasKey, protection, phase;
 
-function reset() {
-  player = { ...marker("P"), radius: 8, facing: 1, hearts: 3 };
-  dragon = { ...marker("D"), facing: 1 };
-  slime = { ...marker("S"), radius: 8 };
-  trail = [{ ...dragon, time: 0 }, { x: player.x, y: player.y, time: 0 }];
+function enterRoom(index, health) {
+  roomIndex = index;
+  room = ROOMS[index];
+  const [spawn] = markers("P");
+  const [dragonSpawn = spawn] = markers("D");
+  player = { ...spawn, radius: 8, facing: 1, hearts: health };
+  dragon = { ...dragonSpawn, facing: 1 };
+  slimes = markers("S").map(position => ({ ...position, radius: 8, name: "slime" }));
+  [key] = markers("K");
+  [potion] = markers("V");
+  [exit] = markers("E");
+  trail = [{ ...dragonSpawn, time: 0 }, { ...spawn, time: 0 }];
   elapsed = 0;
   hasKey = false;
+  updateHud();
+}
+
+function reset() {
   protection = 0;
   phase = "playing";
   ending.hidden = true;
   pressed.clear();
   status.textContent = "";
-  updateHud();
+  enterRoom(0, 3);
 }
 
 function updateHud() {
   hearts.textContent = Array.from({ length: 3 }, (_, i) => i < player.hearts ? "♥" : "♡").join(" ");
   hearts.setAttribute("aria-label", player.hearts + " van 3 hartjes");
+  roomNumber.textContent = "Kamer " + (roomIndex + 1) + " van " + ROOMS.length;
+  keyLabel.hidden = roomIndex !== 0;
   keyLabel.textContent = hasKey ? "Sleutel gevonden" : "Sleutel ontbreekt";
 }
 
@@ -99,7 +133,7 @@ function distance(a, b) {
 function blocked(x, y, radius, doorOpen) {
   for (const edgeY of [y - radius, y + radius]) {
     for (const edgeX of [x - radius, x + radius]) {
-      const tile = ROOM[Math.floor(edgeY / TILE)]?.[Math.floor(edgeX / TILE)];
+      const tile = room[Math.floor(edgeY / TILE)]?.[Math.floor(edgeX / TILE)];
       if (!tile || "#TC".includes(tile) || (tile === "E" && !doorOpen)) return true;
     }
   }
@@ -126,7 +160,7 @@ function followDragon(dt) {
       continue;
     }
     const step = Math.min(gap, remaining, distance(player, dragon) - FOLLOW_DISTANCE);
-    if (step <= 0) break;
+    if (step < 0.001) break;
     const dx = target.x - dragon.x;
     dragon.x += dx * step / gap;
     dragon.y += (target.y - dragon.y) * step / gap;
@@ -144,30 +178,47 @@ function update(dt) {
   const dy = down("s", "arrowdown") - down("w", "arrowup");
   if (dx) player.facing = Math.sign(dx);
   const step = 104 * dt / (Math.hypot(dx, dy) || 1);
-  move(player, dx * step, dy * step, hasKey);
+  move(player, dx * step, dy * step, !key || hasKey);
   followDragon(dt);
 
-  if (!hasKey && distance(player, key) < 16) {
+  if (key && !hasKey && distance(player, key) < 16) {
     hasKey = true;
     updateHud();
-    status.textContent = "Sleutel gevonden. De uitgang is open.";
+    status.textContent = "Sleutel gevonden. De deur naar kamer 2 is open.";
   }
-  if (hasKey && distance(player, exit) < 13) {
-    finish("won", "Jullie zijn ontsnapt!");
+  if ((!key || hasKey) && distance(player, exit) < 13) {
+    if (roomIndex === ROOMS.length - 1) {
+      finish("won", "Jullie zijn ontsnapt!");
+    } else {
+      enterRoom(roomIndex + 1, player.hearts);
+      status.textContent = roomNumber.textContent;
+    }
     return;
   }
 
-  const gap = distance(slime, player);
-  if (gap > 0) {
-    const chase = Math.min(gap, 53 * dt) / gap;
-    move(slime, (player.x - slime.x) * chase, (player.y - slime.y) * chase);
-  }
-  if (distance(player, slime) < 16 && protection === 0) {
-    player.hearts--;
-    protection = 1.1;
+  if (potion && player.hearts < 3 && distance(player, potion) < 16) {
+    potion = undefined;
+    player.hearts++;
     updateHud();
-    status.textContent = player.hearts + " hartjes over.";
-    if (player.hearts === 0) finish("lost", "Je hartjes zijn op");
+    status.textContent = "Potion gebruikt. " + player.hearts + " van 3 hartjes.";
+  }
+
+  for (const slime of slimes) {
+    const gap = distance(slime, player);
+    if (gap > 0) {
+      const chase = Math.min(gap, 53 * dt) / gap;
+      move(slime, (player.x - slime.x) * chase, (player.y - slime.y) * chase);
+    }
+    if (distance(player, slime) < 16 && protection === 0) {
+      player.hearts--;
+      protection = 1.1;
+      updateHud();
+      status.textContent = player.hearts + " hartjes over.";
+      if (player.hearts === 0) {
+        finish("lost", "Je hartjes zijn op");
+        break;
+      }
+    }
   }
 }
 
@@ -193,7 +244,7 @@ function sprite(name, x, y, facing = 1) {
 
 function drawRoom(time) {
   const torches = [];
-  ROOM.forEach((row, j) => {
+  room.forEach((row, j) => {
     [...row].forEach((tile, i) => {
       const x = i * TILE;
       const y = j * TILE;
@@ -224,8 +275,9 @@ function drawRoom(time) {
       }
       if (tile === "E") {
         rect("#767083", x + 5, y + 1, 27, 30);
-        rect(hasKey ? "#183932" : "#4b3133", x + 9, y + 5, 23, 22);
-        if (hasKey) {
+        const doorOpen = !key || hasKey;
+        rect(doorOpen ? "#183932" : "#4b3133", x + 9, y + 5, 23, 22);
+        if (doorOpen) {
           rect("#76d4a6", x + 14, y + 15, 11, 3);
           rect("#76d4a6", x + 22, y + 12, 3, 9);
           rect("#76d4a6", x + 25, y + 15, 3, 3);
@@ -252,11 +304,12 @@ function drawRoom(time) {
 
 function draw(time) {
   drawRoom(time);
-  if (!hasKey) sprite("key", key.x, key.y + Math.round(Math.sin(time * 5) * 2));
+  if (key && !hasKey) sprite("key", key.x, key.y + Math.round(Math.sin(time * 5) * 2));
+  if (potion) sprite("potion", potion.x, potion.y);
   const actors = [
     { ...player, name: "knight" },
     { ...dragon, name: "dragon" },
-    { ...slime, name: "slime" },
+    ...slimes,
   ];
   actors.sort((a, b) => a.y - b.y);
   for (const actor of actors) {
