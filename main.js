@@ -13,26 +13,23 @@ const actionLabel = document.querySelector("#action");
 const feedback = document.querySelector("#feedback");
 const status = document.querySelector("#status");
 
-let buildItem, facingTile, feedbackTime;
+let facingTile, feedbackTime;
 let progress;
 
 function reset() {
   fireballCooldown = 0;
   meleeCooldown = 0;
-  selectedWeapon = undefined;
   aim = { x: 0, y: 1 };
   updateFireballStatus();
   protection = 0;
   phase = "playing";
   ending.hidden = true;
   respawnButton.hidden = true;
-  buildItem = undefined;
   showFeedback("");
   pressed.clear();
   status.textContent = "";
   enterArea("forest", 3);
-  closeHousePanel();
-  toggleBackpack(false, false);
+  resumeInventory();
 }
 
 function updateHud() {
@@ -43,13 +40,13 @@ function updateHud() {
     heart.style.setProperty("--heart-fill", fill * 100 + "%");
     return heart;
   }));
-  hearts.setAttribute("aria-label", formatNumber(player.hearts) + " van 3 hartjes");
+  hearts.setAttribute("aria-label", formatNumber(player.hearts) + " of 3 hearts");
   game.dataset.area = area;
   roomNumber.textContent = {
-    forest: "Bos", house: "Huis", dungeon1: "Kamer 1 van 2", dungeon2: "Kamer 2 van 2",
+    forest: "Forest", house: "House", dungeon1: "Dungeon 1 of 2", dungeon2: "Dungeon 2 of 2",
   }[area];
   keyLabel.hidden = !key;
-  keyLabel.textContent = hasKey ? "Sleutel gevonden" : "Sleutel ontbreekt";
+  keyLabel.textContent = hasKey ? "Key found" : "Key missing";
   updateInventory();
 }
 
@@ -98,7 +95,7 @@ bindInventory();
 progress = loadProgress();
 reset();
 let previousTime;
-// De game loop begrenst de tijdstap zodat een gepauzeerd tabblad geen sprong veroorzaakt.
+// Cap the time step so returning to a suspended tab does not cause a jump.
 function frame(now) {
   const dt = Math.min(0.033, (now - (previousTime ?? now)) / 1000);
   previousTime = now;

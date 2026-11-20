@@ -134,6 +134,8 @@
 #held-stack {
   position: fixed;
   z-index: 4;
+  top: 50%;
+  left: calc(50% + 30px);
   display: grid;
   place-items: center;
   width: 42px;
@@ -204,7 +206,12 @@
   color: var(--muted);
   font-size: 0.7rem;
 }
-#craft-output:not(:disabled) { border-color: var(--copper-light); }
+#craft-output[aria-disabled="false"] { border-color: var(--copper-light); }
+#craft-output[aria-disabled="true"] {
+  border-color: #8c563c;
+  background: linear-gradient(145deg, #201717, #30201b);
+  cursor: default;
+}
 #recipe-guide summary {
   width: fit-content;
   color: var(--parchment);

@@ -96,7 +96,7 @@
                     <div id="craft-grid" class="slot-grid" data-size="2"></div>
                     <span class="craft-arrow" aria-hidden="true">→</span>
                     <div class="craft-result">
-                      <button type="button" id="craft-output" class="slot" aria-label="Crafting output" disabled></button>
+                      <button type="button" id="craft-output" class="slot" aria-label="Crafting output" aria-disabled="true"></button>
                       <span>Output</span>
                     </div>
                   </div>
@@ -113,7 +113,6 @@
             </footer>
           </section>
         </aside>
-        <div id="held-stack" aria-hidden="true" hidden></div>
       </div>
 
       <footer class="controls">
@@ -130,6 +129,7 @@
           <button id="new-game" type="button">New game</button>
         </div>
       </footer>
+      <div id="held-stack" aria-hidden="true" hidden></div>
       <p id="status" class="visually-hidden" role="status"></p>
     </section>
   </main>

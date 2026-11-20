@@ -165,9 +165,9 @@ function harvest(x, y) {
   const remaining = resource.hits - counts[id];
   if (remaining === 0) {
     groundLoot.push(resourceDrop(resource, x, y));
-    showFeedback(ITEMS[resource.item].label + " gevallen · pak op met E.");
+    showFeedback(ITEMS[resource.item].label + " dropped · press E to pick up.");
   } else {
-    showFeedback(remaining === 1 ? "1 slag over" : remaining + " slagen over");
+    showFeedback(remaining === 1 ? "1 hit left" : remaining + " hits left");
   }
   storeProgress();
 }
@@ -195,21 +195,26 @@ function buildSite() {
   const occupied = [player, dragon, ...groundLoot].some(actor =>
     Math.abs(actor.x - x) < TILE / 2 + 8 && Math.abs(actor.y - y) < TILE / 2 + 8);
   const free = room[tile.y]?.[tile.x] === "." && !progress.buildings[id] && !occupied;
-  return { ...tile, id, allowed: free && itemCount(buildItem) > 0 };
+  return { ...tile, id, allowed: free && Boolean(selectedBuildItem()) };
 }
 
 function build() {
-  if (phase !== "playing" || inventoryOpen() || !buildItem || area !== "forest") return;
-  const site = buildSite();
-  if (!site.allowed) {
-    showFeedback(itemCount(buildItem) ? "Hier kun je niet bouwen." : "Maak eerst dit bouwitem.");
+  if (phase !== "playing" || inventoryOpen() || area !== "forest") return;
+  const item = selectedBuildItem();
+  if (!item) {
+    showFeedback("Select a fence, floor tile or torch in the hotbar.");
     return;
   }
-  progress.buildings[site.id] = buildItem;
-  changeItem(buildItem, -1);
+  const site = buildSite();
+  if (!site.allowed) {
+    showFeedback("You cannot build here.");
+    return;
+  }
+  progress.buildings[site.id] = item;
+  progress.hotbar[progress.selectedHotbar] = smallerStack(selectedStack(), 1);
   storeProgress();
   updateInventory();
-  showFeedback(ITEMS[buildItem].label + " geplaatst.");
+  showFeedback(ITEMS[item].label + " placed.");
 }
 
 function nearby(symbol) {
@@ -257,14 +262,14 @@ function interact() {
       break;
     }
     case "inspect":
-      showFeedback("Kapotte deur · 6 hout nodig.");
+      showFeedback("Broken door · needs 6 wood.");
       break;
     case "repair":
-      changeItem("wood", -6);
+      removeItem("wood", 6);
       progress.repaired = true;
       storeProgress();
       updateInventory();
-      showFeedback("De deur is gerepareerd.");
+      showFeedback("Door repaired.");
       break;
     case "enter":
       enterArea("house", player.hearts);
@@ -279,7 +284,7 @@ function interact() {
     case "rest":
       player.hearts = 3;
       updateHud();
-      showFeedback("Uitgerust · 3 hartjes");
+      showFeedback("Rested · 3 hearts");
       break;
   }
 }
@@ -291,33 +296,33 @@ function nearbyLoot() {
 
 function pickUp(drop) {
   if (!addItem(drop.item, drop.count)) {
-    showFeedback("Rugzak vol.");
+    showFeedback("Backpack and hotbar are full.");
     return;
   }
   groundLoot = groundLoot.filter(other => other !== drop);
   if (drop.id) progress.collected[drop.id] = true;
   storeProgress();
   updateInventory();
-  showFeedback(ITEMS[drop.item].label + " opgepakt.");
+  showFeedback(ITEMS[drop.item].label + " picked up.");
 }
 
 function updateAction() {
   const action = getAction();
   const hint = {
-    dungeon: "E — Ga de grot in", chop: "E — Hak boom",
-    inspect: "E — Bekijk kapotte deur", repair: "E — Repareer de deur (6 hout)",
-    enter: "E — Ga naar binnen",
-    leave: "E — Ga naar buiten", rest: "E — Rust uit",
-    workbench: "E — Open werkbank", chest: "E — Open opbergkist",
+    dungeon: "E — Enter the cave", chop: "E — Chop tree",
+    inspect: "E — Inspect broken door", repair: "E — Repair door (6 wood)",
+    enter: "E — Enter house",
+    leave: "E — Go outside", rest: "E — Rest",
+    workbench: "E — Open workbench", chest: "E — Open house chest",
   }[action];
   let text = hint || "";
   if (action === "pickup") {
     const { item, count } = nearbyLoot();
-    text = "E — Pak op · " + ITEMS[item].label + " × " + count;
+    text = "E — Pick up · " + ITEMS[item].label + " × " + count;
   }
   if (action === "mine") {
     const { x, y } = targetTile();
-    text = "E — Delf " + ITEMS[RESOURCES[room[y][x]].item].label.toLowerCase();
+    text = "E — Mine " + ITEMS[RESOURCES[room[y][x]].item].label.toLowerCase();
   }
   if (actionLabel.textContent !== text) actionLabel.textContent = text;
   actionLabel.hidden = !text;
@@ -354,14 +359,14 @@ function completeDungeon() {
   if (progress.dungeonCompleted) return;
   progress.dungeonCompleted = true;
   storeProgress();
-  showFeedback("Dungeon voltooid");
+  showFeedback("Dungeon cleared");
 }
 
 function updateDungeon() {
   if (key && !hasKey && distance(player, key) < 16) {
     hasKey = true;
     updateHud();
-    status.textContent = "Sleutel gevonden. De deur naar kamer 2 is open.";
+    status.textContent = "Key found. The door to room 2 is open.";
   }
   if (exit && (!key || hasKey) && distance(player, exit) < 13) {
     if (area === "dungeon1") {
@@ -377,7 +382,7 @@ function updateDungeon() {
     potion = undefined;
     player.hearts = Math.min(3, player.hearts + 1);
     updateHud();
-    status.textContent = "Potion gebruikt. " + player.hearts + " van 3 hartjes.";
+    status.textContent = "Potion used. " + player.hearts + " of 3 hearts.";
   }
 
   return false;

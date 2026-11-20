@@ -25,14 +25,14 @@ function fireballRecharge() {
 }
 
 function formatNumber(value) {
-  return value.toLocaleString("nl-NL", { maximumFractionDigits: 2 });
+  return value.toLocaleString("en", { maximumFractionDigits: 2 });
 }
 const SLIME_FLASH_TIME = 0.14;
 let fireballs, fireballCooldown, aim;
 function updateFireballStatus() {
   const text = fireballCooldown > 0
-    ? "Vuurbal · " + (Math.ceil(fireballCooldown * 10) / 10).toLocaleString("nl-NL") + " s"
-    : "Vuurbal klaar · " + formatNumber(fireballRecharge()) + " s oplaadtijd";
+    ? "Fireball · " + (Math.ceil(fireballCooldown * 10) / 10).toLocaleString("en") + " s"
+    : "Fireball ready · " + formatNumber(fireballRecharge()) + " s recharge";
   if (fireballStatus.textContent !== text) fireballStatus.textContent = text;
 }
 
@@ -95,7 +95,7 @@ function clearAttackPath(from, to) {
 function melee(hand) {
   const weapon = progress.hands[hand];
   if (!weapon) {
-    showFeedback("Geen wapen uitgerust");
+    showFeedback("No weapon equipped");
     return;
   }
   if (meleeCooldown > 0) return;
@@ -134,9 +134,9 @@ function updateSlimes(dt) {
       player.hearts = Math.max(0, player.hearts - damage);
       protection = 1.1;
       updateHud();
-      status.textContent = formatNumber(player.hearts) + " hartjes over.";
+      status.textContent = formatNumber(player.hearts) + " hearts left.";
       if (player.hearts === 0) {
-        finish("lost", "Je hartjes zijn op");
+        finish("lost", "You ran out of hearts");
         break;
       }
     }

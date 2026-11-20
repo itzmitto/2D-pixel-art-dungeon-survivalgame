@@ -2,7 +2,7 @@
 
 const PNG_SPRITES = {
   knight: { path: "./images/characters/knight-walk.png", width: 40, height: 40, columns: 6, rows: 4 },
-  dragon: { path: "./images/pets/vonkje-fly.png", width: 40, height: 32, columns: 4, rows: 1 },
+  dragon: { path: "./images/pets/vonkje-fly.png", width: 80, height: 64, columns: 4, rows: 1 },
   workbench: { path: "./images/objects/workbench.png", width: 32, height: 32, columns: 1, rows: 1 },
   chest: { path: "./images/objects/chest.png", width: 32, height: 32, columns: 1, rows: 1 },
   torch: { path: "./images/objects/torch.png", width: 32, height: 32, columns: 1, rows: 1 },
@@ -17,17 +17,17 @@ for (const sheet of Object.values(PNG_SPRITES)) {
   image.src = sheet.path;
 }
 
-function drawPng(name, x, y, frame = 0, row = 0, facing = 1, drawWidth, drawHeight) {
+function drawPng(name, x, y, frame = 0, row = 0, facing = 1, drawWidth, drawHeight, context = ctx) {
   const { image, width, height } = PNG_SPRITES[name];
   if (!image) return false;
   const w = drawWidth ?? width;
   const h = drawHeight ?? height;
-  ctx.save();
-  ctx.imageSmoothingEnabled = false;
-  ctx.translate(Math.round(x - w / 2) + (facing < 0 ? w : 0), Math.round(y - h / 2));
-  ctx.scale(facing, 1);
-  ctx.drawImage(image, frame * width, row * height, width, height, 0, 0, w, h);
-  ctx.restore();
+  context.save();
+  context.imageSmoothingEnabled = false;
+  context.translate(Math.round(x - w / 2) + (facing < 0 ? w : 0), Math.round(y - h / 2));
+  context.scale(facing, 1);
+  context.drawImage(image, frame * width, row * height, width, height, 0, 0, w, h);
+  context.restore();
   return true;
 }
 
