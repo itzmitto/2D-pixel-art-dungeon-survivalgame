@@ -86,29 +86,7 @@ function update(dt) {
     if (feedbackTime <= 0) feedback.textContent = "";
   }
 
-  if (key && !hasKey && distance(player, key) < 16) {
-    hasKey = true;
-    updateHud();
-    status.textContent = "Sleutel gevonden. De deur naar kamer 2 is open.";
-  }
-  if (exit && (!key || hasKey) && distance(player, exit) < 13) {
-    if (area === "dungeon1") {
-      enterArea("dungeon2", player.hearts);
-    } else {
-      enterArea("forest", player.hearts, "R");
-      completeDungeon();
-    }
-    return;
-  }
-
-  if (potion && player.hearts < 3 && distance(player, potion) < 16) {
-    potion = undefined;
-    player.hearts++;
-    updateHud();
-    status.textContent = "Potion gebruikt. " + player.hearts + " van 3 hartjes.";
-  }
-
-  updateSlimes(dt);
+  if (!updateDungeon()) updateSlimes(dt);
 }
 
 bindInput();

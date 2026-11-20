@@ -171,11 +171,14 @@ function nearby(symbol) {
 }
 
 function getAction() {
-  if (phase !== "playing") return "";
+  if (phase !== "playing" || !backpack.hidden) return "";
   if (nearbyLoot()) return "pickup";
   if (area === "forest") {
     if (nearby("G")) return "dungeon";
-    if (nearby("U")) return progress.repaired ? "enter" : "repair";
+    if (nearby("U")) {
+      if (progress.repaired) return "enter";
+      return itemCount("wood") >= 6 ? "repair" : "inspect";
+    }
     const { x, y } = targetTile();
     if (room[y]?.[x] === "Y" && !treeCut(x, y) &&
         distance(player, centerOf({ x, y })) < 42 && itemCount("axe")) return "chop";
@@ -213,11 +216,10 @@ function interact() {
       updateInventory();
       break;
     }
+    case "inspect":
+      showFeedback("Kapotte deur · 6 hout nodig.");
+      break;
     case "repair":
-      if (itemCount("wood") < 6) {
-        showFeedback("Kapotte deur · 6 hout nodig.");
-        break;
-      }
       changeItem("wood", -6);
       progress.repaired = true;
       storeProgress();
@@ -259,7 +261,8 @@ function updateAction() {
   const action = getAction();
   const hint = {
     pickup: "E — Pak op", dungeon: "E — Ga de grot in", chop: "E — Hak boom",
-    repair: "E — Repareer de deur (6 hout)", enter: "E — Ga naar binnen",
+    inspect: "E — Bekijk kapotte deur", repair: "E — Repareer de deur (6 hout)",
+    enter: "E — Ga naar binnen",
     leave: "E — Ga naar buiten", rest: "E — Rust uit",
   }[action];
   const text = hint || "";
@@ -298,4 +301,30 @@ function completeDungeon() {
   progress.dungeonCompleted = true;
   storeProgress();
   showFeedback("Dungeon voltooid");
+}
+
+function updateDungeon() {
+  if (key && !hasKey && distance(player, key) < 16) {
+    hasKey = true;
+    updateHud();
+    status.textContent = "Sleutel gevonden. De deur naar kamer 2 is open.";
+  }
+  if (exit && (!key || hasKey) && distance(player, exit) < 13) {
+    if (area === "dungeon1") {
+      enterArea("dungeon2", player.hearts);
+    } else {
+      enterArea("forest", player.hearts, "R");
+      completeDungeon();
+    }
+    return true;
+  }
+
+  if (potion && player.hearts < 3 && distance(player, potion) < 16) {
+    potion = undefined;
+    player.hearts++;
+    updateHud();
+    status.textContent = "Potion gebruikt. " + player.hearts + " van 3 hartjes.";
+  }
+
+  return false;
 }

@@ -26,11 +26,6 @@ const SPRITES = {
     ".caaaaaaaaaac.", ".ca........ac.", ".cnnnnnnnnnnc.",
     ".caaaaaaaaaac.", ".ca........ac.", ".aa........aa.",
   ],
-  floor: [
-    "aaaaaaaaaaaaaa", "ncccccncccccnn", "nnnnnannnnnnnn", "aaaaaaaaaaaaaa",
-    "nnccccccnccccn", "nnnnnnnnannnnn", "aaaaaaaaaaaaaa",
-    "ncccncccccccnn", "nnnannnnnnnnnn", "aaaaaaaaaaaaaa",
-  ],
   knight: [
     "......xxxxxxxx......",
     "....xxzzzzzzzsxx....",
@@ -430,6 +425,13 @@ function drawSwing() {
   const angle = Math.atan2(swing.y, swing.x);
   const phase = 1 - swing.time / SWING_TIME;
   const start = angle + (swing.hand === "left" ? -0.8 : 0.8) * (1 - phase * 2);
+  const weaponPosition = {
+    x: player.x + Math.cos(start) * 15,
+    y: player.y + Math.sin(start) * 15,
+  };
+  if (clearAttackPath(player, weaponPosition)) {
+    sprite(swing.weapon, weaponPosition.x, weaponPosition.y, swing.x < 0 ? -1 : 1);
+  }
   for (let i = 0; i < 5; i++) {
     const offset = i * 0.14 - 0.28;
     const tip = swing.weapon === "sword" ? 21 : 18;
