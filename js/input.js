@@ -83,6 +83,10 @@ async function toggleFullscreen() {
 }
 
 function bindInput() {
+  canvas.addEventListener("pointerdown", event => {
+    if (event.button !== 0 || !event.isPrimary || phase !== "playing" || inventoryOpen()) return;
+    melee("left");
+  });
   fullscreenToggle.addEventListener("click", toggleFullscreen);
   document.addEventListener("fullscreenchange", updateFullscreenButton);
   updateFullscreenButton();

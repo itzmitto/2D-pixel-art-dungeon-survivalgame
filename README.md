@@ -14,7 +14,8 @@
 | Esc or B | Close the open panel. E also closes the chest and workbench. |
 | 1–9 or wheel over the playfield | Select a hotbar slot |
 | F | Place the selected fence, floor tile, or torch |
-| J / K | Attack with the equipped left / right hand |
+| Left click on the playfield / J | Left-hand attack |
+| K | Right-hand attack |
 | Space | Fire Vonkje’s fireball |
 
 ## Inventory, chest, and crafting

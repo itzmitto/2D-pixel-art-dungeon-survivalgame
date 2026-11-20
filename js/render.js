@@ -26,72 +26,6 @@ const SPRITES = {
     ".caaaaaaaaaac.", ".ca........ac.", ".cnnnnnnnnnnc.",
     ".caaaaaaaaaac.", ".ca........ac.", ".aa........aa.",
   ],
-  knight: [
-    "......xxxxxxxx......",
-    "....xxzzzzzzzsxx....",
-    "...xzzllllllllzsx...",
-    "...xsszzzzzlzzssx...",
-    "..xuzsxxxxxxzsusux..",
-    "..xussxgxxgxsusuux..",
-    "...xusxxxxxxuussx...",
-    "....xxuzzssuuxxx....",
-    "....xAxuzzsuxax.....",
-    "...xAnxszzssxgux....",
-    "..xAnncxsszuucxsx...",
-    "..xAncaxusuzusxsx...",
-    "..xAnacxussussxx....",
-    "..xAnaxgngngxuuux...",
-    "...xxxuzsuusuxux....",
-    ".....xussxxusux.....",
-    ".....xuxx..xuxx.....",
-    ".....xasx..xasx.....",
-    "....xaax...xaax.....",
-    "....xxxx...xxxx.....",
-  ],
-  knightStepA: [
-    "......xxxxxxxx......",
-    "....xxzzzzzzzsxx....",
-    "...xzzllllllllzsx...",
-    "...xsszzzzzlzzssx...",
-    "..xuzsxxxxxxzsusux..",
-    "..xussxgxxgxsusuux..",
-    "...xusxxxxxxuussx...",
-    "....xxuzzssuuxxx....",
-    "....xAxuzzsuxax.....",
-    "...xAnxszzssxgux....",
-    "..xAnncxsszuucxsx...",
-    "..xAncaxusuzusxsx...",
-    "..xAnacxussussxx....",
-    "..xAnaxgngngxuuux...",
-    "...xxxuzsuusuxux....",
-    ".....xussxxusux.....",
-    ".....xuxx..xxxx.....",
-    ".....xasx..xaax.....",
-    "....xaax....xxx.....",
-    "....xxxx............",
-  ],
-  knightStepB: [
-    "......xxxxxxxx......",
-    "....xxzzzzzzzsxx....",
-    "...xzzllllllllzsx...",
-    "...xsszzzzzlzzssx...",
-    "..xuzsxxxxxxzsusux..",
-    "..xussxgxxgxsusuux..",
-    "...xusxxxxxxuussx...",
-    "....xxuzzssuuxxx....",
-    "....xAxuzzsuxax.....",
-    "...xAnxszzssxgux....",
-    "..xAnncxsszuucxsx...",
-    "..xAncaxusuzusxsx...",
-    "..xAnacxussussxx....",
-    "..xAnaxgngngxuuux...",
-    "...xxxuzsuusuxux....",
-    ".....xussxxusux.....",
-    ".....xxxx..xuxx.....",
-    ".....xaax..xasx.....",
-    ".....xxx...xaax.....",
-    "...........xxxx.....",
-  ],
   dragon: [
     ".............g..g...",
     "............gx.gx...",
@@ -150,6 +84,46 @@ const SPRITES = {
   ],
 };
 
+const CLOTH_COLORS = {"X": "#28212c", "H": "#4c2d2e", "h": "#78483a", "k": "#a46b4c", "S": "#c88662", "s": "#e2a576", "l": "#f3bf8d", "T": "#365d56", "t": "#508675", "v": "#70a18a", "D": "#333346", "d": "#505168", "L": "#724333", "b": "#9d6440", "B": "#c28753", "g": "#e3bb72"};
+const KNIGHT_FALLBACK = [
+  [
+    ".......XXXXXXXX.......", ".......kkkkkkkkX......", "......XkkkkkkkksX.....",
+    ".....HHhhhhhhhhhhX....", ".....HHhhhhhhhhhHX....", ".....HHXXssssXXsHsX...",
+    ".....ssXXssssXXsHsX...", ".....sssssllssssHsX...", ".....sssssssssssHX....",
+    "...XXssssSSSSSsssX....", ".XbbbtLsssssssssX.....", ".XbbXtLXXXXXXXXXt.....",
+    ".XbXtTLvvvvvvttLTX....", ".BBXtTLttttttttLTX....", "XBBttTLttttttttLTX....",
+    "XLbttSLttttttttLStX...", "XLbXtStttttttttTSX....", ".XLLLXtTTTggTTTtX.....",
+    "..XLLLXttttttttX......", "....X..XXXXXXXX.......", "......................",
+  ],
+  [
+    ".......XXXXXXXX.......", "......Xkkkkkkkk.......", ".....XskkkkkkkkX......",
+    "....XhhhhhhhhhhHH.....", "....XhhhhhhhhhhHH.....", "...XXXXsssssHHHHH.....",
+    "...XsXXsssssHHsss.....", "..XllsssssSSHHsss.....", "..XsssssssSSHHsss.....",
+    "...XXssssssXsssssXX...", ".....XXXsssssssLtbbbX.", ".....tXXXXXXXXXLtXbbX.",
+    "....XTTttvvvvvvLTtXbX.", "....XTTttttttttLTtXBB.", "....XTTttttttttLTttBBX",
+    "...XtSTttttttttLSttbLX", "....XSTtttttttttStXbLX", ".....XtTTTggTTTtXLLLX.",
+    "......XttttttttXLLLX..", ".......XXXXXXXX..X....", "......................",
+  ],
+  [
+    ".......XXXXXXXX.......", ".......kkkkkkkkX......", "......XkkkkkkkksX.....",
+    ".....HHhhhhhhhhhhX....", ".....HHhhhhhhhhhhX....", ".....HHHHHsssssXXXX...",
+    ".....sssHHsssssXXsX...", ".....sssHHSSsssssllX..", ".....sssHHSSsssssssX..",
+    "...XXsssssXssssssXX...", ".XbbbtLsssssssXXX.....", ".XbbXtLXXXXXXXXXt.....",
+    ".XbXtTLvvvvvvttTTX....", ".BBXtTLttttttttTTX....", "XBBttTLttttttttTTX....",
+    "XLbttSLttttttttTStX...", "XLbXtStttttttttTSX....", ".XLLLXtTTTggTTTtX.....",
+    "..XLLLXttttttttX......", "....X..XXXXXXXX.......", "......................",
+  ],
+  [
+    ".......XXXXXXXX.......", ".......kkkkkkkkX......", "......XkkkkkkkkhX.....",
+    ".....HHhhhhhhhhhhX....", ".....HHhhhhhhhhhhX....", ".....HHHHhhhhhhhhhX...",
+    ".....hhhhhhhhhhhhhX...", ".....hhhhhhhhhhhhhX...", ".....hhhhhhhhhhhhX....",
+    ".....hhhHHHHHHHhhX....", ".....XXhhhSShhhhX.....", "....XXbXXXXXXXXXt.....",
+    "...XtbBBBBBBBBBbXX....", "...XtbBBBBBBBBBbXX....", "...ttbBLBBBBBLLbXX....",
+    "...ttbbgbbbbbggbXtX...", "...XtbbLbbbbbLLbXX....", ".....bbLbbbbbLLbX.....",
+    ".....bbLbbbbbLLbX.....", ".....Xbbbbbbbbb.......", "......XXXXXXXXX.......",
+  ],
+];
+
 function rect(color, x, y, width, height, context = ctx) {
   context.fillStyle = color;
   context.fillRect(x, y, width, height);
@@ -158,7 +132,7 @@ function rect(color, x, y, width, height, context = ctx) {
 function sprite(name, x, y, facing = 1, flash = false, context = ctx) {
   const pixels = SPRITES[name];
   // De nieuwe acteurs gebruiken één Canvas-pixel per rastercel; de oude sprites gebruiken twee.
-  const scale = name.startsWith("knight") || name.startsWith("dragon") ? 1 : 2;
+  const scale = name.startsWith("dragon") ? 1 : 2;
   const width = pixels[0].length * scale;
   const left = Math.round(x - width / 2);
   const top = Math.round(y - pixels.length * scale + 7);
@@ -410,11 +384,41 @@ function drawHarvestEffects() {
   }
 }
 
+const KNIGHT_STRIDE = [0, 1, 2, 0, -1, -2];
+
+function knightFootPositions(x, y, row, column) {
+  const stride = KNIGHT_STRIDE[column];
+  return [13, 22].map((left, i) => {
+    const side = row === 1 || row === 2;
+    const sourceX = row === 1 ? 39 - (left + 7) : left - Number(!side);
+    return {
+      x: Math.round(x - 14) + Math.round(sourceX * 0.7),
+      y: Math.round(y - 18) + Math.round((33 + (i ? -stride : stride)) * 0.7),
+    };
+  });
+}
+
+function drawKnight(x, y, row, column, context = ctx) {
+  if (!drawPng("knight", x, y - 4, column, row, 1, 28, 28, context)) {
+    for (const foot of knightFootPositions(x, y, row, column)) {
+      rect("#505168", foot.x + 1, foot.y - 5, 4, 6, context);
+      rect("#4c2d2e", foot.x, foot.y, 5, 2, context);
+    }
+    const bob = [2, 3, 5].includes(column) ? 1 : 0;
+    KNIGHT_FALLBACK[row].forEach((line, j) => {
+      [...line].forEach((pixel, i) => {
+        if (pixel !== ".") rect(CLOTH_COLORS[pixel], Math.round(x - 14) + 3 + i,
+          Math.round(y - 18) + 3 + j + bob, 1, 1, context);
+      });
+    });
+  }
+  drawArmor(x, y, row, column, context);
+}
+
 function drawArmor(x, y, row, column, context = ctx) {
   const { helmet, chestplate, boots } = progress.armor;
   x = Math.round(x);
   y = Math.round(y);
-  const walking = context === ctx && player.walking && !inventoryOpen() && phase === "playing";
   const bob = [2, 3, 5].includes(column) ? 1 : 0;
   if (chestplate) {
     const offset = [0, -3, 3, 0][row];
@@ -430,13 +434,24 @@ function drawArmor(x, y, row, column, context = ctx) {
     }
   }
   if (helmet) {
-    rect("#8e4938", x - 6, y - 13 + bob, 12, 3, context);
-    rect("#db9357", x - 5, y - 14 + bob, 10, 3, context);
-    rect("#f3c182", x - 4, y - 14 + bob, 6, 1, context);
+    const top = y - 15 + bob;
+    const offset = [0, -1, 1, 0][row];
+    const left = x - 7 + offset;
+    rect("#593438", left + 2, top, 10, 2, context);
+    rect("#8e4938", left, top + 2, 14, 6, context);
+    rect("#db9357", left + 1, top + 1, 12, 4, context);
+    rect("#f3c182", left + 3, top + 1, 7, 1, context);
+    if (row !== 3) {
+      rect("#583038", left + 3, top + 6, 8, 1, context);
+      rect("#f3c182", left + 4, top + 6, 2, 1, context);
+      rect("#f3c182", left + 8, top + 6, 2, 1, context);
+    }
   }
-  if (boots && !walking) {
-    rect("#bf744a", x - 5, y + 5, 3, 2, context);
-    rect("#bf744a", x + 2, y + 5, 3, 2, context);
+  if (boots) {
+    for (const foot of knightFootPositions(x, y, row, column)) {
+      rect("#743e37", foot.x, foot.y - 1, 5, 3, context);
+      rect("#db9357", foot.x + 1, foot.y - 1, 3, 2, context);
+    }
   }
 }
 
@@ -451,10 +466,7 @@ function drawKnightPreview() {
   lastPreviewEquipment = signature;
   lastPreviewImage = PNG_SPRITES.knight.image;
   previewContext.clearRect(0, 0, knightPreview.width, knightPreview.height);
-  if (!drawPng("knight", 20, 21, 0, 0, 1, 28, 28, previewContext)) {
-    sprite("knight", 20, 25, 1, false, previewContext);
-  }
-  drawArmor(20, 25, 0, 0, previewContext);
+  drawKnight(20, 25, 0, 0, previewContext);
   for (const [hand, x, facing] of [["left", 8, -1], ["right", 32, 1]]) {
     const weapon = WEAPONS[progress.hands[hand]];
     if (!weapon) continue;
@@ -533,11 +545,7 @@ function draw(time) {
     if (actor === player) {
       if (protection > 0 && Math.floor(time * 18) % 2) continue;
       const { row, column } = knightFrame();
-      if (!drawPng("knight", actor.x, actor.y - 4, column, row, 1, 28, 28)) {
-        const fallback = ["knight", "knightStepA", "knightStepA", "knight", "knightStepB", "knightStepB"];
-        sprite(fallback[column % fallback.length], actor.x, actor.y, actor.facing);
-      }
-      drawArmor(actor.x, actor.y, row, column);
+      drawKnight(actor.x, actor.y, row, column);
     } else if (actor === dragon) {
       const column = dragonFrame(time);
       if (!drawPng("dragon", actor.x, actor.y - 2, column, 0, actor.facing, 25, 20)) {
