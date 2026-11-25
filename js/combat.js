@@ -37,7 +37,7 @@ function updateFireballStatus() {
 }
 
 function shootFireball() {
-  if (fireballCooldown > 0) return;
+  if (phase !== "playing" || inventoryOpen() || fireballCooldown > 0) return;
   fireballs.push({
     x: dragon.x, y: dragon.y,
     vx: aim.x * FIREBALL_SPEED, vy: aim.y * FIREBALL_SPEED,
@@ -61,7 +61,7 @@ function updateFireballs(dt) {
     ball.x += ball.vx * travelTime;
     ball.y += ball.vy * travelTime;
     ball.life -= travelTime;
-    if (blocked(ball.x, ball.y, FIREBALL_RADIUS, !key || hasKey)) return false;
+    if (blocked(ball.x, ball.y, FIREBALL_RADIUS)) return false;
 
     const hit = slimes.find(slime => slime.health > 0 &&
       distance(slime, ball) < slime.radius + FIREBALL_RADIUS);
@@ -78,7 +78,7 @@ let meleeCooldown, swing;
 function damageSlime(slime, damage) {
   slime.health = Math.max(0, slime.health - damage);
   slime.flash = SLIME_FLASH_TIME;
-  if (slime.health === 0) groundLoot.push({ x: slime.x, y: slime.y, item: "gel", count: 1 });
+  recordSlimeDamage(slime);
 }
 
 // Volg de lijn van de slag in kleine stappen zodat muren en gesloten deuren beschermen.
@@ -87,12 +87,13 @@ function clearAttackPath(from, to) {
   for (let i = 1; i <= steps; i++) {
     const x = from.x + (to.x - from.x) * i / steps;
     const y = from.y + (to.y - from.y) * i / steps;
-    if (blocked(x, y, 0, !key || hasKey)) return false;
+    if (blocked(x, y, 0)) return false;
   }
   return true;
 }
 
 function melee(hand) {
+  if (phase !== "playing" || inventoryOpen()) return;
   const weapon = progress.hands[hand];
   if (!weapon) {
     showFeedback("No weapon equipped");
@@ -127,7 +128,7 @@ function updateSlimes(dt) {
     const gap = distance(slime, player);
     if (gap > 0) {
       const chase = Math.min(gap, 53 * dt) / gap;
-      move(slime, (player.x - slime.x) * chase, (player.y - slime.y) * chase);
+      move(slime, (player.x - slime.x) * chase, (player.y - slime.y) * chase, false);
     }
     if (distance(player, slime) < 16 && protection === 0) {
       const damage = Math.max(0.5, 1 - totalDefense() * 0.125);

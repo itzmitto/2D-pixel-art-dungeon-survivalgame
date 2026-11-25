@@ -5,31 +5,38 @@ const game = document.querySelector("#game");
 const fullscreenToggle = document.querySelector("#fullscreen-toggle");
 const placeButton = document.querySelector("#build-place");
 const BUILD_ITEMS = ["fence", "floor", "torch"];
-const movementKeys = ["w", "a", "s", "d", "arrowup", "arrowleft", "arrowdown", "arrowright"];
+const walkKeys = ["w", "a", "s", "d"];
+const arrowKeys = ["arrowup", "arrowleft", "arrowdown", "arrowright"];
 
 window.addEventListener("keydown", event => {
-  if (event.ctrlKey || event.metaKey || event.altKey) return;
+  if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return;
   const key = event.key.toLowerCase();
-  if (key === "tab" && (phase === "playing" || inventoryOpen())) {
+  const panelOpen = inventoryOpen();
+  if (key === "tab" && (phase === "playing" || panelOpen)) {
     event.preventDefault();
     if (!event.repeat) navigateInventory(event.shiftKey);
     return;
   }
-  if (key === "b" || (inventoryOpen() && (key === "escape" || (key === "e" && progress.panelMode !== "bag")))) {
+  if (key === "b" || (panelOpen && (key === "escape" || (key === "e" && inventoryPausesWorld())))) {
     event.preventDefault();
     if (!event.repeat) {
-      if (inventoryOpen()) closeInventory();
+      if (panelOpen) closeInventory();
       else openInventory();
     }
     return;
   }
-  if (inventoryOpen() || phase !== "playing") return;
-  if (movementKeys.includes(key)) {
+  if (phase !== "playing") return;
+  if ((walkKeys.includes(key) && !inventoryPausesWorld()) || (!panelOpen && arrowKeys.includes(key))) {
     event.preventDefault();
     pressed.add(key);
     return;
   }
-  if (!/^[1-9]$/.test(key) && ![" ", "e", "f", "j", "k"].includes(key)) return;
+  if (/^[1-9]$/.test(key)) {
+    event.preventDefault();
+    if (!event.repeat) selectHotbar(Number(key) - 1);
+    return;
+  }
+  if (panelOpen || ![" ", "e", "f", "j", "k"].includes(key)) return;
   event.preventDefault();
   if (event.repeat) return;
   switch (key) {
@@ -38,12 +45,18 @@ window.addEventListener("keydown", event => {
     case "f": build(); break;
     case "j": melee("left"); break;
     case "k": melee("right"); break;
-    default: selectHotbar(Number(key) - 1);
   }
 });
 
-window.addEventListener("keyup", event => pressed.delete(event.key.toLowerCase()));
-window.addEventListener("blur", () => pressed.clear());
+window.addEventListener("keyup", event => {
+  const key = event.key.toLowerCase();
+  pressed.delete(key);
+  releaseArrivalKey(key);
+});
+window.addEventListener("blur", () => {
+  for (const key of pressed) releaseArrivalKey(key);
+  pressed.clear();
+});
 
 function navigateInventory(reverse) {
   if (!inventoryOpen()) {
@@ -83,15 +96,14 @@ async function toggleFullscreen() {
 }
 
 function bindInput() {
-  canvas.addEventListener("pointerdown", event => {
-    if (event.button !== 0 || !event.isPrimary || phase !== "playing" || inventoryOpen()) return;
-    melee("left");
+  canvas.addEventListener("click", event => {
+    if (event.button === 0) melee("left");
   });
   fullscreenToggle.addEventListener("click", toggleFullscreen);
   document.addEventListener("fullscreenchange", updateFullscreenButton);
   updateFullscreenButton();
-  document.querySelector(".stage").addEventListener("wheel", event => {
-    if (inventoryOpen() || phase !== "playing" || event.ctrlKey || !event.deltaY) return;
+  canvas.addEventListener("wheel", event => {
+    if (phase !== "playing" || event.ctrlKey || !event.deltaY) return;
     event.preventDefault();
     selectHotbar((progress.selectedHotbar + Math.sign(event.deltaY) + HOTBAR_SLOTS) % HOTBAR_SLOTS);
   }, { passive: false });

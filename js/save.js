@@ -19,6 +19,7 @@ function newProgress() {
     pet: { pet: null },
     held: null, panelMode: null, selectedHotbar: 0, overflow: { bag: {}, chest: {} },
     trees: {}, mines: {}, buildings: {}, collected: {}, repaired: false, dungeonCompleted: false,
+    dungeonSlimes: {},
   };
 }
 
@@ -158,6 +159,27 @@ function loadSlotInventory(saved, loaded) {
   }
 }
 
+function loadDungeonProgress(saved, loaded) {
+  loaded.dungeonCompleted = saved.dungeonCompleted === true;
+  if (loaded.dungeonCompleted || saved.collected?.[DUNGEON_KEY] === true) loaded.collected[DUNGEON_KEY] = true;
+  if (saved.collected?.[DUNGEON_POTION] === true) loaded.collected[DUNGEON_POTION] = true;
+  for (const mapArea of ["dungeon1", "dungeon2"]) {
+    for (const [index, position] of markers("S", AREAS[mapArea]).entries()) {
+      const id = slimeId(mapArea, index);
+      const state = saved.dungeonSlimes?.[id];
+      if (!state || !Number.isInteger(state.health) || state.health < 0 || state.health >= SLIME_HITS) continue;
+      if (state.health > 0) {
+        loaded.dungeonSlimes[id] = { health: state.health };
+        continue;
+      }
+      const validPosition = state.x >= 8 && state.x <= WORLD_WIDTH - 8 &&
+        state.y >= 8 && state.y <= WORLD_HEIGHT - 8 && Number.isFinite(state.x) && Number.isFinite(state.y);
+      loaded.dungeonSlimes[id] = { health: 0, ...(validPosition ? { x: state.x, y: state.y } : position) };
+      if (saved.collected?.[id] === true) loaded.collected[id] = true;
+    }
+  }
+}
+
 function loadProgress() {
   const loaded = newProgress();
   try {
@@ -171,8 +193,8 @@ function loadProgress() {
       if (saved.collected?.[drop.id] === true) loaded.collected[drop.id] = true;
     }
     loadBuildings(saved, loaded);
+    loadDungeonProgress(saved, loaded);
     loaded.repaired = saved.repaired === true;
-    loaded.dungeonCompleted = saved.dungeonCompleted === true;
     if (!(saved.version >= SAVE_VERSION)) storeProgress(loaded);
   } catch {
     // Local storage may be blocked when opening index.html directly.

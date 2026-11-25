@@ -19,6 +19,14 @@
   box-shadow: 0 10px 30px #100c09b3;
   pointer-events: auto;
 }
+.stage[data-panel="bag"] .inventory {
+  position: static;
+  place-self: stretch;
+  place-items: stretch;
+  min-width: 0;
+  min-height: 0;
+}
+.stage[data-panel="bag"] .panel-body { grid-template-columns: minmax(0, 1fr); }
 .panel-heading, .panel-footer {
   display: flex;
   flex-wrap: wrap;

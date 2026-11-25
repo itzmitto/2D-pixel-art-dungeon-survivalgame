@@ -5,7 +5,14 @@ const PNG_SPRITES = {
   dragon: { path: "./images/pets/vonkje-fly.png", width: 80, height: 64, columns: 4, rows: 1 },
   workbench: { path: "./images/objects/workbench.png", width: 32, height: 32, columns: 1, rows: 1 },
   chest: { path: "./images/objects/chest.png", width: 32, height: 32, columns: 1, rows: 1 },
+  bed: { path: "./images/objects/bed.png", width: 32, height: 32, columns: 1, rows: 1 },
   torch: { path: "./images/objects/torch.png", width: 32, height: 32, columns: 1, rows: 1 },
+  cottage: { path: "./images/house/cottage.png", width: 128, height: 96, columns: 1, rows: 1 },
+  houseDoor: { path: "./images/house/doors.png", width: 32, height: 32, columns: 3, rows: 1 },
+  porch: { path: "./images/house/porch.png", width: 64, height: 32, columns: 1, rows: 1 },
+  houseWall: { path: "./images/house/interior-wall.png", width: 352, height: 48, columns: 1, rows: 1 },
+  houseFloor: { path: "./images/house/interior-floor.png", width: 32, height: 32, columns: 4, rows: 1 },
+  rug: { path: "./images/house/rug.png", width: 114, height: 62, columns: 1, rows: 1 },
 };
 
 for (const sheet of Object.values(PNG_SPRITES)) {
@@ -33,7 +40,7 @@ function drawPng(name, x, y, frame = 0, row = 0, facing = 1, drawWidth, drawHeig
 
 function knightFrame() {
   const row = facingTile.y > 0 ? 0 : facingTile.x < 0 ? 1 : facingTile.x > 0 ? 2 : 3;
-  const walking = player.walking && !inventoryOpen() && phase === "playing";
+  const walking = player.walking && !inventoryPausesWorld() && phase === "playing";
   const column = walking ? Math.floor(player.walkTime * 10) % PNG_SPRITES.knight.columns : 0;
   return { row, column };
 }

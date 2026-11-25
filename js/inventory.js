@@ -53,6 +53,7 @@ const RECIPES = {
   },
 };
 
+const stage = document.querySelector(".stage");
 const backpack = document.querySelector("#backpack");
 const backpackToggle = document.querySelector("#backpack-toggle");
 const closeBackpack = document.querySelector("#close-backpack");
@@ -259,6 +260,10 @@ function inventoryOpen() {
   return !backpack.hidden;
 }
 
+function inventoryPausesWorld() {
+  return inventoryOpen() && progress.panelMode !== "bag";
+}
+
 function openInventory(mode = "bag") {
   if (inventoryOpen() && progress.panelMode !== mode && !closeInventory(false)) return;
   progress.panelMode = mode;
@@ -275,8 +280,9 @@ function openInventory(mode = "bag") {
   document.querySelector("#recipe-guide").open = false;
   panelMessage("");
   backpack.hidden = false;
+  stage.dataset.panel = mode;
   backpackToggle.setAttribute("aria-expanded", "true");
-  pressed.clear();
+  swing = undefined;
   updateInventory();
   closeBackpack.focus();
 }
@@ -292,8 +298,8 @@ function closeInventory(focus = true) {
     return false;
   }
   backpack.hidden = true;
+  delete stage.dataset.panel;
   backpackToggle.setAttribute("aria-expanded", "false");
-  pressed.clear();
   inventoryChanged();
   if (focus) backpackToggle.focus();
   return true;
@@ -302,12 +308,13 @@ function closeInventory(focus = true) {
 function resumeInventory() {
   if (progress.held || progress.bagCraft.some(Boolean) || progress.benchCraft.some(Boolean)) {
     const mode = progress.panelMode || (progress.benchCraft.some(Boolean) ? "workbench" : "bag");
-    if (mode !== "bag") enterArea("house", player.hearts);
+    if (mode !== "bag") enterArea("house", player.hearts, stationResume[mode]);
     openInventory(mode);
     panelMessage("Your unfinished inventory changes were restored.");
   } else {
     progress.panelMode = null;
     backpack.hidden = true;
+    delete stage.dataset.panel;
     backpackToggle.setAttribute("aria-expanded", "false");
     updateInventory();
   }
@@ -445,7 +452,6 @@ function updateInventory() {
       if (button.hidden) continue;
       target.area = craftArea;
     }
-    if (hud) button.disabled = inventoryOpen();
     if (target.area === "hotbar") {
       button.setAttribute("aria-pressed", String(target.index === progress.selectedHotbar));
     }

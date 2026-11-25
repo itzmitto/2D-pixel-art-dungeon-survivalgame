@@ -20,7 +20,6 @@ let progress;
 function reset() {
   fireballCooldown = 0;
   meleeCooldown = 0;
-  aim = { x: 0, y: 1 };
   updateFireballStatus();
   protection = 0;
   phase = "playing";
@@ -28,7 +27,6 @@ function reset() {
   respawnButton.hidden = true;
   showFeedback("");
   pressed.clear();
-  status.textContent = "";
   enterArea("forest", 3);
   resumeInventory();
 }
@@ -70,25 +68,10 @@ function update(dt) {
   updateCombat(dt);
   elapsed += dt;
   protection = Math.max(0, protection - dt);
-
-  const down = (a, b) => Number(pressed.has(a) || pressed.has(b));
-  const dx = down("d", "arrowright") - down("a", "arrowleft");
-  const dy = down("s", "arrowdown") - down("w", "arrowup");
-  if (dx || dy) {
-    if (dx && (!dy || facingTile.x)) facingTile = { x: dx, y: 0 };
-    else facingTile = { x: 0, y: dy };
-  }
-  if (dx) player.facing = Math.sign(dx);
-  const step = 104 * dt / (Math.hypot(dx, dy) || 1);
-  const { x, y } = player;
-  move(player, dx * step, dy * step, !key || hasKey);
-  const traveled = Math.hypot(player.x - x, player.y - y);
-  player.walking = traveled > 0;
-  player.walkTime = player.walking ? player.walkTime + dt : 0;
-  if (traveled > 0) aim = { x: (player.x - x) / traveled, y: (player.y - y) / traveled };
+  if (updateArea(updatePlayer(dt))) return;
   followDragon(dt);
   updateHarvestEffects();
-  if (!updateDungeon()) updateSlimes(dt);
+  updateSlimes(dt);
 }
 
 bindInput();
@@ -104,7 +87,7 @@ function frame(now) {
     feedbackTime -= dt;
     if (feedbackTime <= 0) feedback.textContent = "";
   }
-  if (phase === "playing" && !inventoryOpen()) update(dt);
+  if (phase === "playing" && !inventoryPausesWorld()) update(dt);
   updateAction();
   draw(now / 1000);
   requestAnimationFrame(frame);

@@ -1,7 +1,7 @@
 "use strict";
 
 const TILE = 32;
-// # muur, T fakkel, P ridder, D draak, S slime, K sleutel, E uitgang, C kist, V potion.
+// # wall, T torch, P spawn, S slime, K key, A entrance, E exit, C chest, V potion.
 const ROOM_ONE = [
   "###T#######T###",
   "#.............#",
@@ -11,7 +11,7 @@ const ROOM_ONE = [
   "#.........#...#",
   "#...T.....T...#",
   "#.........S...#",
-  "#.DP..........E",
+  "AP............E",
   "###T#######T###",
 ];
 
@@ -24,17 +24,17 @@ const ROOM_TWO = [
   "##V#.....C....#",
   "##.#.####.....#",
   "##.#......S...#",
-  "#P............#",
+  "AP............#",
   "###T#######T###",
 ];
-// Elk gebied gebruikt hetzelfde tegelraster en dezelfde botsingen.
+// Each area uses the same tile grid and collision rules.
 const FOREST = [
   "###############",
   "#.Y..Y....Y.Y.#",
   "#.HHHH.....QGQ#",
   "#.HHHH....==R.#",
   "#.HHUH..===...#",
-  "#...P====.....#",
+  "#..+P====.....#",
   "#..Y.Y..Y.Y.MN#",
   "#.Y...Y...N..N#",
   "#...Y....YMYN.#",
@@ -56,9 +56,9 @@ const AREAS = { forest: FOREST, house: HOUSE, dungeon1: ROOM_ONE, dungeon2: ROOM
 const WORLD_WIDTH = FOREST[0].length * TILE;
 const WORLD_HEIGHT = FOREST.length * TILE;
 
-function markers(symbol) {
+function markers(symbol, map = room) {
   const positions = [];
-  room.forEach((row, y) => {
+  map.forEach((row, y) => {
     [...row].forEach((tile, x) => {
       if (tile === symbol) positions.push({ x: (x + 0.5) * TILE, y: (y + 0.5) * TILE });
     });
@@ -66,9 +66,39 @@ function markers(symbol) {
   return positions;
 }
 
+function arrivalAt(x, y, dx, dy) {
+  return { ...centerOf({ x, y }), direction: { x: dx, y: dy } };
+}
+
+const stationResume = {
+  chest: arrivalAt(10, 4, 0, -1),
+  workbench: arrivalAt(4, 4, 0, -1),
+};
+const houseApproach = arrivalAt(4, 5, 0, 1);
+const caveApproach = arrivalAt(12, 3, 0, 1);
+const PORTALS = {
+  forest: {
+    U: { to: "house", arrival: arrivalAt(7, 7, 0, -1), back: "U", dy: -1, ready: () => progress.repaired },
+    G: { to: "dungeon1", arrival: arrivalAt(1, 8, 1, 0), back: "A", dy: -1 },
+  },
+  house: {
+    U: { to: "forest", arrival: houseApproach, back: "U", dy: 1 },
+  },
+  dungeon1: {
+    A: { to: "forest", arrival: caveApproach, back: "G", dx: -1 },
+    E: { to: "dungeon2", arrival: arrivalAt(1, 8, 1, 0), back: "A", dx: 1, ready: () => hasKey },
+  },
+  dungeon2: {
+    A: { to: "dungeon1", arrival: arrivalAt(13, 8, -1, 0), back: "E", dx: -1 },
+    E: { to: "forest", arrival: caveApproach, back: "G", dx: 1, completesDungeon: true },
+  },
+};
+const DUNGEON_KEY = "dungeon1:key";
+const DUNGEON_POTION = "dungeon2:potion";
 const FOLLOW_DELAY = 0.28;
 const FOLLOW_DISTANCE = 23;
-let area, room, key, exit, potion;
+let area, room, key, potion;
+let areaPortals, arrivalGuard;
 let player, dragon, slimes, trail, elapsed, hasKey, protection, phase;
 let groundLoot = [];
 let harvestEffects = [];
@@ -100,36 +130,73 @@ const FOREST_LOOT = [
   { id: "trail-potion", item: "potion", count: 1, ...centerOf({ x: 9, y: 4 }) },
 ];
 
-function enterArea(nextArea, health, arrival = "P") {
+function enterArea(nextArea, health, arrival = houseApproach, back = "") {
   area = nextArea;
   room = AREAS[area];
+  areaPortals = Object.entries(PORTALS[area]).map(([tile, portal]) => ({
+    tile, ...portal, position: markers(tile)[0],
+  }));
+  arrivalGuard = back ? { tile: back, keys: new Set(pressed) } : null;
   groundLoot = area === "forest" ? forestLoot() : [];
   harvestEffects = [];
   swing = undefined;
-  const [spawn] = markers(arrival);
-  facingTile = { x: 0, y: 1 };
-  player = { ...spawn, radius: 8, facing: 1, hearts: health, walkTime: 0 };
-  dragon = { x: spawn.x - FOLLOW_DISTANCE, y: spawn.y, facing: 1 };
-  if (blocked(dragon.x, dragon.y, 8, false)) dragon.x = spawn.x + FOLLOW_DISTANCE;
-  slimes = markers("S").map(position => ({
-    ...position, radius: 8, name: "slime", health: SLIME_HITS, flash: 0,
-  }));
-  fireballs = [];
+  const { direction, ...spawn } = arrival;
+  facingTile = aim = direction;
+  const facing = direction.x || 1;
+  player = { ...spawn, radius: 8, facing, hearts: health, walkTime: 0 };
+  const offsets = direction.x ? [[0, -1], [0, 1], [1, 0], [-1, 0]] : [[-1, 0], [1, 0], [0, 1], [0, -1]];
+  const dragonSpawn = offsets.map(([x, y]) => ({
+    x: spawn.x + x * FOLLOW_DISTANCE, y: spawn.y + y * FOLLOW_DISTANCE,
+  })).find(position => !blocked(position.x, position.y, 8, false));
+  dragon = { ...(dragonSpawn || spawn), facing };
   [key] = markers("K");
   [potion] = markers("V");
-  [exit] = markers("E");
+  hasKey = Boolean(key && progress.collected[DUNGEON_KEY]);
+  if (progress.collected[DUNGEON_POTION]) potion = undefined;
+  slimes = loadSlimes();
+  fireballs = [];
   trail = [{ ...dragon, time: 0 }, { ...spawn, time: 0 }];
   elapsed = 0;
-  hasKey = false;
+  status.textContent = "";
   updateHud();
+}
+
+function slimeId(mapArea, index) {
+  return mapArea + ":slime:" + index;
+}
+
+function slimeDrop(id, { x, y }) {
+  return { id, x, y, item: "gel", count: 1 };
+}
+
+function loadSlimes() {
+  return markers("S").flatMap((position, index) => {
+    const id = slimeId(area, index);
+    const saved = progress.dungeonSlimes[id];
+    if (saved?.health === 0) {
+      if (!progress.collected[id]) groundLoot.push(slimeDrop(id, saved));
+      return [];
+    }
+    return [{ ...position, id, radius: 8, name: "slime", health: saved?.health ?? SLIME_HITS, flash: 0 }];
+  });
+}
+
+function recordSlimeDamage({ id, x, y, health }) {
+  progress.dungeonSlimes[id] = health === 0 ? { health, x, y } : { health };
+  if (health === 0) groundLoot.push(slimeDrop(id, { x, y }));
+  storeProgress();
 }
 
 function distance(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
-// Test de vier hoeken van het botsingsvak. Beweeg per as zodat je langs muren kunt glijden.
-function blocked(x, y, radius, doorOpen) {
+function portalOpen(portal) {
+  return !portal.ready || portal.ready();
+}
+
+// Test all four corners. Separate the axes so actors can slide along walls.
+function blocked(x, y, radius, canUsePortals = true) {
   for (const edgeY of [y - radius, y + radius]) {
     for (const edgeX of [x - radius, x + radius]) {
       const column = Math.floor(edgeX / TILE);
@@ -138,15 +205,37 @@ function blocked(x, y, radius, doorOpen) {
       const resource = area === "forest" && RESOURCES[tile];
       if (area === "forest" && ((resource && !exhausted(resource, column, row)) ||
           progress.buildings[tileId(column, row)] === "fence")) return true;
-      if (!tile || "#TCHUGBQWO".includes(tile) || (tile === "E" && !doorOpen)) return true;
+      if (!tile || "#TCHBQWO".includes(tile)) return true;
+      const portal = PORTALS[area][tile];
+      if (portal && (!canUsePortals || !portalOpen(portal))) return true;
     }
   }
   return false;
 }
 
-function move(actor, dx, dy, doorOpen = false) {
-  if (!blocked(actor.x + dx, actor.y, actor.radius, doorOpen)) actor.x += dx;
-  if (!blocked(actor.x, actor.y + dy, actor.radius, doorOpen)) actor.y += dy;
+function move(actor, dx, dy, canUsePortals = true) {
+  if (!blocked(actor.x + dx, actor.y, actor.radius, canUsePortals)) actor.x += dx;
+  if (!blocked(actor.x, actor.y + dy, actor.radius, canUsePortals)) actor.y += dy;
+}
+
+function updatePlayer(dt) {
+  const arrowsMove = !inventoryOpen();
+  const down = (letter, arrow) => Number(pressed.has(letter) || (arrowsMove && pressed.has(arrow)));
+  const dx = down("d", "arrowright") - down("a", "arrowleft");
+  const dy = down("s", "arrowdown") - down("w", "arrowup");
+  if (dx || dy) {
+    if (dx && (!dy || facingTile.x)) facingTile = { x: dx, y: 0 };
+    else facingTile = { x: 0, y: dy };
+  }
+  if (dx) player.facing = Math.sign(dx);
+  const step = 104 * dt / (Math.hypot(dx, dy) || 1);
+  const { x, y } = player;
+  move(player, dx * step, dy * step);
+  const traveled = Math.hypot(player.x - x, player.y - y);
+  player.walking = traveled > 0;
+  player.walkTime = player.walking ? player.walkTime + dt : 0;
+  if (player.walking) aim = { x: (player.x - x) / traveled, y: (player.y - y) / traveled };
+  return { dx, dy };
 }
 
 function tileId(x, y) {
@@ -227,9 +316,7 @@ function getAction() {
   if (phase !== "playing" || inventoryOpen()) return "";
   if (nearbyLoot()) return "pickup";
   if (area === "forest") {
-    if (nearby("G")) return "dungeon";
-    if (nearby("U")) {
-      if (progress.repaired) return "enter";
+    if (nearby("U") && !progress.repaired) {
       return itemCount("wood") >= 6 ? "repair" : "inspect";
     }
     const { x, y } = targetTile();
@@ -240,7 +327,6 @@ function getAction() {
     }
   }
   if (area === "house") {
-    if (nearby("U")) return "leave";
     if (nearby("W")) return "workbench";
     if (nearby("O")) return "chest";
     if (nearby("B") && player.hearts < 3) return "rest";
@@ -253,9 +339,6 @@ function interact() {
   switch (action) {
     case "pickup":
       pickUp(nearbyLoot());
-      break;
-    case "dungeon":
-      enterArea("dungeon1", player.hearts);
       break;
     case "chop":
     case "mine": {
@@ -272,12 +355,6 @@ function interact() {
       storeProgress();
       updateInventory();
       showFeedback("Door repaired.");
-      break;
-    case "enter":
-      enterArea("house", player.hearts);
-      break;
-    case "leave":
-      enterArea("forest", player.hearts);
       break;
     case "workbench":
     case "chest":
@@ -311,10 +388,9 @@ function pickUp(drop) {
 function updateAction() {
   const action = getAction();
   const hint = {
-    dungeon: "E — Enter the cave", chop: "E — Chop tree",
+    chop: "E — Chop tree",
     inspect: "E — Inspect broken door", repair: "E — Repair door (6 wood)",
-    enter: "E — Enter house",
-    leave: "E — Go outside", rest: "E — Rest",
+    rest: "E — Rest",
     workbench: "E — Open workbench", chest: "E — Open house chest",
   }[action];
   let text = hint || "";
@@ -364,28 +440,33 @@ function completeDungeon() {
   showFeedback("Dungeon cleared");
 }
 
-function updateDungeon() {
+function releaseArrivalKey(key) {
+  arrivalGuard?.keys.delete(key);
+}
+
+function updateArea({ dx, dy }) {
   if (key && !hasKey && distance(player, key) < 16) {
     hasKey = true;
+    progress.collected[DUNGEON_KEY] = true;
+    storeProgress();
     updateHud();
     status.textContent = "Key found. The door to room 2 is open.";
   }
-  if (exit && (!key || hasKey) && distance(player, exit) < 13) {
-    if (area === "dungeon1") {
-      enterArea("dungeon2", player.hearts);
-    } else {
-      enterArea("forest", player.hearts, "R");
-      completeDungeon();
-    }
-    return true;
-  }
-
   if (potion && player.hearts < 3 && distance(player, potion) < 16) {
     potion = undefined;
+    progress.collected[DUNGEON_POTION] = true;
     player.hearts = Math.min(3, player.hearts + 1);
+    storeProgress();
     updateHud();
     status.textContent = "Potion used. " + player.hearts + " of 3 hearts.";
   }
 
-  return false;
+  if (arrivalGuard && arrivalGuard.keys.size === 0) arrivalGuard = null;
+  const portal = areaPortals.find(portal => portal.tile !== arrivalGuard?.tile &&
+    dx * (portal.dx || 0) + dy * (portal.dy || 0) > 0 &&
+    distance(player, portal.position) < 13 && portalOpen(portal));
+  if (!portal) return false;
+  enterArea(portal.to, player.hearts, portal.arrival, portal.back);
+  if (portal.completesDungeon) completeDungeon();
+  return true;
 }
