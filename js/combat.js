@@ -6,7 +6,7 @@ const FIREBALL_SPEED = 220;
 const FIREBALL_RADIUS = 4;
 const FIREBALL_DAMAGE = 2;
 const ENEMIES = {
-  wolf: { health: 4, speed: 68, rushSpeed: 68, reach: 16, sight: 152, damage: 1 },
+  wolf: { health: 4, speed: 68, reach: 16, sight: 152, damage: 1 },
   snake: { health: 4, speed: 38, rushSpeed: 96, reach: 15, sight: 104, damage: 0.75 },
   warden: { health: 24, radius: 14 },
 };
@@ -140,7 +140,17 @@ function damagePlayer(rawDamage) {
 
 function updateEnemies(dt) {
   for (const enemy of enemies) {
-    if (enemy.health === 0) continue;
+    if (enemy.health === 0 || phase !== "playing") continue;
+    if (enemy.kind === "wolf") {
+      updateWolf(enemy, dt);
+      continue;
+    }
+    if (!enemyMayEngage(enemy)) {
+      enemy.walkTime = 0;
+      enemy.attackPose = false;
+      if (enemy.kind === "warden") enemy.attack = null;
+      continue;
+    }
     if (enemy.kind === "warden") {
       updateWarden(enemy, dt);
       continue;

@@ -325,10 +325,13 @@ function resumeInventory() {
     const mode = progress.panelMode || (progress.benchCraft.some(Boolean) ? "workbench" : "bag");
     const chestId = progress.chestId ?? "house";
     if (mode === "chest" && chestUnlocked(chestId)) {
-      enterArea(chestId, player.hearts, CHEST_STATIONS[chestId].arrival);
+      const station = CHEST_STATIONS[chestId];
+      if (distance(player, station.position) >= 38) placeParty(station.arrival);
       openInventory(mode, chestId);
     } else {
-      if (mode === "workbench") enterArea("house", player.hearts, WORKBENCH_ARRIVAL);
+      if (mode === "workbench" && (!insideCottage(player) || distance(player, COTTAGE.workbench) >= 35)) {
+        placeParty(COTTAGE.workbenchArrival);
+      }
       openInventory(mode === "chest" ? "bag" : mode);
     }
     panelMessage("Your unfinished inventory changes were restored.");
@@ -528,19 +531,41 @@ function registerSlot(parent, target, label, options = {}) {
         event.preventDefault();
         act(true);
       }
-      if (!parent.classList.contains("slot-grid")) return;
-      const columns = Number(parent.dataset.size) || HOTBAR_SLOTS;
-      const delta = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -columns, ArrowDown: columns }[event.key];
-      if (!delta) return;
-      event.preventDefault();
-      const next = parent.children[target.index + delta];
-      if (next && !next.hidden) next.focus();
     });
   }
   slotViews.push({ button, target, label, number, hud, crafting });
 }
 
+const PANEL_DIRECTIONS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+
+function navigatePanel(event) {
+  const direction = PANEL_DIRECTIONS[event.key];
+  if (!direction || !inventoryOpen() || event.ctrlKey || event.metaKey || event.altKey) return;
+  event.preventDefault();
+  const current = document.activeElement;
+  const origin = current.getBoundingClientRect();
+  const [axisX, axisY] = direction;
+  let next;
+  let best = Infinity;
+  for (const control of backpack.querySelectorAll("button:enabled, summary")) {
+    if (control === current) continue;
+    const bounds = control.getBoundingClientRect();
+    if (!bounds.width || !bounds.height) continue;
+    const dx = bounds.left + (bounds.width - origin.width) / 2 - origin.left;
+    const dy = bounds.top + (bounds.height - origin.height) / 2 - origin.top;
+    const forward = dx * axisX + dy * axisY;
+    if (forward <= 1) continue;
+    const score = forward + 3 * Math.abs(dx * axisY - dy * axisX);
+    if (score < best) {
+      best = score;
+      next = control;
+    }
+  }
+  next?.focus();
+}
+
 function bindInventory() {
+  backpack.addEventListener("keydown", navigatePanel);
   backpackToggle.addEventListener("click", () => inventoryOpen() ? closeInventory() : openInventory());
   closeBackpack.addEventListener("click", () => closeInventory());
   recoverButton.addEventListener("click", recoverOverflow);

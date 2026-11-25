@@ -22,12 +22,8 @@ window.addEventListener("keydown", event => {
   if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return;
   const key = event.key.toLowerCase();
   const panelOpen = inventoryOpen();
-  if (key === "tab" && (phase === "playing" || panelOpen)) {
-    event.preventDefault();
-    if (!event.repeat) navigateInventory(event.shiftKey);
-    return;
-  }
-  if (key === "b" || (panelOpen && (key === "escape" || (key === "e" && inventoryPausesWorld())))) {
+  if (((key === "tab" || key === "b") && (phase === "playing" || panelOpen)) ||
+      (panelOpen && (key === "escape" || (key === "e" && inventoryPausesWorld())))) {
     event.preventDefault();
     if (!event.repeat) {
       if (panelOpen) closeInventory();
@@ -63,27 +59,12 @@ window.addEventListener("keyup", event => {
   if (event.key === "Shift") heldShift.delete(shiftKey(event));
   const key = event.key.toLowerCase();
   pressed.delete(key);
-  releaseArrivalKey(key);
 });
 window.addEventListener("blur", () => {
-  for (const key of pressed) releaseArrivalKey(key);
   pressed.clear();
   heldShift.clear();
   clearMouseRoute();
 });
-
-function navigateInventory(reverse) {
-  if (!inventoryOpen()) {
-    openInventory();
-    return;
-  }
-  const controls = [...backpack.querySelectorAll("button:enabled, summary")]
-    .filter(element => !element.closest("[hidden]"));
-  const current = controls.indexOf(document.activeElement);
-  const offset = reverse ? -1 : 1;
-  const next = current < 0 ? (reverse ? controls.length - 1 : 0) : (current + offset + controls.length) % controls.length;
-  controls[next]?.focus();
-}
 
 function selectedBuildItem() {
   const item = selectedStack()?.item;
@@ -91,7 +72,7 @@ function selectedBuildItem() {
 }
 
 function updateBuildControls() {
-  placeButton.disabled = phase !== "playing" || inventoryOpen() || area !== "forest" || !selectedBuildItem();
+  placeButton.disabled = phase !== "playing" || inventoryOpen() || region !== "village" || !selectedBuildItem();
 }
 
 function updateFullscreenButton() {
@@ -115,7 +96,7 @@ function worldPoint(event) {
   const y = (event.clientY - rect.top) / rect.height;
   // The stage letterboxes the canvas itself. Only the canvas rectangle maps to the world.
   if (!(x >= 0 && x < 1 && y >= 0 && y < 1)) return null;
-  return { x: x * WORLD_WIDTH, y: y * WORLD_HEIGHT };
+  return { x: camera.x + x * VIEW_WIDTH, y: camera.y + y * VIEW_HEIGHT };
 }
 
 function bindInput() {
@@ -137,7 +118,7 @@ function bindInput() {
     selectHotbar((progress.selectedHotbar + Math.sign(event.deltaY) + HOTBAR_SLOTS) % HOTBAR_SLOTS);
   }, { passive: false });
   placeButton.addEventListener("click", build);
-  respawnButton.addEventListener("click", reset);
+  respawnButton.addEventListener("click", () => reset());
   document.querySelector("#new-game").addEventListener("click", () => {
     if (!window.confirm("Start a new game? Your saved progress will be erased.")) return;
     clearProgress();

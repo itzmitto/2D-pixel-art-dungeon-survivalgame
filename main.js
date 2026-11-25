@@ -2,23 +2,11 @@
 
 const canvas = document.querySelector("#dungeon");
 const ctx = canvas.getContext("2d");
-ctx.scale(canvas.width / WORLD_WIDTH, canvas.height / WORLD_HEIGHT);
+ctx.scale(canvas.width / VIEW_WIDTH, canvas.height / VIEW_HEIGHT);
 ctx.imageSmoothingEnabled = false;
-const roomNumber = document.querySelector("#room-number");
-const hearts = document.querySelector("#hearts");
-const fireballStatus = document.querySelector("#fireball-status");
-const keyLabel = document.querySelector("#key");
-const ending = document.querySelector("#ending");
-const result = document.querySelector("#result");
-const respawnButton = document.querySelector("#respawn");
-const actionLabel = document.querySelector("#action");
-const feedback = document.querySelector("#feedback");
-const status = document.querySelector("#status");
-
-let facingTile, feedbackTime;
 let progress;
 
-function reset() {
+function reset(position = COTTAGE.spawn) {
   fireballCooldown = 0;
   meleeCooldown = 0;
   updateFireballStatus();
@@ -28,50 +16,17 @@ function reset() {
   respawnButton.hidden = true;
   showFeedback("");
   pressed.clear();
-  enterArea("forest", 3);
+  startWorld(position);
   resumeInventory();
-}
-
-function updateHud() {
-  hearts.replaceChildren(...Array.from({ length: 3 }, (_, i) => {
-    const heart = document.createElement("span");
-    const fill = Math.max(0, Math.min(1, player.hearts - i));
-    heart.textContent = fill === 0 ? "♡" : "♥";
-    heart.style.setProperty("--heart-fill", fill * 100 + "%");
-    return heart;
-  }));
-  hearts.setAttribute("aria-label", formatNumber(player.hearts) + " of 3 hearts");
-  game.dataset.area = area;
-  roomNumber.textContent = {
-    forest: "Forest", house: "House", dungeon1: "Dungeon 1 of 3", dungeon2: "Dungeon 2 of 3", dungeon3: "Warden's hall",
-  }[area];
-  keyLabel.hidden = !key;
-  keyLabel.textContent = hasKey ? "Key found" : "Key missing";
-  updateInventory();
-  updateWardenHud();
-}
-
-function finish(outcome, message) {
-  clearMouseRoute();
-  phase = outcome;
-  result.textContent = message;
-  ending.hidden = false;
-  respawnButton.hidden = false;
-  status.textContent = message;
-  updateInventory();
-  updateAction();
-}
-
-function showFeedback(message) {
-  feedback.textContent = message;
-  feedbackTime = 3;
+  storeProgress();
 }
 
 function update(dt) {
   updateCombat(dt);
   elapsed += dt;
   protection = Math.max(0, protection - dt);
-  if (updateArea(updatePlayer(dt))) return;
+  updatePlayer(dt);
+  updateWorld(dt);
   followDragon(dt);
   updateEnemies(dt);
 }
@@ -79,17 +34,17 @@ function update(dt) {
 bindInput();
 bindInventory();
 progress = loadProgress();
-reset();
+reset(progress.position);
+window.addEventListener("pagehide", () => storeProgress());
 let previousTime;
-// Cap the time step so returning to a suspended tab does not cause a jump.
+
 function frame(now) {
+  // Cap the timestep after the tab has been suspended.
   const dt = Math.min(0.033, (now - (previousTime ?? now)) / 1000);
   previousTime = now;
-  if (feedbackTime > 0) {
-    feedbackTime -= dt;
-    if (feedbackTime <= 0) feedback.textContent = "";
-  }
+  updateFeedback(dt);
   if (phase === "playing" && !inventoryPausesWorld()) update(dt);
+  updateCamera(dt);
   updateAction();
   draw(now / 1000);
   requestAnimationFrame(frame);

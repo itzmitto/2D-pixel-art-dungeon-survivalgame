@@ -10,7 +10,7 @@ const wardenHealth = document.querySelector("#warden-health");
 const wardenCue = document.querySelector("#warden-cue");
 
 function updateWardenHud() {
-  const warden = enemies.find(enemy => enemy.id === WARDEN_ID && enemy.health > 0);
+  const warden = region === "arena" && enemies.find(enemy => enemy.id === WARDEN_ID && enemy.health > 0);
   wardenHud.hidden = !warden;
   if (!warden) return;
   wardenHealth.max = ENEMIES.warden.health;

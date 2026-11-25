@@ -13,10 +13,6 @@ function tileAt({ x, y }) {
   return { x: Math.floor(x / TILE), y: Math.floor(y / TILE) };
 }
 
-function roomTile({ x, y }) {
-  return room[y]?.[x];
-}
-
 function routeSegmentClear(from, to, walkable) {
   const steps = Math.ceil(distance(from, to) / (MAX_MOVE_STEP / 2));
   let previousX = from.x;
@@ -34,20 +30,8 @@ function routeSegmentClear(from, to, walkable) {
 function findMouseRoute(target) {
   const start = tileAt(player);
   const goal = tileAt(target);
-  const goalTile = roomTile(goal);
-  const goalPortal = PORTALS[area][goalTile];
-  if (!goalTile || (goalPortal && !portalOpen(goalPortal))) return null;
-  if (goalPortal) target = centerOf(goal);
-
   const startId = tileId(start.x, start.y);
-  const goalId = tileId(goal.x, goal.y);
-  const walkable = (x, y) => {
-    if (blocked(x, y, player.radius)) return false;
-    const tile = tileAt({ x, y });
-    const id = tileId(tile.x, tile.y);
-    // A door is a valid destination. Avoid routing through other thresholds on the way.
-    return id === startId || id === goalId || !PORTALS[area][roomTile(tile)];
-  };
+  const walkable = (x, y) => !blocked(x, y, player.radius);
   if (!walkable(target.x, target.y)) return null;
   if (routeSegmentClear(player, target, walkable)) return [target];
 
@@ -131,15 +115,12 @@ function updatePlayer(dt) {
   const multiplier = sprinting() ? 2 : 1;
   const budget = WALK_SPEED * multiplier * dt;
   const { x, y } = player;
-  let routePortal;
 
   if (drive) {
     clearMouseRoute();
     const steps = Math.ceil(budget / MAX_MOVE_STEP);
     for (let i = 0; i < steps; i++) move(player, dx * budget / drive / steps, dy * budget / drive / steps);
   } else {
-    const destination = mouseRoute.at(-1);
-    if (destination) routePortal = roomTile(tileAt(destination));
     ({ dx, dy } = moveAlongRoute(budget));
   }
 
@@ -155,5 +136,4 @@ function updatePlayer(dt) {
   player.walking = traveled > 0;
   player.walkTime = player.walking ? player.walkTime + dt * multiplier : 0;
   if (player.walking) aim = { x: (player.x - x) / traveled, y: (player.y - y) / traveled };
-  return { dx, dy, routePortal };
 }

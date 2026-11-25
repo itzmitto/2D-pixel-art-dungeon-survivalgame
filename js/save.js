@@ -1,8 +1,9 @@
 "use strict";
 
 const SAVE_KEY = "vonkje-survival-v1";
-const SAVE_VERSION = 6;
+const SAVE_VERSION = 7;
 const SLOT_SAVE_VERSION = 5;
+const DUNGEON_LOOT_VERSION = 6;
 const SAVED_SLOT_COUNTS = { bag: BAG_SLOTS, hotbar: HOTBAR_SLOTS, chest: CHEST_SLOTS, bagCraft: 4, benchCraft: 9 };
 
 function newProgress() {
@@ -25,7 +26,7 @@ function newProgress() {
     pet: { pet: null },
     held: null, panelMode: null, chestId: null, selectedHotbar: 0, overflow: { bag: {}, chest: {} },
     trees: {}, mines: {}, buildings: {}, collected: {}, dungeonCompleted: false,
-    dungeonEnemies: {}, dungeonChests, legacyTrailLoot: false,
+    dungeonEnemies: {}, dungeonChests, legacyTrailLoot: false, position: { ...COTTAGE.spawn },
   };
 }
 
@@ -39,20 +40,11 @@ function addOverflow(loaded, area, item, count) {
   overflow[item] = (overflow[item] || 0) + count;
 }
 
-// Relocate older buildings that overlap reserved tiles, and restore harvest progress.
 function loadBuildings(saved, loaded) {
   const displaced = [];
-  const empty = [];
-  FOREST.forEach((row, y) => {
+  LEGACY_FOREST.forEach((row, y) => {
     [...row].forEach((tile, x) => {
       const id = tileId(x, y);
-      const building = saved.buildings?.[id];
-      if (building === "fence" || building === "floor" || building === "torch") {
-        if (tile === ".") loaded.buildings[id] = building;
-        else displaced.push({ x, y, building });
-      } else if (tile === ".") {
-        empty.push({ x, y, id });
-      }
       const resource = LEGACY_RESOURCES[tile];
       if (!resource) return;
       const hits = saved[resource.state]?.[id];
@@ -65,6 +57,22 @@ function loadBuildings(saved, loaded) {
       }
     });
   });
+  for (const [id, building] of Object.entries(saved.buildings || {})) {
+    if (!["fence", "floor", "torch"].includes(building) || !/^\d+,\d+$/.test(id)) continue;
+    let [x, y] = id.split(",").map(Number);
+    if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y)) continue;
+    if (!(saved.version >= SAVE_VERSION)) ({ x, y } = tileAt(legacyWorldPoint("forest", worldCenter(x, y))));
+    const slot = tileId(x, y);
+    if (canBuildTile(x, y) && !loaded.buildings[slot]) loaded.buildings[slot] = building;
+    else displaced.push({ x, y, building });
+  }
+  const empty = [];
+  if (displaced.length) {
+    WORLD_MAP.forEach((row, y) => [...row].forEach((_, x) => {
+      const id = tileId(x, y);
+      if (canBuildTile(x, y) && !loaded.buildings[id]) empty.push({ x, y, id });
+    }));
+  }
   for (const { x, y, building } of displaced) {
     empty.sort((a, b) => (Math.abs(a.x - x) + Math.abs(a.y - y)) -
       (Math.abs(b.x - x) + Math.abs(b.y - y)));
@@ -186,10 +194,10 @@ function loadDungeonProgress(saved, loaded) {
   loaded.dungeonCompleted = saved.dungeonCompleted === true;
   if (loaded.dungeonCompleted || saved.collected?.[DUNGEON_KEY] === true) loaded.collected[DUNGEON_KEY] = true;
   if (saved.collected?.[DUNGEON_POTION] === true) loaded.collected[DUNGEON_POTION] = true;
-  for (const mapArea of Object.keys(loaded.dungeonChests)) {
-    for (const { id, kind, x, y } of dungeonSpawns(mapArea)) {
+  for (const spawn of WORLD_ENEMY_SPAWNS) {
+      const { id, kind, zone } = spawn;
       const state = saved.dungeonEnemies?.[id] ?? saved.dungeonSlimes?.[id];
-      if (!state || !Number.isInteger(state.health) || state.health < 0 || state.health >= ENEMIES[kind].health) continue;
+      if (!state || !Number.isInteger(state.health) || state.health < 0 || state.health >= enemyMaxHealth(spawn)) continue;
       if (state.health > 0) {
         loaded.dungeonEnemies[id] = { health: state.health };
         continue;
@@ -198,14 +206,27 @@ function loadDungeonProgress(saved, loaded) {
         loaded.dungeonEnemies[id] = { health: 0 };
         continue;
       }
-      const validPosition = state.x >= 8 && state.x <= WORLD_WIDTH - 8 &&
-        state.y >= 8 && state.y <= WORLD_HEIGHT - 8 && Number.isFinite(state.x) && Number.isFinite(state.y);
+      const legacy = !(saved.version >= SAVE_VERSION);
+      const width = legacy ? 15 * TILE : WORLD_WIDTH;
+      const height = legacy ? 10 * TILE : WORLD_HEIGHT;
+      const validPosition = state.x >= 8 && state.x <= width - 8 && state.y >= 8 && state.y <= height - 8;
+      const destination = validPosition ? (legacy ? legacyWorldPoint(id.split(":")[0], state) : state) : spawn;
+      const position = safeWorldPoint(destination, loaded, zone);
       const drop = validStack(state.drop) ? { item: state.drop.item, count: state.drop.count } :
-        !(saved.version >= SAVE_VERSION) ? { item: "gel", count: 1 } : DUNGEON_DROPS[kind];
-      loaded.dungeonEnemies[id] = { health: 0, ...(validPosition ? { x: state.x, y: state.y } : { x, y }), drop };
+        !(saved.version >= DUNGEON_LOOT_VERSION) ? { item: "gel", count: 1 } : DUNGEON_DROPS[kind];
+      loaded.dungeonEnemies[id] = { health: 0, ...position, drop };
       if (saved.collected?.[id] === true) loaded.collected[id] = true;
-    }
   }
+}
+
+function loadPosition(saved, loaded) {
+  const point = saved.position ?? saved.playerPosition ?? saved.player ?? saved.location;
+  if (saved.version >= SAVE_VERSION) return safeWorldPoint(point, loaded);
+  const oldArea = point?.area ?? point?.region ?? saved.area ?? saved.currentArea ?? "forest";
+  const arrival = LEGACY_ARRIVALS[oldArea];
+  if (!arrival) return { ...COTTAGE.spawn };
+  const translated = Number.isFinite(point?.x) && Number.isFinite(point?.y) ? legacyWorldPoint(oldArea, point) : arrival;
+  return safeWorldPoint(translated, loaded, regionAt(arrival));
 }
 
 function loadProgress() {
@@ -217,12 +238,13 @@ function loadProgress() {
     if (saved.version >= SLOT_SAVE_VERSION) loadSlotInventory(saved, loaded);
     else migrateLegacyInventory(saved, loaded);
 
-    loaded.legacyTrailLoot = saved.legacyTrailLoot === true || !(saved.version >= SAVE_VERSION);
+    loaded.legacyTrailLoot = saved.legacyTrailLoot === true || !(saved.version >= DUNGEON_LOOT_VERSION);
     for (const drop of FOREST_LOOT) {
       if (saved.collected?.[drop.id] === true) loaded.collected[drop.id] = true;
     }
     loadBuildings(saved, loaded);
     loadDungeonProgress(saved, loaded);
+    loaded.position = loadPosition(saved, loaded);
     if (!(saved.version >= SAVE_VERSION)) storeProgress(loaded);
   } catch {
     // Local storage may be blocked when opening index.html directly.

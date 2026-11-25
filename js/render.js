@@ -192,12 +192,14 @@ function drawPixelMap(pixels, colors, x, y, facing = 1, context = ctx) {
   });
 }
 
-function drawEnemy({ kind, x, y, walkTime, facing, flash, attackPose }) {
+function drawEnemy(enemy, time) {
+  const { kind, x, y, walkTime, facing, flash, attackPose } = enemy;
   const actionFrame = PNG_SPRITES[kind].columns - 1;
   const frame = attackPose ? actionFrame : Math.floor(walkTime * 8) % actionFrame;
   ctx.save();
   if (flash > 0) ctx.filter = "brightness(1.8) saturate(0.5)";
-  if (!drawPng(kind, x, y - 4, frame, 0, facing, 34, 26)) {
+  const paintedWolf = kind === "wolf" && drawWolf(enemy, time);
+  if (!paintedWolf && !drawPng(kind, x, y - 4, frame, 0, facing, 34, 26)) {
     drawPixelMap(ENEMY_FALLBACK[kind], ENEMY_COLORS, x, y - 4, facing);
   }
   ctx.restore();
@@ -224,81 +226,10 @@ function drawWarden(warden) {
   ctx.restore();
 }
 
-const terrainBackdrops = new Map();
-
-function drawTerrainBackdrop(name, variantFor) {
-  const { image, width, height } = PNG_SPRITES[name];
-  if (!image) return false;
-  let backdrop = terrainBackdrops.get(area);
-  if (backdrop?.image !== image) {
-    const layer = document.createElement("canvas");
-    layer.width = room[0].length * width;
-    layer.height = room.length * height;
-    const paint = layer.getContext("2d");
-    if (!paint) return false;
-    room.forEach((row, y) => {
-      [...row].forEach((tile, x) => {
-        const frame = variantFor(tile, x, y);
-        paint.drawImage(image, frame * width, 0, width, height, x * width, y * height, width, height);
-      });
-    });
-    backdrop = { image, layer };
-    terrainBackdrops.set(area, backdrop);
-  }
-  ctx.drawImage(backdrop.layer, 0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-  return true;
-}
-
-function dungeonTileFrame(tile, x, y) {
-  return (x * 17 + y * 31) % 4 + (tile === "#" || tile === "T" ? 4 : 0);
-}
-
-function grassTileFrame(_tile, x, y) {
-  return (x * 29 + y * 17 + x * y) % 8;
-}
-
-function drawRoom(time) {
-  const torches = [];
-  const painted = drawTerrainBackdrop("dungeonStone", dungeonTileFrame);
-  room.forEach((row, j) => {
-    [...row].forEach((tile, i) => {
-      const x = i * TILE;
-      const y = j * TILE;
-      const isWall = tile === "#" || tile === "T";
-      if (!painted && isWall) {
-        rect("#23212c", x, y, 32, 32);
-        rect("#656071", x + 1, y + 1, 30, 5);
-        rect("#494452", x + 1, y + 6, 30, 20);
-        rect("#322d3c", x, y + 15, 32, 2);
-        rect("#322d3c", x + 12, y + 6, 2, 9);
-        rect("#322d3c", x + 23, y + 17, 2, 9);
-        rect("#302a36", x + 1, y + 26, 30, 5);
-      }
-      if (!painted && !isWall) {
-        const variant = dungeonTileFrame(tile, i, j);
-        rect(["#373541", "#3b3845", "#413c46", "#3c3942"][variant], x, y, TILE, TILE);
-      }
-      if (tile === "T") torches.push({ x: x + 16, y: y + 14 });
-      if (tile === "C") drawDungeonChest(x, y);
-      if (tile === "A" || tile === "E") drawDungeonDoor(tile, x, y);
-    });
-  });
-  for (const { x, y } of torches) {
-    const flicker = Math.round(Math.sin(time * 11 + x));
-    const glow = ctx.createRadialGradient(x, y, 2, x, y, 42 + flicker * 3);
-    glow.addColorStop(0, "#ff933655");
-    glow.addColorStop(1, "#ff933600");
-    rect(glow, x - 46, y - 46, 92, 92);
-    rect("#ac6f43", x - 2, y, 4, 11);
-    rect("#e3734d", x - 4, y - 6, 8, 8);
-    rect("#ffd386", x - 2, y - 7 + flicker, 4, 7);
-  }
-}
-
-function drawDungeonChest(x, y) {
-  const unlocked = chestUnlocked(area);
-  const open = unlocked && (progress.chestId === area || !chestSlots(progress, area).some(Boolean));
-  const spriteName = area === "dungeon3" ? (open ? "rewardOpen" : "rewardClosed") :
+function drawDungeonChest(id, x, y) {
+  const unlocked = chestUnlocked(id);
+  const open = unlocked && (progress.chestId === id || !chestSlots(progress, id).some(Boolean));
+  const spriteName = id === "dungeon3" ? (open ? "rewardOpen" : "rewardClosed") :
     (open ? "supplyOpen" : "supplyClosed");
   const { width, height } = PNG_SPRITES[spriteName];
   if (!drawPng(spriteName, x + 16, y + 26 - height, 0, 0, 1, width * 2, height * 2)) drawFurniture("chest", x, y);
@@ -309,39 +240,27 @@ function drawDungeonChest(x, y) {
   }
 }
 
-function drawDungeonDoor(tile, x, y) {
-  const returnDoor = tile === "A";
-  const open = portalOpen(PORTALS[area][tile]);
-  ctx.save();
-  ctx.translate(x + (returnDoor ? TILE : 0), y);
-  if (returnDoor) ctx.scale(-1, 1);
-  rect("#767083", 5, 1, 27, 30);
-  rect(open ? "#183932" : "#4b3133", 9, 5, 23, 22);
+function drawRuinGate(tile, x, y) {
+  const open = gateOpen(tile);
+  const stone = tile === "G" ? "#736e57" : "#6b6860";
+  rect("#262b2b", x, y + 4, TILE, 24);
+  rect("#3d4240", x, y + 8, TILE, 16);
+  for (const offset of [0, 25]) {
+    rect("#323832", x, y + offset, TILE, 7);
+    rect(stone, x + 1, y + offset, TILE - 2, 4);
+    rect("#879172", x + 5, y + offset + 1, 9, 1);
+    rect("#4b5842", x + 22, y + offset + 3, 7, 2);
+  }
   if (open) {
-    const arrow = returnDoor ? "#abbecc" : "#76d4a6";
-    rect(arrow, 14, 15, 11, 3);
-    rect(arrow, 22, 12, 3, 9);
-    rect(arrow, 25, 15, 3, 3);
-  } else {
-    for (const bar of [12, 19, 26]) rect("#a08780", bar, 5, 2, 22);
-    rect("#f6bc65", 18, 15, 6, 6);
+    rect("#525546", x + 12, y + 8, 8, 16);
+    rect("#74715d", x + 13, y + 9, 1, 13);
+    return;
   }
-  ctx.restore();
-}
-
-function drawCabin() {
-  const [door] = markers("U");
-  if (!drawPng("cottage", door.x - 16, door.y - 32)) {
-    rect("#ae774e", door.x - 80, door.y - 38, 128, 53);
-    rect("#773f42", door.x - 80, door.y - 70, 128, 36);
-    rect("#ffd18a", door.x - 57, door.y - 22, 16, 14);
-    rect("#ffd18a", door.x + 22, door.y - 22, 16, 14);
-  }
-  if (!drawPng("porch", door.x - 16, door.y + TILE)) {
-    rect("#ae774e", door.x - 48, door.y + 16, 64, 20);
-    rect("#c48a58", door.x - 12, door.y + 36, 24, 8);
-  }
-  drawHouseDoor(door.x, door.y, 0);
+  rect("#222328", x + 10, y + 5, 12, 23);
+  for (let bar = 0; bar < 4; bar++) rect("#746d61", x + 11 + bar * 3, y + 4, 1, 23);
+  for (const offset of [8, 22]) rect("#453c3c", x + 9, y + offset, 14, 3);
+  rect("#c89255", x + 14, y + 13, 5, 6);
+  rect("#533944", x + 16, y + 15, 1, 2);
 }
 
 function drawHouseDoor(x, y, frame) {
@@ -351,70 +270,55 @@ function drawHouseDoor(x, y, frame) {
   rect("#c48a58", x - 10, y + 12, 20, 4);
 }
 
-function drawHouse(time) {
-  rect("#281f26", 0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-  rect("#543934", 56, 56, 368, 232);
-  rect("#78503c", 60, 60, 360, 208);
-  room.forEach((row, j) => {
-    [...row].forEach((tile, i) => {
-      if (tile === "#") return;
-      const x = i * TILE;
-      const y = j * TILE;
-      const variant = (i * 19 + j * 11) % 4;
+function buildingInView({ left, top, right, bottom }) {
+  return left * TILE < camera.x + VIEW_WIDTH && (right + 1) * TILE > camera.x &&
+    top * TILE < camera.y + VIEW_HEIGHT && (bottom + 1) * TILE > camera.y;
+}
+
+function drawBuildingExterior({ left, top, right, bottom }, cottage = false) {
+  const x = left * TILE;
+  const y = top * TILE;
+  const width = (right - left + 1) * TILE;
+  const height = (bottom - top + 1) * TILE;
+  rect("#1d27279c", x + 7, y + height - 19, width + 3, 24);
+  ctx.save();
+  if (!cottage) {
+    ctx.filter = (left + top) % 3 === 0 ? "saturate(0.6) brightness(0.79)" : "saturate(0.72) brightness(0.88)";
+  }
+  if (!drawPng("cottage", x + width / 2, y + height / 2, 0, 0, 1, width, height)) {
+    rect("#523b34", x + 3, y + 40, width - 6, height - 42);
+    rect("#422e37", x, y + 19, width, 34);
+    rect("#6f493d", x + 12, y + 9, width - 24, 15);
+    rect("#c1915c", x + 20, y + height - 39, 12, 16);
+    rect("#c1915c", x + width - 33, y + height - 39, 12, 16);
+  }
+  ctx.restore();
+  if (cottage) drawHouseDoor(COTTAGE.door.x, COTTAGE.door.y + 2, 0);
+}
+
+function drawCottageCutaway(time) {
+  const { left, top, right, bottom, door } = COTTAGE;
+  const floorTop = (top + 1) * TILE;
+  const floorWidth = (right - left - 1) * TILE;
+  const centerX = (left + right + 1) * TILE / 2;
+  rect("#403631", left * TILE, top * TILE + 8, (right - left + 1) * TILE, (bottom - top + 1) * TILE - 8);
+  rect("#262623", left * TILE + 3, top * TILE + 11, (right - left + 1) * TILE - 6, (bottom - top + 1) * TILE - 14);
+  for (let row = top + 1; row <= bottom; row++) {
+    for (let col = left + 1; col < right; col++) {
+      if (worldTile(col, row) === "H") continue;
+      const x = col * TILE;
+      const y = row * TILE;
+      const variant = terrainVariant(col, row, 4);
       if (!drawPng("houseFloor", x + TILE / 2, y + TILE / 2, variant)) drawPlanks(x, y, variant);
-    });
-  });
-  const center = WORLD_WIDTH / 2;
-  drawPng("houseWall", center, 40);
-  const glow = ctx.createRadialGradient(center, 60, 5, center, 60, 42 + Math.sin(time * 7) * 3);
-  glow.addColorStop(0, "#ffd07e40");
-  glow.addColorStop(1, "#ff9d6400");
-  rect(glow, center - 46, 64, 92, 42);
-  drawPng("rug", center, 178);
-  for (const [tile, name] of [["W", "workbench"], ["O", "chest"], ["B", "bed"]]) {
-    const [position] = markers(tile);
-    drawFurniture(name, position.x - TILE / 2, position.y - TILE / 2);
+    }
   }
-  const [door] = markers("U");
+  if (!drawPng("houseWall", centerX, floorTop - 11, 0, 0, 1, floorWidth, 22)) {
+    rect("#815039", centerX - floorWidth / 2, floorTop - 23, floorWidth, 21);
+    rect("#d48655", centerX - 9, floorTop - 14, 18, 9);
+  }
+  drawPng("rug", centerX, floorTop + TILE * 1.45, 0, 0, 1, 55, 30);
   drawHouseDoor(door.x, door.y, 1);
-}
-
-// Alle grondversieringen worden door hun tegelcoördinaten bepaald.
-function drawGrass(i, j, variant) {
-  const x = i * TILE;
-  const y = j * TILE;
-  const seed = (i * 117 + j * 91 + i * j * 17) % 97;
-  rect(["#426843", "#476e46", "#4b7448", "#406342"][variant], x, y, TILE, TILE);
-  for (let n = 0; n < 5; n++) {
-    const px = x + 3 + (seed + n * 11) % 25;
-    const py = y + 4 + (seed * 3 + n * 7) % 23;
-    rect("#365b3b", px, py, 5, 2);
-    rect("#638650", px + 1, py - 3, 1, 4);
-    rect("#769854", px + 3, py - 2, 1, 3);
-  }
-  if (seed % 3 === 0) {
-    rect("#75654a", x + 5, y + 22, 8, 4);
-    rect("#88724e", x + 8, y + 20, 6, 3);
-  }
-  if (seed % 4 === 0) {
-    rect("#485745", x + 22, y + 12, 6, 4);
-    rect("#9b9f80", x + 23, y + 11, 4, 2);
-  }
-}
-
-function drawPath(i, j, variant) {
-  const x = i * TILE;
-  const y = j * TILE;
-  const connects = (dx, dy) => "=PRGU".includes(room[j + dy]?.[i + dx] || " ");
-  const path = "#b18a5d";
-  rect(path, x + 5, y + 5, 22, 22);
-  if (connects(-1, 0)) rect(path, x, y + 5, 6, 22);
-  if (connects(1, 0)) rect(path, x + 26, y + 5, 6, 22);
-  if (connects(0, -1)) rect(path, x + 5, y, 22, 6);
-  if (connects(0, 1)) rect(path, x + 5, y + 26, 22, 6);
-  rect("#c5a275", x + 7 + variant * 3, y + 10, 6, 2);
-  rect("#92704d", x + 12, y + 22 - variant * 2, 4, 2);
-  rect("#dac093", x + 20, y + 14, 2, 2);
+  drawLight(centerX, floorTop + 1, 47 + Math.sin(time * 6) * 2, "#eac68e45");
 }
 
 function drawPlanks(x, y, variant) {
@@ -439,27 +343,6 @@ function drawRock(x, y, variant) {
   rect("#354538", x + 3, y + 24, 9 + variant, 5);
   rect("#5d7847", x + 5, y + 23, 7 + variant, 3);
   rect("#859459", x + 7, y + 21, 4, 2);
-}
-
-function drawCave(x, y) {
-  rect("#363e39", x - 7, y + 1, 46, 31);
-  rect("#636b5e", x - 4, y - 3, 40, 9);
-  rect("#87907a", x + 2, y - 7, 28, 5);
-  rect("#515c50", x - 6, y + 5, 44, 6);
-  rect("#252f2d", x + 3, y + 13, 26, 19);
-  rect("#131b1b", x + 6, y + 10, 20, 20);
-  rect("#101719", x + 9, y + 15, 14, 13);
-  rect("#66584a", x + 5, y + 27, 22, 5);
-  rect("#9e805c", x + 5, y + 30, 22, 2);
-  rect("#b18a5d", x + 5, y + 32, 22, 1);
-  rect("#bc9b71", x + 13, y + 31, 6, 1);
-  rect("#687e4b", x - 5, y + 6, 12, 3);
-  rect("#839759", x + 23, y - 5, 9, 3);
-  for (const torchX of [x - 8, x + 36]) {
-    rect("#563f34", torchX - 1, y + 22, 3, 8);
-    rect("#bb6145", torchX - 3, y + 18, 7, 6);
-    rect("#ffc581", torchX - 1, y + 16, 3, 6);
-  }
 }
 
 function drawFurniture(name, x, y) {
@@ -599,76 +482,145 @@ function drawKnightPreview() {
   }
 }
 
-function drawForest() {
-  const builtTorches = [];
-  const painted = drawTerrainBackdrop("grass", grassTileFrame);
-  room.forEach((row, j) => {
-    [...row].forEach((tile, i) => {
-      const x = i * TILE;
-      const y = j * TILE;
-      const variant = (i * 19 + j * 11) % 4;
-      if (!painted) drawGrass(i, j, variant);
-      if ("=PR".includes(tile)) drawPath(i, j, variant);
-      if (tile === "#" || tile === "Y") {
-        const spent = tile === "Y" && exhausted(LEGACY_RESOURCES.Y, i, j);
-        const drawn = spent ? drawPng("stump", x + 16, y + 24, 0, 0, 1, 18, 8) :
-          drawPng("trees", x + 16, y + 17, (i + j * 2) % 3, 0, 1, 24, 22);
-        if (!drawn) sprite(spent ? "stump" : "tree", x + 16, y + 21);
-      }
-      if (tile === "Q") drawRock(x, y, variant);
-      if (tile === "M" || tile === "N") drawDeposit(tile, x, y, variant, exhausted(LEGACY_RESOURCES[tile], i, j));
+function drawLight(x, y, radius, color) {
+  const light = ctx.createRadialGradient(x, y, 0, x, y, radius);
+  light.addColorStop(0, color);
+  light.addColorStop(1, "#f5aa5000");
+  rect(light, x - radius, y - radius, radius * 2, radius * 2);
+}
 
-      const building = progress.buildings[tileId(i, j)];
+function drawWorldLantern(x, y, isRuin, time) {
+  const stem = isRuin ? "#5a5750" : "#675041";
+  const rim = "#332e30";
+  const pulse = Math.sin(time * 7 + x / 9) > 0.4;
+  rect("#222b2b77", x - 5, y + 1, 14, 3);
+  rect(stem, x - 2, y - 11, 4, 15);
+  rect("#a57d54", x - 2, y - 7, 1, 9);
+  rect(rim, x - 5, y - 21, 10, 11);
+  rect("#8f5d4b", x - 4, y - 20, 8, 1);
+  rect(pulse ? "#ffc978" : "#e6a96a", x - 3, y - 18, 6, 6);
+  rect("#fff0af", x - 2, y - 17, 3, 3);
+  rect(rim, x - 6, y - 10, 12, 2);
+}
+
+function drawWorldTree(col, row, x, y, zone) {
+  const spent = exhausted(LEGACY_RESOURCES.Y, col, row);
+  const frame = terrainVariant(col, row, 3);
+  const size = zone === "forest" ? 1.17 : 1;
+  ctx.save();
+  if (!spent && zone === "forest") ctx.filter = "saturate(0.72) brightness(0.77)";
+  const drawn = spent ? drawPng("stump", x + 16, y + 24, 0, 0, 1, 18, 8) :
+    drawPng("trees", x + 16, y + 12, frame, 0, frame === 2 ? -1 : 1, 38 * size, 34 * size);
+  if (!drawn) sprite(spent ? "stump" : "tree", x + 16, y + 21);
+  ctx.restore();
+}
+
+function collectWorldScenery(time, add) {
+  const { left, right, top, bottom } = visibleTileBounds(50);
+  const cutaway = insideCottage(player);
+  for (let row = top; row < bottom; row++) {
+    for (let col = left; col < right; col++) {
+      const tile = worldTile(col, row);
+      const x = col * TILE;
+      const y = row * TILE;
+      const variant = terrainVariant(col, row, 4);
+      const building = progress.buildings[tileId(col, row)];
       if (building === "floor") drawPlanks(x, y, variant);
-      if (building === "fence") sprite(building, x + 16, y + 19);
-      if (building === "torch") builtTorches.push({ x: x + 16, y: y + 16 });
-    });
-  });
-  drawCabin();
-  const [cave] = markers("G");
-  drawCave(cave.x - 16, cave.y - 16);
-  for (const { x, y } of builtTorches) drawBuiltTorch(x, y);
-  if (!inventoryOpen() && selectedBuildItem()) {
-    const site = buildSite();
-    const x = site.x * TILE;
-    const y = site.y * TILE;
-    rect(site.allowed ? "#89df8d66" : "#f4777466", x + 1, y + 1, 30, 30);
-    ctx.strokeStyle = site.allowed ? "#a2f5a5" : "#ff9390";
-    ctx.strokeRect(x + 1.5, y + 1.5, 29, 29);
+      if (tile === "Y") {
+        const zone = regionAt({ x: x + 16, y: y + 16 });
+        add(y + 27, () => drawWorldTree(col, row, x, y, zone));
+      }
+      if (tile === "Q") add(y + 28, () => drawRock(x, y, variant));
+      if (tile === "M" || tile === "N") {
+        add(y + 28, () => drawDeposit(tile, x, y, variant, exhausted(LEGACY_RESOURCES[tile], col, row)));
+      }
+      if (tile === "G" || tile === "X") add(y + 16, () => drawRuinGate(tile, x, y));
+      if (tile === "L" || tile === "T") {
+        drawLight(x + 16, y + 8, 39 + Math.sin(time * 6 + col) * 2, "#e9a96645");
+        add(y + 26, () => drawWorldLantern(x + 16, y + 26, tile === "T", time));
+      }
+      if (building === "fence") add(y + 25, () => sprite("fence", x + 16, y + 19));
+      if (building === "torch") add(y + 25, () => drawBuiltTorch(x + 16, y + 16));
+    }
+  }
+
+  for (const hut of VILLAGE_HUTS) {
+    if (buildingInView(hut)) add((hut.bottom + 1) * TILE, () => drawBuildingExterior(hut));
+  }
+  if (buildingInView(COTTAGE)) {
+    const { door, workbench, chest, bed } = COTTAGE;
+    drawPng("porch", door.x, door.y + 25);
+    if (cutaway) {
+      drawCottageCutaway(time);
+      for (const [point, name] of [[workbench, "workbench"], [chest, "chest"], [bed, "bed"]]) {
+        add(point.y + 8, () => drawFurniture(name, point.x - 16, point.y - 16));
+      }
+    } else {
+      drawLight(door.x, door.y + 22, 48, "#e1ae6555");
+      add((COTTAGE.bottom + 1) * TILE, () => drawBuildingExterior(COTTAGE, true));
+    }
+  }
+
+  for (const [id, { position }] of Object.entries(CHEST_STATIONS)) {
+    if (id !== "house" && pointInView(position.x, position.y, TILE)) {
+      add(position.y + 10, () => drawDungeonChest(id, position.x - 16, position.y - 16));
+    }
+  }
+}
+
+function drawBuildPreview() {
+  if (inventoryOpen() || !selectedBuildItem() || regionAt(player) !== "village") return;
+  const site = buildSite();
+  const x = site.x * TILE;
+  const y = site.y * TILE;
+  rect(site.allowed ? "#89df8d66" : "#f4777466", x + 1, y + 1, 30, 30);
+  ctx.strokeStyle = site.allowed ? "#a2f5a5" : "#ff9390";
+  ctx.strokeRect(x + 1.5, y + 1.5, 29, 29);
+}
+
+function drawWorldActor(actor, time) {
+  rect("#1d1926aa", Math.round(actor.x - 9), Math.round(actor.y + 4), 18, 4);
+  if (actor === player) {
+    if (protection > 0 && Math.floor(time * 18) % 2) return;
+    const { row, column } = knightFrame();
+    drawKnight(actor.x, actor.y, row, column);
+  } else if (actor === dragon) {
+    drawDragon(actor.x, actor.y, actor.facing, time);
+  } else if (actor.kind === "warden") {
+    drawWarden(actor);
+  } else {
+    drawEnemy(actor, time);
   }
 }
 
 function draw(time) {
   drawKnightPreview();
-  if (area === "forest") drawForest();
-  else if (area === "house") drawHouse(time);
-  else drawRoom(time);
+  ctx.save();
+  ctx.translate(-camera.x, -camera.y);
+  drawTerrain(time);
+  const entries = [];
+  const add = (y, paint) => entries.push({ y, paint });
+  collectWorldScenery(time, add);
+  drawBuildPreview();
   const warden = enemies.find(enemy => enemy.kind === "warden" && enemy.health > 0);
-  if (warden) drawWardenTelegraph(warden);
-  if (key && !hasKey) sprite("key", key.x, key.y + Math.round(Math.sin(time * 5) * 2));
-  if (potion) sprite("potion", potion.x, potion.y);
+  if (warden && pointInView(warden.x, warden.y, TILE * 5)) drawWardenTelegraph(warden);
+  const bob = Math.round(Math.sin(time * 4) * 2);
+  if (key && !hasKey && pointInView(key.x, key.y, TILE)) sprite("key", key.x, key.y + bob);
+  if (potion && pointInView(potion.x, potion.y, TILE)) sprite("potion", potion.x, potion.y);
   for (const drop of groundLoot) {
-    sprite(drop.item, drop.x, drop.y + Math.round(Math.sin(time * 4) * 2));
+    if (pointInView(drop.x, drop.y, TILE)) sprite(drop.item, drop.x, drop.y + bob);
   }
-  const actors = [player, dragon, ...enemies].sort((a, b) => a.y - b.y);
-  for (const actor of actors) {
-    rect("#1d1926aa", Math.round(actor.x - 9), Math.round(actor.y + 4), 18, 4);
-    if (actor === player) {
-      if (protection > 0 && Math.floor(time * 18) % 2) continue;
-      const { row, column } = knightFrame();
-      drawKnight(actor.x, actor.y, row, column);
-    } else if (actor === dragon) {
-      drawDragon(actor.x, actor.y, actor.facing, time);
-    } else if (actor.kind === "warden") {
-      drawWarden(actor);
-    } else {
-      drawEnemy(actor);
-    }
+  for (const actor of [player, dragon, ...enemies]) {
+    if (pointInView(actor.x, actor.y, TILE)) add(actor.y, () => drawWorldActor(actor, time));
   }
+  entries.sort((a, b) => a.y - b.y);
+  for (const entry of entries) entry.paint();
   if (swing) drawSwing();
-  for (const ball of fireballs) sprite("fireball", ball.x, ball.y - 2);
+  for (const ball of fireballs) {
+    if (pointInView(ball.x, ball.y, TILE)) sprite("fireball", ball.x, ball.y - 2);
+  }
+  ctx.restore();
 }
-
 
 function drawSwing() {
   const angle = Math.atan2(swing.y, swing.x);
