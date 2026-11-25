@@ -43,8 +43,8 @@ export default function Wilderness() {
       <div className="wild-hotbar" aria-label="Prototype hotbar">
         {Array.from({length:9},(_,i)=><button key={i} aria-label={`Empty slot ${i+1}`} aria-pressed={i===selected} onClick={()=>setSelected(i)}>{i+1}</button>)}
       </div>
-      <small>WASD Walk · Shift Sprint · Wheel Zoom · M Map</small>
-      <small>Exploration prototype · Knight test model</small>
+      <small>WASD Walk · Shift Sprint · Click Slash · Wheel Zoom · M Map</small>
+      <small>Exploration prototype</small>
     </footer>
     {map && <WorldMap {...position} close={()=>changeMap(false)}/>}
   </main>;

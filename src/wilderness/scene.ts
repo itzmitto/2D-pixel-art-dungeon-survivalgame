@@ -6,24 +6,7 @@ import { spawn, surface, walkable } from './layout';
 import { scenery } from './scenery';
 import { terrain } from './terrain';
 
-function scout() {
-  const body=new T.Group();
-  const steel=new T.MeshStandardMaterial({color:'#a1a7ab',roughness:.55,metalness:.25});
-  const cloth=new T.MeshStandardMaterial({color:'#57362b'});
-  const dark=new T.MeshStandardMaterial({color:'#302b29'});
-  const part=(geo:T.BufferGeometry,mat:T.Material,x:number,y:number,z:number)=>{
-    const mesh=new T.Mesh(geo,mat);
-    mesh.position.set(x,y,z); mesh.castShadow=true; body.add(mesh); return mesh;
-  };
-  part(new T.CapsuleGeometry(.35,.43,3,8),steel,0,1.18,0);
-  part(new T.SphereGeometry(.26,10,7),steel,0,1.88,0);
-  part(new T.BoxGeometry(.31,.067,.1),dark,0,1.9,.235);
-  part(new T.BoxGeometry(.6,.88,.13),cloth,0,1.12,-.28).rotation.x=.17;
-  for(const side of [-1,1]) part(new T.CapsuleGeometry(.12,.43,2,6),steel,side*.42,1.15,0);
-  const legs=[-1,1].map(side=>part(new T.BoxGeometry(.23,.68,.26),dark,side*.17,.35,0));
-  part(new T.BoxGeometry(.087,1,.04),steel,.48,.86,.15).rotation.z=-.3;
-  return {body,legs};
-}
+import { createDarkKnight } from './knight/animation';
 
 export function startWilderness(
   canvas:HTMLCanvasElement,
@@ -40,7 +23,8 @@ export function startWilderness(
   renderer.toneMapping=T.ACESFilmicToneMapping;
   const scene=new T.Scene();
   const camera=new T.PerspectiveCamera(43,1,.3,400);
-  const {body,legs}=scout();
+  const knight=createDarkKnight();
+  const body=knight.root;
   body.position.set(spawn.x,surface(spawn.x,spawn.z),spawn.z);
   scene.add(body);
   const water=terrain(scene);
@@ -53,7 +37,7 @@ export function startWilderness(
   const controller=new AbortController();
   const {signal}=controller;
   const keys=new Set<string>();
-  let zoom=36,distance=zoom,lastReport=0,reportedX=spawn.x,reportedZ=spawn.z, gait=0;
+  let zoom=36,distance=zoom,lastReport=0,reportedX=spawn.x,reportedZ=spawn.z;
   function resize(){
     const width=Math.max(1,canvas.clientWidth),height=Math.max(1,canvas.clientHeight);
     renderer.setSize(width,height,false);
@@ -76,6 +60,9 @@ export function startWilderness(
   },{signal});
   window.addEventListener('keyup',e=>keys.delete(e.code),{signal});
   window.addEventListener('blur',()=>keys.clear(),{signal});
+  canvas.addEventListener('pointerdown',e=>{
+    if(e.isPrimary && e.button===0 && !mapOpen()) knight.playAttack();
+  },{signal});
   canvas.addEventListener('wheel',e=>{
     e.preventDefault();
     if(!mapOpen()) zoom=T.MathUtils.clamp(zoom+Math.sign(e.deltaY)*3,24,57);
@@ -87,19 +74,21 @@ export function startWilderness(
       const x=Number(keys.has('KeyD'))-Number(keys.has('KeyA'));
       const z=Number(keys.has('KeyS'))-Number(keys.has('KeyW'));
       const length=Math.hypot(x,z);
-      const speed=keys.has('ShiftLeft')||keys.has('ShiftRight')?12:6;
+      const sprinting=keys.has('ShiftLeft')||keys.has('ShiftRight');
+      const speed=sprinting?12:6;
       const p=body.position;
       const beforeX=p.x,beforeZ=p.z;
       if(length){
         const dx=x/length*speed*dt,dz=z/length*speed*dt;
         if(walkable(p.x+dx,p.z,obstacles)) p.x+=dx;
         if(walkable(p.x,p.z+dz,obstacles)) p.z+=dz;
-        const target=Math.atan2(x,z);
-        body.rotation.y+=Math.atan2(Math.sin(target-body.rotation.y),Math.cos(target-body.rotation.y))*(1-Math.exp(-15*dt));
       }
       const travelled=Math.hypot(p.x-beforeX,p.z-beforeZ);
-      gait+=travelled*4;
-      for(let i=0;i<legs.length;i++) legs[i].rotation.x=T.MathUtils.lerp(legs[i].rotation.x,travelled?Math.sin(gait+i*Math.PI)*.45:0,1-Math.exp(-18*dt));
+      knight.update(dt,{
+        speed:dt>0?travelled/dt:0,
+        sprinting,
+        facing:length?Math.atan2(x,z):undefined,
+      });
       p.y=T.MathUtils.lerp(p.y,surface(p.x,p.z),1-Math.exp(-22*dt));
       destination.set(p.x,p.y+.75,p.z);
       focus.lerp(destination,1-Math.exp(-7*dt));
