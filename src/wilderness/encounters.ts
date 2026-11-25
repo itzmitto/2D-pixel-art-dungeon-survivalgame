@@ -1,5 +1,5 @@
 import { goblinModels } from './goblins.ts';
-import type { CreatureRig } from './creatureGeometry.ts';
+import { loft, shapedPlate, type CreatureRig } from './creatureGeometry.ts';
 import { skeletonModels } from './skeletons.ts';
 import { den, inDen } from './denLayout.ts';
 import { monsters, rollDrop, type MonsterKind, type Drop } from './huntData.ts';
@@ -78,12 +78,18 @@ export function createEncounters(
   const backing=new T.MeshBasicMaterial({color:'#251919',depthWrite:false});
   const red=new T.MeshBasicMaterial({color:'#ba5447',depthWrite:false});
   const alert=new T.MeshBasicMaterial({color:'#de9c55',depthWrite:false});
-  const lootGeometry=new T.OctahedronGeometry(.29);
+  const lootGeometry=loft([[-.20,.07,-.14,.106],[-.13,.22,-.18,.153],[.09,.235,-.183,.179],[.203,.135,-.119,.119]],10);
+  const drawstring=new T.TorusGeometry(.088,.016,5,9).rotateX(Math.PI/2);
+  const lootFang=shapedPlate([[-.053,.095],[.082,.079],[.09,-.014],[-.064,-.16],[-.014,-.035]],.041,.011);
+  const lootCoin=new T.CylinderGeometry(.09,.09,.024,9).rotateX(Math.PI/2);
+  const bagTie=new T.MeshStandardMaterial({color:0xb1986c,roughness:.96});
+  const boneLoot=new T.MeshStandardMaterial({color:0xd9c7a8,roughness:.83});
+  const metalLoot=new T.MeshStandardMaterial({color:0xc9a044,roughness:.44,metalness:.61});
   const lootBeamGeometry=new T.CylinderGeometry(.028,.10,1.25,6,1,true);
   const lootMaterial=new T.MeshStandardMaterial({color:'#bd9868',emissive:'#916024',emissiveIntensity:.7,roughness:.36});
   type Enemy = CreatureRig & {
     affinity:T.Mesh<T.BufferGeometry,T.MeshBasicMaterial>;
-    posePhase:number; gait:number; collapse:number; impactAge:number; retreat:number; strikes:number;
+    posePhase:number; gait:number; anticipation:number; collapse:number; impactAge:number; retreat:number; strikes:number;
 
     id:string; kind:MonsterKind; spec:typeof monsters[MonsterKind]; home:T.Vector3; hp:number; hpBar:T.Group; fill:T.Mesh;
     statuses:ReturnType<typeof statuses>; cooldown:number; windup:number; heading:number; phase:number; hitFlash:number; charge:number; chargeWindup:boolean; chargeHit:boolean; beam:T.Mesh<T.BufferGeometry,T.MeshBasicMaterial>; loot:T.Mesh<T.BufferGeometry,T.MeshStandardMaterial>;
@@ -129,6 +135,10 @@ export function createEncounters(
     group.add(affinity);
     const loot=new T.Mesh(lootGeometry,lootMaterial.clone());
     loot.position.copy(home);
+    const tie=new T.Mesh(drawstring,bagTie);tie.position.y=.159;loot.add(tie);
+    const token=new T.Mesh(kind==='wild'||kind==='dire'||kind==='guardian'||kind==='elite'?lootFang:lootCoin,
+      kind==='wild'||kind==='dire'||kind==='guardian'||kind==='elite'?boneLoot:metalLoot);
+    token.position.set(.018,.028,.205);token.rotation.z=-.28;loot.add(token);
     const previousDrop=save.pending[id];
     if(previousDrop&&canWalk(previousDrop.x,previousDrop.z)){
       loot.position.set(previousDrop.x,surface(previousDrop.x,previousDrop.z),previousDrop.z);
@@ -139,7 +149,7 @@ export function createEncounters(
       opacity:.36,depthWrite:false,side:T.DoubleSide}));
     beam.visible=false;group.add(beam);
     if(save.drops[id]) loot.material.color.set(rarity[save.drops[id].rarity].color);
-    enemies.push({...actor,id,kind,spec,home,affinity,posePhase:enemies.length*.92,gait:0,collapse:1,
+    enemies.push({...actor,id,kind,spec,home,affinity,posePhase:enemies.length*.92,gait:0,anticipation:0,collapse:1,
       impactAge:3,retreat:0,strikes:0,hp:(oldDefeats.has(id)||save.defeatedBosses.includes(id))?0:spec.health,hpBar,fill,
       statuses:statuses(spec.resistance),cooldown:0,windup:0,heading:rand()*6.28,phase:rand()*10,hitFlash:0,charge:0,chargeWindup:false,chargeHit:false,loot,beam});
   }
@@ -408,7 +418,7 @@ export function createEncounters(
         if(!enemy.hp&&!enemy.loot.visible&&returnAt&&Date.now()>=returnAt&&
           Math.hypot(player.position.x-enemy.home.x,player.position.z-enemy.home.z)>18){
           enemy.hp=spec.health;enemy.statuses=statuses(spec.resistance);enemy.cooldown=enemy.windup=0;
-          p.copy(enemy.home);enemy.collapse=1;enemy.gait=0;oldDefeats.delete(enemy.id);collected.delete(enemy.id);
+          p.copy(enemy.home);enemy.collapse=1;enemy.gait=0;enemy.anticipation=0;oldDefeats.delete(enemy.id);collected.delete(enemy.id);
           save.defeated=[...oldDefeats];save.collected=[...collected];delete save.returns[enemy.id];changed();
         }
         if(enemy.hp>0) enemy.statuses.update(dt,amount=>hitEnemy(enemy,amount),(dx,dz)=>{
@@ -502,8 +512,10 @@ export function createEncounters(
         if(!enemy.statuses.halted) enemy.posePhase+=dt*(3.1+enemy.gait*9.4);
         const leapDuration=enemy.kind==='guardian'?.65:.43;
         const currentWindup=enemy.chargeWindup?(enemy.kind==='guardian'?1.15:.89):spec.windup;
+        enemy.anticipation=T.MathUtils.damp(enemy.anticipation,
+          enemy.windup>0?Math.min(1,(1-enemy.windup/currentWindup)*1.5+.22):0,enemy.windup>0?12:20,dt);
         enemy.animate({time,phase:enemy.posePhase,gait:enemy.gait,
-          windup:enemy.windup>0?Math.min(1,(1-enemy.windup/currentWindup)*1.5+.22):0,
+          windup:enemy.anticipation,
           recovery:Math.max(0,1-enemy.impactAge/.33),hit:enemy.hitFlash/.22,
           leap:enemy.charge>0&&enemy.kind!=='guardian'?Math.sin(Math.PI*enemy.charge/leapDuration):0,
           dead:0,frozen:status==='frozen'});
@@ -556,7 +568,7 @@ export function createEncounters(
       scene.remove(group);
       models.dispose();skeletons.dispose();goblins.dispose();
       affinityGeometry.dispose();Object.values(affinities).forEach(material=>material.dispose());
-      for(const resource of [barGeometry,backing,red,alert,lootGeometry,lootBeamGeometry,lootMaterial,sparkGeometry,sparks.material,slashGeometry,slashMaterial]) resource.dispose();
+      for(const resource of [barGeometry,backing,red,alert,lootGeometry,drawstring,lootFang,lootCoin,bagTie,boneLoot,metalLoot,lootBeamGeometry,lootMaterial,sparkGeometry,sparks.material,slashGeometry,slashMaterial]) resource.dispose();
       fx.dispose();
       chestViews.dispose();
       for(const enemy of enemies){enemy.loot.material.dispose();enemy.beam.material.dispose();}

@@ -1,5 +1,5 @@
 import * as T from 'three';
-import { loft, shapedPlate, joint, meshPart, type CreatureRig } from './creatureGeometry.ts';
+import { loft, shapedPlate, joint, meshPart, rigidBatcher, type CreatureRig } from './creatureGeometry.ts';
 
 export function wolfModels(){
   const pelt=(color:number)=>new T.MeshStandardMaterial({color,roughness:.93,flatShading:true});
@@ -25,6 +25,7 @@ export function wolfModels(){
   const tail=loft([[-.76,.025,-.058,.016],[-.57,.079,-.078,.075],[-.35,.104,-.08,.088],[-.11,.1,-.067,.088],[0,.087,-.06,.075]],12);
   const tailTip=loft([[-.43,.01,-.025,.008],[-.31,.041,-.051,.024],[-.13,.068,-.056,.043],[0,.06,-.052,.048]],10);
   const furTine=shapedPlate([[-.13,-.08],[-.06,.13],[.19,.10],[.04,-.21]],.11,.023);
+  const batcher=rigidBatcher();
   const all=[gray,neckGray,underside,dark,maneBrown,pale,nose,mouth,eye,torso,throat,shoulder,head,chin,snout,brow,ear,inEar,iris,tooth,upper,lower,paw,claw,tail,tailTip,furTine];
   return {
     make(kind='wild'):CreatureRig{
@@ -69,6 +70,7 @@ export function wolfModels(){
       });
       const brush=joint(frame,0,1.31,-.90), tip=joint(brush,0,0,-.64);
       meshPart(brush,tail,skin);meshPart(tip,tailTip,mane);
+      batcher.bake(root);
       return {root,animate(p){
         const t=p.time, run=p.gait, gait=p.phase;
         frame.rotation.z=p.dead*1.39+p.hit*.23;
@@ -91,6 +93,6 @@ export function wolfModels(){
         });
       }};
     },
-    dispose(){all.forEach(resource=>resource.dispose());},
+    dispose(){batcher.dispose();all.forEach(resource=>resource.dispose());},
   };
 }

@@ -1,4 +1,5 @@
 import * as T from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // Elliptical sections along Z. Each ring defines half-width, bottom and top.
 export function loft(rings:readonly (readonly [number,number,number,number])[], sides=12){
@@ -41,4 +42,47 @@ export function meshPart(parent:T.Object3D,geometry:T.BufferGeometry,material:T.
 export function joint(parent:T.Object3D,x=0,y=0,z=0){
   const node=new T.Group();
   node.position.set(x,y,z);parent.add(node);return node;
+}
+
+// Bake meshes that move together, while leaving each anatomical joint and
+// transparent effect independent. Identical rigid parts share baked geometry.
+export function rigidBatcher(){
+  const cache=new Map<string,T.BufferGeometry>();
+  return {
+    bake(root:T.Object3D){
+      root.traverse(node=>{
+        if(!(node instanceof T.Group)) return;
+        const batches=new Map<T.Material,T.Mesh[]>();
+        for(const child of [...node.children]){
+          if(!(child instanceof T.Mesh)||Array.isArray(child.material)||child.material.transparent||child.children.length) continue;
+          const batch=batches.get(child.material);
+          if(batch) batch.push(child);
+          else batches.set(child.material,[child]);
+        }
+        for(const [material,parts] of batches){
+          if(parts.length<2) continue;
+          for(const part of parts) part.updateMatrix();
+          const key=parts.map(part=>part.geometry.id+':'+part.matrix.elements.join(',')).join('|');
+          let merged=cache.get(key);
+          if(!merged){
+            const copies=parts.map(part=>{
+              const geo=part.geometry.index ? part.geometry.toNonIndexed() : part.geometry.clone();
+              for(const attr of Object.keys(geo.attributes)) if(attr!=='position'&&attr!=='normal') geo.deleteAttribute(attr);
+              return geo.applyMatrix4(part.matrix);
+            });
+            const result=mergeGeometries(copies);
+            copies.forEach(geo=>geo.dispose());
+            if(!result) continue;
+            merged=result;cache.set(key,merged);
+          }
+          const composite=new T.Mesh(merged,material);
+          composite.castShadow=parts.some(part=>part.castShadow);
+          composite.receiveShadow=parts.some(part=>part.receiveShadow);
+          node.remove(...parts);
+          node.add(composite);
+        }
+      });
+    },
+    dispose(){for(const geometry of cache.values()) geometry.dispose();cache.clear();},
+  };
 }

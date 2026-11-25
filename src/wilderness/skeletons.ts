@@ -1,6 +1,6 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { loft, shapedPlate, joint, meshPart, type CreatureRig } from './creatureGeometry.ts';
+import { loft, shapedPlate, joint, meshPart, rigidBatcher, type CreatureRig } from './creatureGeometry.ts';
 
 export function skeletonModels(){
   const bone=new T.MeshStandardMaterial({color:0xc1b5a3,roughness:.89,flatShading:true});
@@ -37,6 +37,7 @@ export function skeletonModels(){
   const blade=shapedPlate([[-.071,.04],[.067,.04],[.062,.66],[.037,.78],[-.018,.89],[-.065,.70]],.04,.015);
   const guard=shapedPlate([[-.18,-.03],[.17,-.034],[.12,.034],[-.13,.034]],.067,.016);
   const shield=shapedPlate([[-.19,.17],[.20,.17],[.192,-.12],[.09,-.242],[0,-.282],[-.094,-.232],[-.19,-.12]],.048,.027);
+  const batcher=rigidBatcher();
   const resources=[bone,rust,steel,hollow,skull,jaw,socket,nose,tooth,ribs,vertebra,shaft,pelvis,armor,grooved,feet,blade,guard,shield];
   return {
     make():CreatureRig{
@@ -72,6 +73,7 @@ export function skeletonModels(){
         }
         return {thigh,shin,shoulder,elbow};
       });
+      batcher.bake(root);
       return {root,animate(p){
         body.rotation.set(p.windup*-.12+p.recovery*.28,Math.sin(p.phase)*p.gait*.09,p.dead*1.45+p.hit*.23);
         body.position.y=-p.dead*.75+.042*p.gait*Math.abs(Math.sin(p.phase));
@@ -92,6 +94,6 @@ export function skeletonModels(){
         });
       }};
     },
-    dispose(){resources.forEach(resource=>resource.dispose());},
+    dispose(){batcher.dispose();resources.forEach(resource=>resource.dispose());},
   };
 }

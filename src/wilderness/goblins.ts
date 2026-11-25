@@ -1,5 +1,5 @@
 import * as T from 'three';
-import { loft,shapedPlate,joint,meshPart,type CreatureRig } from './creatureGeometry.ts';
+import { loft,shapedPlate,joint,meshPart, rigidBatcher,type CreatureRig } from './creatureGeometry.ts';
 
 export function goblinModels(){
   const skin=new T.MeshStandardMaterial({color:0x798267,roughness:.92,flatShading:true});
@@ -21,6 +21,7 @@ export function goblinModels(){
   const guard=shapedPlate([[-.107,-.018],[.112,-.023],[.103,.031],[-.101,.039]],.057,.013);
   const waist=shapedPlate([[-.18,.09],[.17,.105],[.202,-.10],[.06,-.199],[-.139,-.17]],.054,.025);
   const plates=shapedPlate([[-.09,-.043],[-.09,.055],[.014,.113],[.109,.034],[.092,-.067]],.040,.018);
+  const batcher=rigidBatcher();
   const resources=[skin,cheek,hide,cloth,metal,amber,torso,head,ear,lip,brow,iris,forearm,thigh,foot,blade,guard,waist,plates];
   return {
     make():CreatureRig{
@@ -53,6 +54,7 @@ export function goblinModels(){
         }
         return {hip,knee,arm,elbow};
       });
+      batcher.bake(root);
       return {root,animate(p){
         core.rotation.set(.145+p.gait*.22-p.windup*.16+p.recovery*.21,Math.sin(p.phase)*p.gait*.11,p.dead*1.43+p.hit*.26);
         core.position.y=-p.dead*.49+.041*p.gait*Math.abs(Math.sin(p.phase))-.05*p.windup;
@@ -68,6 +70,6 @@ export function goblinModels(){
         });
       }};
     },
-    dispose(){resources.forEach(resource=>resource.dispose());},
+    dispose(){batcher.dispose();resources.forEach(resource=>resource.dispose());},
   };
 }

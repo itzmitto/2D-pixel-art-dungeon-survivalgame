@@ -1,6 +1,6 @@
 import * as T from 'three';
 import { surface, randomSequence } from './layout.ts';
-import { loft, shapedPlate, joint, meshPart } from './creatureGeometry.ts';
+import { loft, shapedPlate, joint, meshPart, rigidBatcher } from './creatureGeometry.ts';
 import { rarity, type Rarity, type WeaponId } from './weapons.ts';
 import { rarityOrder } from './huntData.ts';
 
@@ -76,6 +76,7 @@ export function chestModels(group:T.Group,chests:readonly Chest[],opened:readonl
       emissive:rarity[rarityOrder[tier]].color,emissiveIntensity:tier<2?0:.34});
     return {own,trim,magic,lid:archedLid(.775,height,1.11,detail),band:archedLid(.068,height+.025,1.125,detail,true)};
   });
+  const batcher=rigidBatcher();
   const holders=chests.map(chest=>{
     const tier=rarityOrder.indexOf(chest.rarity),style=styles[tier];
     const root=new T.Group(),lid=joint(root,0,.589,-.56);
@@ -131,6 +132,7 @@ export function chestModels(group:T.Group,chests:readonly Chest[],opened:readonl
     const isOpen=opened.includes(chest.id);
     lid.rotation.x=isOpen?-1.48:0;
     reveal.visible=false;shine.visible=false;
+    batcher.bake(root);
     return {chest,root,lid,shine,reveal,isOpen,opening:0,tier};
   });
   return {
@@ -150,6 +152,7 @@ export function chestModels(group:T.Group,chests:readonly Chest[],opened:readonl
       }
     },
     dispose(){
+      batcher.dispose();
       for(const resource of [beam,bulk,panel,saddle,corner,lock,keyhole,rivet,hinge,jewel,rune,foot,floor,wall,stem,dark,coin]) resource.dispose();
       for(const {own,trim,magic,lid,band} of styles){own.dispose();trim.dispose();magic.dispose();lid.dispose();band.dispose();}
       for(const holder of holders) holder.shine.material.dispose();
