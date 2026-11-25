@@ -1,51 +1,83 @@
 import { useEffect, useRef, useState } from 'react';
-import { HealthBar } from '../components/hud/HealthBar';
-import { ArmorBar } from '../components/hud/ArmorBar';
-import { spawn, clearing } from './layout';
+import { clearing } from './layout';
+import { newExploration, readExploration, reveal, saveKey, type Position } from './exploration';
 import { startWilderness } from './scene';
 import { WorldMap } from './WorldMap';
 import './wilderness.css';
 
 export default function Wilderness() {
   const canvas=useRef<HTMLCanvasElement>(null);
+  const mapButton=useRef<HTMLButtonElement>(null);
   const open=useRef(false);
   const [map,setMap]=useState(false);
-  const [position,setPosition]=useState(spawn);
+  const [position,setPosition]=useState<Position>(newExploration().position);
+  const [discovered,setDiscovered]=useState<number[]>([]);
   const [error,setError]=useState('');
-  const [selected,setSelected]=useState(0);
-  const changeMap=(value:boolean)=>{open.current=value;setMap(value);};
+  const [saveNotice,setSaveNotice]=useState('');
+
+  const changeMap=(value:boolean)=>{
+    open.current=value;
+    setMap(value);
+    if(!value) mapButton.current?.focus();
+  };
   useEffect(()=>{
     if(!canvas.current) return;
+    let save=newExploration(), writable=true, dirty=false;
+    try {
+      const raw=localStorage.getItem(saveKey);
+      const restored=readExploration(raw);
+      if(restored) save=restored;
+      else if(raw!==null) {
+        writable=false;
+        setSaveNotice('This exploration save is incompatible. This visit will not replace it.');
+      }
+    } catch {
+      writable=false;
+      setSaveNotice('Browser storage is unavailable. Exploration will not be saved.');
+    }
+    const known=new Set(save.discovered);
+    setDiscovered([...known]);
+    const flush=()=>{
+      if(!dirty||!writable) return;
+      try {
+        localStorage.setItem(saveKey,JSON.stringify({...save,discovered:[...known]}));
+        dirty=false;
+      } catch {
+        writable=false;
+        setSaveNotice('Exploration could not be saved to browser storage.');
+      }
+    };
     let dispose: (()=>void)|undefined;
     try {
-      dispose=startWilderness(canvas.current,(x,z)=>setPosition({x,z}),
-        closeOnly=>changeMap(!closeOnly&&!open.current),()=>open.current);
+      dispose=startWilderness(canvas.current,save,next=>{
+        save.position=next;
+        const before=known.size;
+        reveal(known,next);
+        if(known.size!==before) setDiscovered([...known]);
+        setPosition(next);
+        dirty=true;
+      },closeOnly=>changeMap(!closeOnly&&!open.current),()=>open.current);
     } catch(e) {
       setError(e instanceof Error?e.message:'The wilderness could not start.');
     }
-    return ()=>dispose?.();
+    const timer=window.setInterval(flush,1500);
+    window.addEventListener('pagehide',flush);
+    return ()=>{
+      dispose?.();
+      window.clearInterval(timer);
+      window.removeEventListener('pagehide',flush);
+    };
   },[]);
-  useEffect(()=>{
-    const controller=new AbortController();
-    window.addEventListener('keydown',event=>{
-      if(!open.current && /^[1-9]$/.test(event.key)) setSelected(Number(event.key)-1);
-    },{signal:controller.signal});
-    return ()=>controller.abort();
-  },[]);
-  const nearFire=clearing(position.x,position.z)<10;
-  return <main className="wild" aria-label="Vonkje 3D wilderness">
-    <canvas ref={canvas} aria-label="3D wilderness" />
-    <div className="wild-health"><HealthBar hearts={3}/><ArmorBar defense={0}/></div>
-    <nav><button onClick={()=>changeMap(!open.current)}>Map · M</button><a href="./">2D game</a></nav>
+
+  return <main className="wild" aria-label="Vonkje">
+    <canvas ref={canvas} aria-label="Blackwater Wilds" />
+    <nav><button ref={mapButton} onClick={()=>changeMap(!open.current)} aria-expanded={map}>Map · M</button></nav>
     {error && <p className="wild-error" role="alert">{error}</p>}
     <footer>
-      {nearFire && <p>Ember Clearing · Campfire nearby</p>}
-      <div className="wild-hotbar" aria-label="Prototype hotbar">
-        {Array.from({length:9},(_,i)=><button key={i} aria-label={`Empty slot ${i+1}`} aria-pressed={i===selected} onClick={()=>setSelected(i)}>{i+1}</button>)}
-      </div>
+      {clearing(position.x,position.z)<10 && <p>Ember Clearing · Campfire nearby</p>}
+      {saveNotice && <p role="status">{saveNotice}</p>}
       <small>WASD Walk · Shift Sprint · Click Slash · Wheel Zoom · M Map</small>
-      <small>Exploration prototype</small>
     </footer>
-    {map && <WorldMap {...position} close={()=>changeMap(false)}/>}
+    {map && <WorldMap position={position} discovered={discovered} close={()=>changeMap(false)}/>}
   </main>;
 }

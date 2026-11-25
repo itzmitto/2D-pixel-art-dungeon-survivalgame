@@ -5,12 +5,15 @@ import { meadow } from './grass';
 import { spawn, surface, walkable } from './layout';
 import { scenery } from './scenery';
 import { terrain } from './terrain';
+import { obstacleGrid } from './spatial';
+import type { Exploration, Position } from './exploration';
 
 import { createDarkKnight } from './knight/animation';
 
 export function startWilderness(
   canvas:HTMLCanvasElement,
-  onPosition:(x:number,z:number)=>void,
+  save: Exploration,
+  onPosition:(position:Position)=>void,
   onMapKey:(closeOnly:boolean)=>void,
   mapOpen:()=>boolean,
 ) {
@@ -25,11 +28,17 @@ export function startWilderness(
   const camera=new T.PerspectiveCamera(43,1,.3,400);
   const knight=createDarkKnight();
   const body=knight.root;
-  body.position.set(spawn.x,surface(spawn.x,spawn.z),spawn.z);
+
   scene.add(body);
   const water=terrain(scene);
-  const {obstacles,rocks,fireY}=scenery(scene);
-  const animateGrass=meadow(scene,body.position,rocks);
+  const {obstacles,rocks,fireY}=scenery(scene,save.seed);
+  const nearby = obstacleGrid(obstacles);
+  const canWalk = (x:number,z:number) => walkable(x,z,nearby(x,z));
+  const start = canWalk(save.position.x,save.position.z) ? save.position : {...spawn,yaw:0};
+  body.position.set(start.x,surface(start.x,start.z),start.z);
+  body.rotation.y=start.yaw;
+  onPosition(start);
+  const animateGrass=meadow(scene,body.position,rocks,save.seed);
   const animateNight=atmosphere(scene,fireY);
   const destination=body.position.clone();
   const focus=destination.clone();
@@ -37,7 +46,7 @@ export function startWilderness(
   const controller=new AbortController();
   const {signal}=controller;
   const keys=new Set<string>();
-  let zoom=36,distance=zoom,lastReport=0,reportedX=spawn.x,reportedZ=spawn.z;
+  let zoom=36,distance=zoom,lastReport=0,reportedX=start.x,reportedZ=start.z,reportedYaw=start.yaw;
   function resize(){
     const width=Math.max(1,canvas.clientWidth),height=Math.max(1,canvas.clientHeight);
     renderer.setSize(width,height,false);
@@ -80,8 +89,8 @@ export function startWilderness(
       const beforeX=p.x,beforeZ=p.z;
       if(length){
         const dx=x/length*speed*dt,dz=z/length*speed*dt;
-        if(walkable(p.x+dx,p.z,obstacles)) p.x+=dx;
-        if(walkable(p.x,p.z+dz,obstacles)) p.z+=dz;
+        if(canWalk(p.x+dx,p.z)) p.x+=dx;
+        if(canWalk(p.x,p.z+dz)) p.z+=dz;
       }
       const travelled=Math.hypot(p.x-beforeX,p.z-beforeZ);
       knight.update(dt,{
@@ -96,8 +105,8 @@ export function startWilderness(
       camera.position.copy(focus).addScaledVector(offset,distance);
       camera.lookAt(focus);
       lastReport+=dt;
-      if(lastReport>=.09&&(p.x!==reportedX||p.z!==reportedZ)){
-        lastReport=0; reportedX=p.x; reportedZ=p.z; onPosition(p.x,p.z);
+      if(lastReport>=.09&&(p.x!==reportedX||p.z!==reportedZ||Math.abs(body.rotation.y-reportedYaw)>.025)){
+        lastReport=0; reportedX=p.x; reportedZ=p.z; reportedYaw=body.rotation.y; onPosition({x:p.x,z:p.z,yaw:reportedYaw});
       }
     },
     render(time){

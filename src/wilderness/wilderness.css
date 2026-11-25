@@ -16,3 +16,6 @@
 .wild-map text { fill: #fff0c8; paint-order: stroke; stroke: #1d261d; stroke-width: 2px; font: 7px Georgia, serif; }
 .wild-map p { font-size: .72rem; }
 .wild-error { position: absolute; top: 40%; left: 50%; transform: translateX(-50%); padding: 1rem; background: #2b2019; }
+.wild-map svg { touch-action: none; cursor: grab; aspect-ratio: 1; max-height: 66dvh; }
+.wild-map svg:active { cursor: grabbing; }
+.wild-map-controls { display: flex; gap: .4rem; margin-bottom: .35rem; }
