@@ -1,16 +1,16 @@
-"use strict";
+import type { EnemyKind, EnemySpawn, RegionId, Vec2 } from '../types/world';
 
-const TILE = 32;
-const WORLD_COLUMNS = 96;
-const WORLD_ROWS = 64;
-const WORLD_WIDTH = WORLD_COLUMNS * TILE;
-const WORLD_HEIGHT = WORLD_ROWS * TILE;
+export const TILE = 32;
+export const WORLD_COLUMNS = 96;
+export const WORLD_ROWS = 64;
+export const WORLD_WIDTH = WORLD_COLUMNS * TILE;
+export const WORLD_HEIGHT = WORLD_ROWS * TILE;
 
-function worldCenter(x, y) {
+export function worldCenter(x: number, y: number): Vec2 {
   return { x: (x + 0.5) * TILE, y: (y + 0.5) * TILE };
 }
 
-const ZONES = {
+export const ZONES: Partial<Record<RegionId, string>> = {
   village: "Ashen Wilds",
   cottage: "Field Camp",
   river: "The Blackwater",
@@ -20,7 +20,7 @@ const ZONES = {
   arena: "Warden's Court",
 };
 
-const COTTAGE = {
+export const COTTAGE = {
   left: 11, top: 14, right: 16, bottom: 20,
   door: worldCenter(13, 18),
   workbench: worldCenter(13, 17),
@@ -30,13 +30,13 @@ const COTTAGE = {
   workbenchArrival: worldCenter(12, 16),
   chestArrival: worldCenter(16, 16),
 };
-const VILLAGE_HUTS = [];
-const VILLAGE_BUILD_BOUNDS = { left: 2, top: 2, right: WORLD_COLUMNS - 3, bottom: WORLD_ROWS - 3 };
+const VILLAGE_HUTS: readonly TileBounds[] = [];
+export const VILLAGE_BUILD_BOUNDS: TileBounds = { left: 2, top: 2, right: WORLD_COLUMNS - 3, bottom: WORLD_ROWS - 3 };
 
-const WORLD_GATES = { G: worldCenter(49, 26), X: worldCenter(48, 32) };
-const KEY_POSITION = worldCenter(47, 20);
-const POTION_POSITION = worldCenter(45, 9);
-const CHEST_LOCATIONS = {
+export const WORLD_GATES = { G: worldCenter(49, 26), X: worldCenter(48, 32) };
+export const KEY_POSITION = worldCenter(47, 20);
+export const POTION_POSITION = worldCenter(45, 9);
+export const CHEST_LOCATIONS = {
   house: { position: COTTAGE.chest, arrival: COTTAGE.chestArrival },
   dungeon1: { position: worldCenter(38, 21), arrival: worldCenter(38, 22) },
   dungeon2: { position: worldCenter(52, 9), arrival: worldCenter(52, 10) },
@@ -44,20 +44,20 @@ const CHEST_LOCATIONS = {
 };
 
 // Preserve the old room offsets for existing heroes, buildings and unclaimed drops.
-const LEGACY_OFFSETS = {
+export const LEGACY_OFFSETS: Record<Exclude<LegacyArea, 'house'>, { x: number; y: number }> = {
   forest: { x: 3, y: 9 },
   dungeon1: { x: 35, y: 18 },
   dungeon2: { x: 43, y: 4 },
   dungeon3: { x: 48, y: 27 },
 };
-const LEGACY_ARRIVALS = {
+export const LEGACY_ARRIVALS: Record<LegacyArea, Vec2> = {
   forest: COTTAGE.spawn,
   house: worldCenter(7, 12),
   dungeon1: worldCenter(36, 26),
   dungeon2: worldCenter(44, 12),
   dungeon3: worldCenter(59, 28),
 };
-const LEGACY_FOREST = [
+export const LEGACY_FOREST: readonly string[] = [
   "###############",
   "#.Y..Y....Y.Y.#",
   "#.HHHH.....QGQ#",
@@ -70,7 +70,7 @@ const LEGACY_FOREST = [
   "###############",
 ];
 
-function legacyWorldPoint(oldArea, point) {
+export function legacyWorldPoint(oldArea: LegacyArea, point: Vec2): Vec2 {
   if (oldArea === "house") {
     const x = Math.max(6, Math.min(8, Math.floor(point.x / TILE)));
     return worldCenter(x, 12);
@@ -79,7 +79,11 @@ function legacyWorldPoint(oldArea, point) {
   return offset ? { x: point.x + offset.x * TILE, y: point.y + offset.y * TILE } : COTTAGE.spawn;
 }
 
-const WORLD_ENEMY_SPAWNS = [
+type LegacyArea = 'forest' | 'house' | 'dungeon1' | 'dungeon2' | 'dungeon3';
+interface TileBounds { left: number; top: number; right: number; bottom: number }
+type SpawnRow = readonly [string, EnemyKind, number, number, RegionId, boolean?];
+
+export const WORLD_ENEMY_SPAWNS: readonly EnemySpawn[] = ([
   ["forest:wolf:0", "wolf", 27, 13, "forest"],
   ["forest:wolf:1", "wolf", 29, 20, "forest"],
   ["forest:wolf:2", "wolf", 33, 10, "forest"],
@@ -91,9 +95,11 @@ const WORLD_ENEMY_SPAWNS = [
   ["dungeon2:slime:2", "snake", 55, 7, "undercroft", true],
   ["dungeon2:guard:0", "snake", 55, 10, "undercroft", true],
   ["dungeon3:warden", "warden", 55, 32, "arena"],
-].map(([id, kind, x, y, zone, veteran = false]) => ({ id, kind, ...worldCenter(x, y), zone, veteran }));
+] satisfies readonly SpawnRow[]).map(([id, kind, x, y, zone, veteran = false]) => ({
+  id, kind, ...worldCenter(x, y), zone, veteran,
+}));
 
-const RUIN_LAYOUTS = {
+export const RUIN_LAYOUTS: Readonly<Record<'dungeon1' | 'dungeon2' | 'dungeon3', readonly string[]>> = {
   dungeon1: [
     "###############",
     "#%%%%%%%%%%%%%#",
@@ -132,22 +138,22 @@ const RUIN_LAYOUTS = {
   ],
 };
 
-function inTileBounds(x, y, bounds) {
+export function inTileBounds(x: number, y: number, bounds: TileBounds): boolean {
   return x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom;
 }
 
-function makeWorldMap() {
+function makeWorldMap(): string[] {
   const map = Array.from({ length: WORLD_ROWS }, () => Array(WORLD_COLUMNS).fill("."));
-  const horizontal = (y, left, right, tile) => {
+  const horizontal = (y: number, left: number, right: number, tile: string): void => {
     for (let x = left; x <= right; x++) map[y][x] = tile;
   };
-  const vertical = (x, top, bottom, tile) => {
+  const vertical = (x: number, top: number, bottom: number, tile: string): void => {
     for (let y = top; y <= bottom; y++) map[y][x] = tile;
   };
-  const fill = ({ left, top, right, bottom }, tile) => {
+  const fill = ({ left, top, right, bottom }: TileBounds, tile: string): void => {
     for (let y = top; y <= bottom; y++) horizontal(y, left, right, tile);
   };
-  const place = (tile, points) => {
+  const place = (tile: string, points: readonly (readonly [number, number])[]): void => {
     for (const [x, y] of points) map[y][x] = tile;
   };
 
@@ -184,7 +190,7 @@ function makeWorldMap() {
   place("L", [[24, 15], [30, 16], [32, 24], [33, 26], [46, 32]]);
 
   // Woodland glades and rock outcrops frame the dirt paths and the old walls.
-  const groves = [
+  const groves: readonly (readonly [number, number, number, number])[] = [
     [2, 2, 3, 2], [7, 3, 3, 2], [14, 3, 4, 2], [1, 11, 3, 3],
     [2, 28, 4, 4], [7, 32, 4, 3], [13, 29, 3, 4], [16, 10, 2, 3],
     [24, 2, 10, 5], [23, 7, 6, 3], [27, 11, 4, 2], [29, 13, 2, 3],
@@ -204,18 +210,19 @@ function makeWorldMap() {
     }
   }
 
-  for (const [id, rows] of Object.entries(RUIN_LAYOUTS)) {
+  for (const id of ['dungeon1', 'dungeon2', 'dungeon3'] as const) {
+    const rows = RUIN_LAYOUTS[id];
     const { x, y } = LEGACY_OFFSETS[id];
     rows.forEach((row, j) => [...row].forEach((tile, i) => { map[y + j][x + i] = tile; }));
   }
 
   // Masonry closes the routes between wings so the locked gate cannot be bypassed.
-  const passages = [
+  const passages: readonly (readonly (readonly [number, number])[])[] = [
     [[50, 26], [52, 26], [52, 15], [41, 15], [41, 12], [42, 12]],
     [[58, 5], [59, 5], [59, 27]],
   ];
   for (const points of passages) {
-    const cells = [];
+    const cells: [number, number][] = [];
     for (let i = 1; i < points.length; i++) {
       const [x, y] = points[i - 1];
       const [endX, endY] = points[i];
@@ -246,10 +253,10 @@ function makeWorldMap() {
   return map.map(row => row.join(""));
 }
 
-const WORLD_MAP = makeWorldMap();
+export const WORLD_MAP = makeWorldMap();
 
-function regionAt({ x, y }) {
-  const floor = towerFloorAt({ y });
+export function regionAt({ x, y }: Vec2, floorAt?: (position: Vec2) => { id: RegionId } | undefined): RegionId {
+  const floor = floorAt?.({ x, y });
   if (floor) return floor.id;
   const col = Math.floor(x / TILE);
   const row = Math.floor(y / TILE);
@@ -263,6 +270,6 @@ function regionAt({ x, y }) {
   return "forest";
 }
 
-function canBuildTile(x, y) {
+export function canBuildTile(x: number, y: number): boolean {
   return inTileBounds(x, y, VILLAGE_BUILD_BOUNDS) && WORLD_MAP[y]?.[x] === "." && !inTileBounds(x, y, COTTAGE);
 }

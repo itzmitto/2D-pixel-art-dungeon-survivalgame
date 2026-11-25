@@ -1,8 +1,12 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022", "DOM"],
-    "module": "None",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "strict": true,
     "noImplicitOverride": true,
     "noImplicitReturns": true,
@@ -11,29 +15,20 @@
     "noUnusedParameters": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "noEmitOnError": true,
-    "outFile": "public/game-engine.js"
+    "noEmit": true,
+    "allowImportingTsExtensions": true
   },
-  "files": [
-    "src/game/types/globals.ts",
-    "src/game/items/inventory.ts",
-    "src/game/world/regions.ts",
-    "src/game/world/towers.ts",
-    "src/game/entities/encounters.ts",
+  "include": [
+    "src/game/types/world.ts",
     "src/game/world/camera.ts",
     "src/game/world/collision.ts",
-    "src/game/world/world.ts",
-    "src/game/entities/party.ts",
-    "src/game/systems/movement.ts",
-    "src/game/rendering/sprites.ts",
-    "src/game/rendering/terrain.ts",
-    "src/game/rendering/render.ts",
-    "src/game/combat/combat.ts",
-    "src/game/entities/wolf.ts",
-    "src/game/combat/boss.ts",
-    "src/game/systems/save.ts",
-    "src/game/systems/hud.ts",
-    "src/game/systems/input.ts",
-    "src/game/main.ts"
+    "src/game/world/regions.ts",
+    "src/game/world/towers.ts",
+    "src/game/types/items.ts",
+    "src/game/types/combat.ts",
+    "src/game/items/catalog.ts",
+    "src/game/entities/encounters.ts",
+    "src/game/items/recipes.ts",
+    "src/game/core/loop.ts"
   ]
 }

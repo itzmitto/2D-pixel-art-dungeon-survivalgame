@@ -1,62 +1,92 @@
-"use strict";
+import type { TowerFloorGeometry, Vec2 } from '../types/world.ts';
 
-const SOLID_TILES = new Set("#~YQHBWOC");
-
-function worldTile(x, y) {
-  const floor = towerFloorAt({ y: y * TILE });
-  if (y === 36 && (x === 27 || x === 28)) return "=";
-  if (!floor && TOWER_CONNECTIONS.some(([from, arrival]) => towerFloorAt(from) &&
-      arrival.x === (x + 0.5) * TILE && arrival.y === (y + 0.5) * TILE)) return "=";
-  if (floor) return floor.rows[y - floor.top]?.[x];
-  if (TOWER_LANDMARKS.some(hut => inTileBounds(x, y, hut))) {
-    return TOWER_LANDMARKS.some(hut => hut.door.x === worldCenter(x,y).x && hut.door.y === worldCenter(x,y).y) ? "D" : "H";
-  }
-  return towerTrail(x, y) ? "=" : WORLD_MAP[y]?.[x];
+export interface CollisionActor extends Vec2 {
+  x: number;
+  y: number;
+  readonly radius: number;
+  readonly zone?: string;
 }
 
-function gateOpen(tile, state = progress) {
-  if (tile === "G") return state?.collected[DUNGEON_KEY] === true;
-  if (tile === "X") return wardenDefeated(state);
-  return true;
+export interface CollisionWorld<State> {
+  readonly tileSize: number;
+  readonly mapRows: readonly string[];
+  readonly solidTiles: ReadonlySet<string>;
+  readonly fallbackSpawn: Vec2;
+  tileAt(column: number, row: number): string | undefined;
+  floorAt(position: Vec2): TowerFloorGeometry | undefined;
+  regionAt(position: Vec2): string;
+  gateUnlocked(tile: 'G' | 'X', state: State): boolean;
+  fenceAt(column: number, row: number, state: State): boolean;
+  worldCenter(column: number, row: number): Vec2;
+  distance(left: Vec2, right: Vec2): number;
 }
 
-function blocked(x, y, radius, canUseGates = true, state = progress) {
-  for (const edgeY of [y - radius, y + radius]) {
-    for (const edgeX of [x - radius, x + radius]) {
-      const col = Math.floor(edgeX / TILE);
-      const row = Math.floor(edgeY / TILE);
-      const tile = worldTile(col, row);
-      if (!tile || SOLID_TILES.has(tile) || state?.buildings?.[tileId(col, row)] === "fence") return true;
-      if ((tile === "G" || tile === "X") && (!canUseGates || !gateOpen(tile, state))) return true;
+export function isBlocked<State>(
+  point: Vec2,
+  radius: number,
+  state: State,
+  world: CollisionWorld<State>,
+  canUseGates = true,
+): boolean {
+  const { tileSize, solidTiles } = world;
+  for (const edgeY of [point.y - radius, point.y + radius]) {
+    for (const edgeX of [point.x - radius, point.x + radius]) {
+      const column = Math.floor(edgeX / tileSize);
+      const row = Math.floor(edgeY / tileSize);
+      const tile = world.tileAt(column, row);
+      if (!tile || solidTiles.has(tile) || world.fenceAt(column, row, state)) return true;
+      if ((tile === 'G' || tile === 'X') && (!canUseGates || !world.gateUnlocked(tile, state))) return true;
     }
   }
   return false;
 }
 
-function move(actor, dx, dy, canUseGates = true) {
-  const walkable = (x, y) => (!actor.zone || regionAt({ x, y }) === actor.zone) &&
-    !blocked(x, y, actor.radius, canUseGates);
-  if (walkable(actor.x + dx, actor.y)) actor.x += dx;
-  if (walkable(actor.x, actor.y + dy)) actor.y += dy;
+export function moveActor<State>(
+  actor: CollisionActor,
+  delta: Vec2,
+  state: State,
+  world: CollisionWorld<State>,
+  canUseGates = true,
+): Vec2 {
+  const moved = { x: actor.x, y: actor.y };
+  const canOccupy = (candidate: Vec2): boolean =>
+    (!actor.zone || world.regionAt(candidate) === actor.zone) &&
+    !isBlocked(candidate, actor.radius, state, world, canUseGates);
+  const horizontal = { x: moved.x + delta.x, y: moved.y };
+  if (canOccupy(horizontal)) moved.x = horizontal.x;
+  const vertical = { x: moved.x, y: moved.y + delta.y };
+  if (canOccupy(vertical)) moved.y = vertical.y;
+  actor.x = moved.x;
+  actor.y = moved.y;
+  return moved;
 }
 
-function safeWorldPoint(point, state, zone) {
-  const valid = point && Number.isFinite(point.x) && Number.isFinite(point.y);
-  if (!valid) return { ...COTTAGE.spawn };
-  if ((!zone || regionAt(point) === zone) && !blocked(point.x, point.y, 8, true, state)) return { x: point.x, y: point.y };
-  const floor = towerFloorAt(point);
-  const rows = floor?.rows ?? WORLD_MAP;
+export function nearestWalkablePoint<State>(
+  point: Vec2,
+  state: State,
+  world: CollisionWorld<State>,
+  zone?: string,
+  radius = 8,
+): Vec2 {
+  if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return { ...world.fallbackSpawn };
+  if ((!zone || world.regionAt(point) === zone) && !isBlocked(point, radius, state, world)) {
+    return { x: point.x, y: point.y };
+  }
+
+  const floor = world.floorAt(point);
+  const rows = floor?.rows ?? world.mapRows;
   const top = floor?.top ?? 0;
-  let closest;
-  let nearest = Infinity;
-  for (let y = top + 1; y < top + rows.length - 1; y++) {
-    for (let x = 1; x < rows[0].length - 1; x++) {
-      const position = worldCenter(x, y);
-      const gap = distance(point, position);
-      if (gap >= nearest || (zone && regionAt(position) !== zone) || blocked(position.x, position.y, 8, true, state)) continue;
+  let best: Vec2 | undefined;
+  let nearest = Number.POSITIVE_INFINITY;
+  for (let row = top + 1; row < top + rows.length - 1; row++) {
+    const width = rows[row - top]?.length ?? 0;
+    for (let column = 1; column < width - 1; column++) {
+      const candidate = world.worldCenter(column, row);
+      const gap = world.distance(point, candidate);
+      if (gap >= nearest || (zone && world.regionAt(candidate) !== zone) || isBlocked(candidate, radius, state, world)) continue;
       nearest = gap;
-      closest = position;
+      best = candidate;
     }
   }
-  return closest || { ...COTTAGE.spawn };
+  return best ?? { ...world.fallbackSpawn };
 }

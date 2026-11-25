@@ -1,60 +1,79 @@
-"use strict";
+import type { CameraState, CameraWorld, TileBounds, Vec2 } from '../types/world.ts';
 
-const VIEW_WIDTH = 240;
-const VIEW_HEIGHT = 160;
-const camera = { x: 0, y: 0 };
-let cameraFollowX = 0;
-let cameraFollowY = 0;
+const FOLLOW_RATE = 12;
+const LOWER_THIRD_ANCHOR = 0.69;
 
-function cameraTarget(position) {
-  const floor = towerFloorAt(position);
-  if (floor) return {
-    x: Math.max(0, Math.min(floor.rows[0].length * TILE - VIEW_WIDTH, position.x - VIEW_WIDTH / 2)),
-    y: Math.max(floor.top * TILE, Math.min((floor.top + floor.rows.length) * TILE - VIEW_HEIGHT,
-      position.y - VIEW_HEIGHT * 0.69)),
-  };
+export function createCamera(position: Vec2, world: CameraWorld): CameraState {
+  const target = cameraTarget(position, world);
+  return { ...target, followX: target.x, followY: target.y };
+}
+
+export function cameraTarget(position: Vec2, world: CameraWorld): Vec2 {
+  const floor = world.floorAt(position);
+  if (floor) {
+    const width = floor.rows[0]?.length ?? 0;
+    const height = floor.rows.length;
+    return {
+      x: clamp(position.x - world.viewWidth / 2, 0, Math.max(0, width * world.tileSize - world.viewWidth)),
+      y: clamp(
+        position.y - world.viewHeight * LOWER_THIRD_ANCHOR,
+        floor.top * world.tileSize,
+        Math.max(floor.top * world.tileSize, (floor.top + height) * world.tileSize - world.viewHeight),
+      ),
+    };
+  }
   return {
-    x: Math.max(0, Math.min(WORLD_WIDTH - VIEW_WIDTH, position.x - VIEW_WIDTH / 2)),
-    // Keep the knight in the lower third so the view follows from behind and exposes the trail ahead.
-    y: Math.max(0, Math.min(WORLD_HEIGHT - VIEW_HEIGHT, position.y - VIEW_HEIGHT * 0.69)),
+    x: clamp(position.x - world.viewWidth / 2, 0, Math.max(0, world.worldWidth - world.viewWidth)),
+    y: clamp(
+      position.y - world.viewHeight * LOWER_THIRD_ANCHOR,
+      0,
+      Math.max(0, world.worldHeight - world.viewHeight),
+    ),
   };
 }
 
-function snapCamera() {
-  const target = cameraTarget(player);
-  cameraFollowX = target.x;
-  cameraFollowY = target.y;
-  camera.x = Math.round(cameraFollowX);
-  camera.y = Math.round(cameraFollowY);
+export function snapCamera(state: CameraState, position: Vec2, world: CameraWorld): void {
+  const target = cameraTarget(position, world);
+  state.followX = target.x;
+  state.followY = target.y;
+  state.x = Math.round(target.x);
+  state.y = Math.round(target.y);
 }
 
-function updateCamera(dt) {
-  const target = cameraTarget(player);
-  const follow = 1 - Math.exp(-12 * dt);
-  cameraFollowX += (target.x - cameraFollowX) * follow;
-  cameraFollowY += (target.y - cameraFollowY) * follow;
-  // Keep the world aligned to the pixel grid without discarding the fractional follow state.
-  camera.x = Math.round(cameraFollowX);
-  camera.y = Math.round(cameraFollowY);
+export function updateCamera(state: CameraState, position: Vec2, elapsedSeconds: number, world: CameraWorld): void {
+  const target = cameraTarget(position, world);
+  const dt = Math.max(0, Math.min(elapsedSeconds, 0.25));
+  const amount = 1 - Math.exp(-FOLLOW_RATE * dt);
+  state.followX += (target.x - state.followX) * amount;
+  state.followY += (target.y - state.followY) * amount;
+  state.x = Math.round(state.followX);
+  state.y = Math.round(state.followY);
 }
 
-function visibleTileBounds(padding = 0) {
-  const floor = towerFloorAt(player);
-  if (floor) return {
-    left: Math.max(0, Math.floor((camera.x - padding) / TILE)),
-    right: Math.min(floor.rows[0].length, Math.ceil((camera.x + VIEW_WIDTH + padding) / TILE)),
-    top: Math.max(floor.top, Math.floor((camera.y - padding) / TILE)),
-    bottom: Math.min(floor.top + floor.rows.length, Math.ceil((camera.y + VIEW_HEIGHT + padding) / TILE)),
-  };
+export function visibleTileBounds(
+  state: CameraState,
+  position: Vec2,
+  world: CameraWorld,
+  padding = 0,
+): TileBounds {
+  const floor = world.floorAt(position);
+  const columns = floor?.rows[0]?.length ?? Math.ceil(world.worldWidth / world.tileSize);
+  const rows = floor?.rows.length ?? Math.ceil(world.worldHeight / world.tileSize);
+  const topEdge = floor?.top ?? 0;
+  const bottomEdge = topEdge + rows;
   return {
-    left: Math.max(0, Math.floor((camera.x - padding) / TILE)),
-    right: Math.min(WORLD_MAP[0].length, Math.ceil((camera.x + VIEW_WIDTH + padding) / TILE)),
-    top: Math.max(0, Math.floor((camera.y - padding) / TILE)),
-    bottom: Math.min(WORLD_MAP.length, Math.ceil((camera.y + VIEW_HEIGHT + padding) / TILE)),
+    left: Math.max(0, Math.floor((state.x - padding) / world.tileSize)),
+    right: Math.min(columns, Math.ceil((state.x + world.viewWidth + padding) / world.tileSize)),
+    top: Math.max(topEdge, Math.floor((state.y - padding) / world.tileSize)),
+    bottom: Math.min(bottomEdge, Math.ceil((state.y + world.viewHeight + padding) / world.tileSize)),
   };
 }
 
-function pointInView(x, y, padding = 0) {
-  return x >= camera.x - padding && x < camera.x + VIEW_WIDTH + padding &&
-    y >= camera.y - padding && y < camera.y + VIEW_HEIGHT + padding;
+export function pointInView(state: CameraState, point: Vec2, world: CameraWorld, padding = 0): boolean {
+  return point.x >= state.x - padding && point.x < state.x + world.viewWidth + padding &&
+    point.y >= state.y - padding && point.y < state.y + world.viewHeight + padding;
+}
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.max(minimum, Math.min(maximum, value));
 }
