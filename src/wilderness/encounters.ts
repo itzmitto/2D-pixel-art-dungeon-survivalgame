@@ -1,0 +1,306 @@
+import * as T from 'three';
+import { inArc, longsword, maxHealth, swingTimer, wolf, wolfLoot, xpNeeded } from './combatRules';
+import type { Exploration } from './exploration';
+import { randomSequence, spawn, surface } from './layout';
+import { wolfModels } from './wolves';
+
+const territories = [
+  { x:-66,z:-20 }, { x:-97,z:-68 }, { x:-162,z:67 }, { x:-170,z:-111 },
+  { x:83,z:-67 }, { x:142,z:-117 }, { x:99,z:91 }, { x:173,z:-154 },
+];
+const safe = (x:number,z:number) => Math.hypot(x+45,z)<12 || Math.hypot(x-154,z-103)<11;
+const nearDistance = 48;
+const notificationsSeconds = 3.5;
+
+function numberSprite(value:number) {
+  const canvas=document.createElement('canvas');
+  canvas.width=64; canvas.height=48;
+  const context=canvas.getContext('2d');
+  if(!context) return null;
+  context.font='bold 32px Georgia';
+  context.textAlign='center';
+  context.textBaseline='middle';
+  context.lineWidth=5;
+  context.strokeStyle='#2a1713';
+  context.fillStyle='#ffd591';
+  context.strokeText(String(value),32,24);
+  context.fillText(String(value),32,24);
+  const texture=new T.CanvasTexture(canvas);
+  texture.colorSpace=T.SRGBColorSpace;
+  return new T.SpriteMaterial({map:texture,transparent:true,depthWrite:false});
+}
+
+export function createEncounters(
+  scene:T.Scene, camera:T.Camera, player:T.Group, save:Exploration,
+  canWalk:(x:number,z:number)=>boolean, changed:()=>void,
+) {
+  const models=wolfModels();
+  const group=new T.Group();
+  scene.add(group);
+  const rangeTimer=swingTimer();
+  const oldDefeats=new Set(save.defeated), collected=new Set(save.collected);
+  const rand=randomSequence(save.seed ^ 0xa3615);
+  let time=0, notification='', noticeUntil=0;
+  const notify=(message:string)=>{
+    notification=message; noticeUntil=time+notificationsSeconds; changed();
+  };
+  const barGeometry=new T.PlaneGeometry(1.2,.115);
+  const backing=new T.MeshBasicMaterial({color:'#251919',depthWrite:false});
+  const red=new T.MeshBasicMaterial({color:'#ba5447',depthWrite:false});
+  const alert=new T.MeshBasicMaterial({color:'#de9c55',depthWrite:false});
+  const lootGeometry=new T.OctahedronGeometry(.29);
+  const lootMaterial=new T.MeshStandardMaterial({color:'#bd9868',emissive:'#916024',emissiveIntensity:.7,roughness:.36});
+  type Enemy = ReturnType<typeof models.make> & {
+    id:string; home:T.Vector3; hp:number; hpBar:T.Group; fill:T.Mesh;
+    cooldown:number; windup:number; heading:number; phase:number; hitFlash:number; loot:T.Mesh;
+  };
+  const enemies:Enemy[]=[];
+  for(const [index,center] of territories.entries()){
+    const candidates=Array.from({length:30},()=>{
+      const a=rand()*Math.PI*2,r=2+rand()*9;
+      return {x:center.x+Math.cos(a)*r,z:center.z+Math.sin(a)*r};
+    });
+    const spot=candidates.find(({x,z})=>!safe(x,z)&&canWalk(x,z));
+    if(!spot) continue;
+    const id='wolf-'+index, actor=models.make();
+    const home=new T.Vector3(spot.x,surface(spot.x,spot.z),spot.z);
+    actor.root.position.copy(home);
+    group.add(actor.root);
+    const hpBar=new T.Group();
+    const background=new T.Mesh(barGeometry,backing), fill=new T.Mesh(barGeometry,red);
+    fill.position.z=.017;
+    hpBar.add(background,fill);
+    group.add(hpBar);
+    const loot=new T.Mesh(lootGeometry,lootMaterial);
+    loot.position.copy(home);
+    loot.visible=oldDefeats.has(id)&&!collected.has(id);
+    group.add(loot);
+    enemies.push({...actor,id,home,hp:oldDefeats.has(id)?0:wolf.health,hpBar,fill,
+      cooldown:0,windup:0,heading:rand()*6.28,phase:rand()*10,hitFlash:0,loot});
+  }
+
+  const sparkGeometry=new T.BufferGeometry();
+  const sparkPositions=new Float32Array(36*3);
+  sparkGeometry.setAttribute('position',new T.BufferAttribute(sparkPositions,3));
+  const sparks=new T.Points(sparkGeometry,new T.PointsMaterial({color:'#eac398',size:.14,depthWrite:false}));
+  sparks.frustumCulled=false;
+  sparks.visible=false;
+  group.add(sparks);
+  const bursts=Array.from({length:36},()=>({p:new T.Vector3(),v:new T.Vector3(),life:0}));
+  let sparkCursor=0;
+  const numberMaterial=numberSprite(longsword.damage);
+  const numbers=numberMaterial?Array.from({length:6},()=>{
+    const sprite=new T.Sprite(numberMaterial);
+    sprite.scale.set(1.6,1.2,1);
+    sprite.visible=false;
+    group.add(sprite);
+    return {sprite,age:1,base:0};
+  }):[];
+  let numberCursor=0;
+
+  const slashGeometry=new T.RingGeometry(1.53,2.71,18,1,Math.PI/2-1,2).rotateX(Math.PI/2);
+  const slashMaterial=new T.MeshBasicMaterial({color:'#e3cda6',transparent:true,opacity:0,
+    side:T.DoubleSide,depthWrite:false});
+  const slash=new T.Mesh(slashGeometry,slashMaterial);
+  slash.visible=false;
+  group.add(slash);
+  let slashTime=0;
+  function impact(point:T.Vector3){
+    for(let i=0;i<8;i++){
+      const spark=bursts[sparkCursor++%bursts.length];
+      spark.p.copy(point); spark.p.y+=.85;
+      spark.v.set((rand()-.5)*6,1.5+rand()*3,(rand()-.5)*6);
+      spark.life=.32+rand()*.16;
+    }
+    if(numbers.length){
+      const number=numbers[numberCursor++%numbers.length];
+      number.sprite.position.copy(point);
+      number.base=point.y+2.2;
+      number.age=0;
+    }
+  }
+  function clearLine(x:number,z:number,tx:number,tz:number){
+    const distance=Math.hypot(x-tx,z-tz), steps=Math.ceil(distance/.75);
+    for(let i=1;i<steps;i++){
+      const mix=i/steps;
+      if(!canWalk(x+(tx-x)*mix,z+(tz-z)*mix)) return false;
+    }
+    return true;
+  }
+
+  function hitEnemy(enemy:Enemy){
+    enemy.hp=Math.max(0,enemy.hp-longsword.damage);
+    enemy.hitFlash=.22;
+    impact(enemy.root.position);
+    if(enemy.hp) return;
+    enemy.loot.position.copy(enemy.root.position);
+    enemy.loot.visible=true;
+    oldDefeats.add(enemy.id);
+    save.defeated=[...oldDefeats];
+    save.xp+=wolf.xp;
+    const before=save.level;
+    while(save.xp>=xpNeeded(save.level)){
+      save.xp-=xpNeeded(save.level);
+      save.level++;
+    }
+    if(save.level!==before) notify('Level '+save.level+' reached.');
+    else notify('Wolf defeated · +'+wolf.xp+' XP');
+  }
+
+  function hitPlayer(enemy:Enemy, blocking:boolean){
+    const guard=blocking&&inArc(player.position,enemy.root.position,player.rotation.y,3,1.25);
+    if(guard){
+      impact(player.position);
+      notify('Blocked');
+      return;
+    }
+    save.health=Math.max(0,save.health-wolf.damage);
+    impact(player.position);
+    if(!save.health) rangeTimer.cancel();
+    notify(save.health?'The wolf hit you.':'You fell in the Blackwater Wilds.');
+  }
+
+  function lootNearby(){
+    return enemies.find(enemy=>enemy.loot.visible &&
+      Math.hypot(player.position.x-enemy.loot.position.x,player.position.z-enemy.loot.position.z)<2.95 &&
+      clearLine(player.position.x,player.position.z,enemy.loot.position.x,enemy.loot.position.z));
+  }
+  const atCamp=()=> Math.hypot(player.position.x+45,player.position.z)<4 ||
+    Math.hypot(player.position.x-154,player.position.z-103)<4;
+  return {
+    attack(startAnimation:()=>boolean){
+      if(!save.health||!rangeTimer.start()) return;
+      if(!startAnimation()) rangeTimer.cancel();
+    },
+    interact(){
+      if(!save.health){
+        player.position.set(spawn.x,surface(spawn.x,spawn.z),spawn.z);
+        player.rotation.y=0;
+        save.health=maxHealth;
+        notify('Returned to Ember Clearing.');
+        return;
+      }
+      const loot=lootNearby();
+      if(loot){
+        loot.loot.visible=false;
+        collected.add(loot.id);
+        save.collected=[...collected];
+        save.gold+=wolfLoot.gold;
+        save.fangs+=wolfLoot.count;
+        notify('Collected '+wolfLoot.item+' and '+wolfLoot.gold+' gold.');
+      } else if(atCamp()&&save.health<maxHealth){
+        save.health=maxHealth;
+        notify('Rested at the campfire.');
+      }
+    },
+    ui(){
+      return {notification, prompt:!save.health?'E · Return to Ember Clearing':lootNearby()?'E · Collect wolf loot':
+        atCamp()&&save.health<maxHealth?'E · Rest at campfire':''};
+    },
+    update(dt:number,blocking:boolean){
+      time+=dt;
+      if(notification&&time>=noticeUntil){notification='';changed();}
+      if(rangeTimer.advance(dt)&&save.health){
+        slashTime=.23;
+        slash.position.copy(player.position);
+        slash.position.y+=1.15;
+        slash.rotation.y=player.rotation.y;
+        for(const enemy of enemies){
+          const p=enemy.root.position;
+          if(enemy.hp && Math.abs(player.position.y-p.y)<2 &&
+            inArc(player.position,p,player.rotation.y,longsword.range,longsword.reachAngle) &&
+            clearLine(player.position.x,player.position.z,p.x,p.z)) hitEnemy(enemy);
+        }
+      }
+
+      for(const enemy of enemies){
+        const root=enemy.root, p=root.position;
+        const gap=Math.hypot(player.position.x-p.x,player.position.z-p.z);
+        const active=gap<nearDistance&&enemy.hp>0;
+        root.visible=active;
+        enemy.hpBar.visible=active&&gap<23&&(enemy.hp<wolf.health||enemy.windup>0);
+        if(!active) continue;
+        const homeGap=Math.hypot(p.x-enemy.home.x,p.z-enemy.home.z);
+        const playerHome=Math.hypot(player.position.x-enemy.home.x,player.position.z-enemy.home.z);
+        const aggro=save.health>0&&gap<wolf.awareness&&playerHome<wolf.leash&&!safe(player.position.x,player.position.z);
+        enemy.cooldown=Math.max(0,enemy.cooldown-dt);
+        enemy.hitFlash=Math.max(0,enemy.hitFlash-dt);
+        let gait=0;
+        if(enemy.windup>0){
+          enemy.windup=Math.max(0,enemy.windup-dt);
+          if(!enemy.windup){
+            enemy.cooldown=wolf.recovery;
+            if(aggro && gap<wolf.reach+.35 && Math.abs(player.position.y-p.y)<1.9 &&
+              clearLine(p.x,p.z,player.position.x,player.position.z)) hitPlayer(enemy,blocking);
+          }
+        } else if(aggro&&gap<wolf.reach&&enemy.cooldown===0&&clearLine(p.x,p.z,player.position.x,player.position.z)){
+          enemy.windup=wolf.windup;
+        } else if(!aggro||gap>wolf.reach-.18){
+          const goal = aggro ? player.position : homeGap>8 ? enemy.home : {
+            x:enemy.home.x+Math.sin(time*.31+enemy.phase)*5,
+            z:enemy.home.z+Math.cos(time*.26+enemy.phase)*5,
+          };
+          const dx=goal.x-p.x,dz=goal.z-p.z,remaining=Math.hypot(dx,dz);
+          if(remaining>.35){
+            const step=Math.min(remaining,(aggro?wolf.speed:1.65)*dt);
+            const tryStep=(factor:number)=>{
+              const angle=Math.atan2(dx,dz)+factor;
+              const x=p.x+Math.sin(angle)*step,z=p.z+Math.cos(angle)*step;
+              if(!canWalk(x,z)||safe(x,z)||Math.hypot(x-player.position.x,z-player.position.z)<.9) return false;
+              p.x=x;p.z=z;enemy.heading=angle;gait=aggro?1:.48;
+              return true;
+            };
+            tryStep(0)||tryStep(.87)||tryStep(-.87);
+          }
+        }
+        if(enemy.windup>0) enemy.heading=Math.atan2(player.position.x-p.x,player.position.z-p.z);
+        const angle=enemy.heading-root.rotation.y;
+        root.rotation.y+=Math.atan2(Math.sin(angle),Math.cos(angle))*(1-Math.exp(-10*dt));
+        p.y=surface(p.x,p.z)+Math.abs(Math.sin(time*14+enemy.phase))*.09*gait;
+        root.rotation.x=enemy.windup>0?-.16*Math.sin(enemy.windup/wolf.windup*Math.PI):0;
+        root.rotation.z=enemy.hitFlash*1.5;
+        for(let i=0;i<enemy.legs.length;i++) enemy.legs[i].rotation.x=Math.sin(time*(gait>.7?14:7)+enemy.phase+(i===0||i===3?0:Math.PI))*.54*gait;
+        enemy.brush.rotation.y=Math.sin(time*4+enemy.phase)*.23;
+      }
+    },
+    render(dt:number){
+      slashTime=Math.max(0,slashTime-dt);
+      slash.visible=slashTime>0;
+      slashMaterial.opacity=slashTime*1.7;
+      for(const enemy of enemies){
+        enemy.hpBar.position.copy(enemy.root.position);
+        enemy.hpBar.position.y+=2.23;
+        enemy.hpBar.quaternion.copy(camera.quaternion);
+        enemy.fill.material=enemy.windup>0?alert:red;
+        enemy.fill.scale.x=enemy.hp/wolf.health;
+        enemy.fill.position.x=(enemy.fill.scale.x-1)*.6;
+        if(enemy.loot.visible){
+          enemy.loot.position.y=surface(enemy.loot.position.x,enemy.loot.position.z)+.32+Math.sin(time*4+enemy.phase)*.12;
+          enemy.loot.rotation.y=time*1.8;
+        }
+      }
+      let cursor=0;
+      for(const spark of bursts){
+        if(spark.life<=0) continue;
+        spark.life-=dt; spark.v.y-=9*dt;
+        spark.p.addScaledVector(spark.v,dt);
+        sparkPositions.set([spark.p.x,spark.p.y,spark.p.z],cursor++*3);
+      }
+      sparkGeometry.setDrawRange(0,cursor);
+      sparkGeometry.attributes.position.needsUpdate=true;
+      sparks.visible=cursor>0;
+      for(const number of numbers){
+        number.age+=dt;
+        number.sprite.visible=number.age<.55;
+        number.sprite.position.y=number.base+number.age*1.8;
+      }
+    },
+    dispose(){
+      scene.remove(group);
+      models.dispose();
+      for(const resource of [barGeometry,backing,red,alert,lootGeometry,lootMaterial,sparkGeometry,sparks.material,slashGeometry,slashMaterial]) resource.dispose();
+      numberMaterial?.map?.dispose();
+      numberMaterial?.dispose();
+    },
+  };
+}
