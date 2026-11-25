@@ -1,0 +1,12 @@
+.saveTools {
+  position: fixed;
+  z-index: 20;
+  right: 0.75rem;
+  top: 0.75rem;
+  display: flex;
+  gap: 0.4rem;
+  opacity: 0.18;
+  transition: opacity 120ms ease;
+}
+.saveTools:hover, .saveTools:focus-within { opacity: 1; }
+.saveTools button { font-size: 0.7rem; }

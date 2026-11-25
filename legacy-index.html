@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vonkje • Dungeon Survival</title>
+  <link rel="stylesheet" href="styles/base.css">
+  <link rel="stylesheet" href="styles/game.css">
+  <link rel="stylesheet" href="styles/inventory.css">
+  <script src="js/world/regions.js" defer></script>
+  <script src="js/world/towers.js" defer></script>
+  <script src="js/entities/encounters.js" defer></script>
+  <script src="js/world/camera.js" defer></script>
+  <script src="js/world/collision.js" defer></script>
+  <script src="js/world.js" defer></script>
+  <script src="js/entities/party.js" defer></script>
+  <script src="js/movement.js" defer></script>
+  <script src="js/sprites.js" defer></script>
+  <script src="js/world/terrain.js" defer></script>
+  <script src="js/render.js" defer></script>
+  <script src="js/inventory.js" defer></script>
+  <script src="js/combat.js" defer></script>
+  <script src="js/entities/wolf.js" defer></script>
+  <script src="js/boss.js" defer></script>
+  <script src="js/save.js" defer></script>
+  <script src="js/ui/hud.js" defer></script>
+  <script src="js/input.js" defer></script>
+  <script src="main.js" defer></script>
+</head>
+<body>
+  <main>
+    <section class="game" id="game" aria-label="Vonkje playfield" data-area="forest">
+      <header class="hud">
+
+        <div class="hud-status" aria-label="Game status">
+          <strong id="room-number">Village</strong>
+          <span id="hearts" role="img" aria-label="3 of 3 hearts">♥ ♥ ♥</span>
+          <span id="hud-defense">Armor 0</span>
+          <span id="fireball-status">Fireball ready</span>
+          <span id="wood">Wood 0</span>
+          <span id="key" hidden>Key missing</span>
+        </div>
+        <div class="hud-hands" aria-label="Equipped weapons">
+          <span id="hud-left-hand">J · Empty</span>
+          <span id="hud-right-hand">K · Empty</span>
+        </div>
+        <div class="hud-actions">
+          <button id="backpack-toggle" type="button" aria-controls="backpack" aria-expanded="false">Inventory <kbd>Tab</kbd></button>
+          <button id="fullscreen-toggle" type="button" aria-pressed="false">Full screen</button>
+        </div>
+      </header>
+
+      <div class="stage">
+        <div class="room">
+          <p id="action" hidden></p>
+          <canvas id="dungeon" width="2880" height="1920" aria-label="Pixel world with a knight and a baby dragon"></canvas>
+          <div id="warden-hud" hidden>
+            <strong id="boss-name">Cyclops Warden</strong>
+            <progress id="warden-health" max="24" value="24" aria-label="Cyclops Warden health"></progress>
+            <span id="warden-cue"></span>
+          </div>
+          <div id="ending" class="ending" hidden>
+            <strong id="result"></strong>
+            <button id="respawn" type="button" hidden>Return to field camp</button>
+          </div>
+        </div>
+
+        <aside class="inventory" aria-label="Inventory and storage">
+          <section id="backpack" aria-labelledby="panel-title" hidden>
+            <header class="panel-heading">
+              <h2 id="panel-title">Inventory</h2>
+              <button id="close-backpack" type="button">Close <kbd>Esc</kbd></button>
+            </header>
+
+            <div class="panel-body">
+              <div class="panel-storage">
+                <section class="inventory-section" id="chest-section" aria-labelledby="chest-label" hidden>
+                  <h3 id="chest-label">Chest</h3>
+                  <div id="chest-slots" class="slot-grid"></div>
+                </section>
+                <section class="inventory-section" aria-labelledby="bag-label">
+                  <div class="section-heading">
+                    <h3 id="bag-label">Backpack</h3>
+                    <span id="bag-capacity"></span>
+                  </div>
+                  <div id="bag-items" class="slot-grid"></div>
+                </section>
+                <section class="inventory-section" aria-labelledby="inventory-hotbar-label">
+                  <h3 id="inventory-hotbar-label">Hotbar</h3>
+                  <div id="inventory-hotbar" class="slot-grid"></div>
+                </section>
+                <button id="recover-overflow" type="button" hidden>Recover saved items</button>
+              </div>
+
+              <div class="panel-tools">
+                <section class="inventory-section" aria-labelledby="equipment-label">
+                  <h3 id="equipment-label">Equipment</h3>
+                  <div class="equipment">
+                    <div class="knight-portrait">
+                      <canvas id="knight-preview" width="40" height="40" aria-label="Equipped knight preview"></canvas>
+                    </div>
+                    <div id="equipment-slots"></div>
+                  </div>
+                  <div class="equipment-stats">
+                    <span id="armor-total"></span>
+                    <span id="pet-recharge"></span>
+                  </div>
+                </section>
+
+                <section class="inventory-section" id="craft-section" aria-labelledby="craft-title">
+                  <h3 id="craft-title">Crafting</h3>
+                  <div class="craft-workspace">
+                    <div id="craft-grid" class="slot-grid" data-size="2"></div>
+                    <span class="craft-arrow" aria-hidden="true">→</span>
+                    <div class="craft-result">
+                      <button type="button" id="craft-output" class="slot" aria-label="Crafting output" aria-disabled="true"></button>
+                      <span>Output</span>
+                    </div>
+                  </div>
+                  <details id="recipe-guide">
+                    <summary>Recipe guide</summary>
+                    <div id="recipe-list" class="recipe-list"></div>
+                  </details>
+                </section>
+              </div>
+            </div>
+            <footer class="panel-footer">
+              <button id="drink-potion" type="button">Drink potion</button>
+              <p class="inventory-hints">Left click: stack · Right click: split or place one · Shift + click: transfer at chest</p>
+              <p id="panel-feedback" role="status"></p>
+            </footer>
+          </section>
+        </aside>
+      </div>
+
+      <footer class="controls">
+        <div class="play-hints">
+
+          <p id="feedback" role="status"></p>
+        </div>
+        <div class="hotbar">
+          <p id="hotbar-name" role="status" hidden></p>
+          <div id="hud-hotbar" class="slot-grid" role="group" aria-label="Hotbar"></div>
+        </div>
+        <div class="game-actions">
+          <button id="build-place" type="button" disabled><kbd>F</kbd> Place</button>
+          <button id="new-game" type="button">New game</button>
+        </div>
+      </footer>
+      <div id="held-stack" aria-hidden="true" hidden></div>
+      <p id="status" class="visually-hidden" role="status"></p>
+    </section>
+  </main>
+</body>
+</html>

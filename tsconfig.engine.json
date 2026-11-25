@@ -1,0 +1,39 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "None",
+    "strict": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "noEmitOnError": true,
+    "outFile": "public/game-engine.js"
+  },
+  "files": [
+    "src/game/types/globals.ts",
+    "src/game/items/inventory.ts",
+    "src/game/world/regions.ts",
+    "src/game/world/towers.ts",
+    "src/game/entities/encounters.ts",
+    "src/game/world/camera.ts",
+    "src/game/world/collision.ts",
+    "src/game/world/world.ts",
+    "src/game/entities/party.ts",
+    "src/game/systems/movement.ts",
+    "src/game/rendering/sprites.ts",
+    "src/game/rendering/terrain.ts",
+    "src/game/rendering/render.ts",
+    "src/game/combat/combat.ts",
+    "src/game/entities/wolf.ts",
+    "src/game/combat/boss.ts",
+    "src/game/systems/save.ts",
+    "src/game/systems/hud.ts",
+    "src/game/systems/input.ts",
+    "src/game/main.ts"
+  ]
+}

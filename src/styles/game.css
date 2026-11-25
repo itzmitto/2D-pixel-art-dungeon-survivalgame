@@ -1,0 +1,198 @@
+.game {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+  height: 100dvh;
+  background: #211915;
+}
+.game:fullscreen { width: 100%; height: 100%; }
+
+.hud, .controls {
+  background: linear-gradient(#35251e, #261c18);
+  font-size: 0.875rem;
+}
+.hud {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--copper);
+}
+.hud h1 {
+  margin: 0;
+  color: var(--copper-light);
+  font: bold 1.45rem/1 Georgia, serif;
+}
+.hud-status, .hud-hands, .hud-actions, .game-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+.hud-status { gap: 4px 12px; }
+.hud-hands span {
+  padding: 3px 7px;
+  border: 1px solid #754b35;
+  background: #382821;
+}
+.hud-actions { margin-inline-start: auto; }
+.hud button, .game-actions button { padding: 4px 8px; font-size: inherit; }
+.hud button kbd, .game-actions button kbd {
+  margin-inline-start: 3px;
+  color: #ffd194;
+  font-size: 0.75rem;
+}
+#hearts { display: inline-flex; gap: 4px; font-size: 1.25rem; }
+#hearts span {
+  background: linear-gradient(90deg, #ff8187 var(--heart-fill), #9d7e83 var(--heart-fill));
+  background-clip: text;
+  color: transparent;
+}
+#key, #fireball-status, #feedback { color: #d9bd85; }
+
+.stage {
+  position: relative;
+  container-type: size;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(ellipse, #334c39, #223529);
+}
+.game[data-area="house"] .stage { background: radial-gradient(ellipse, #594133, #382822); }
+.game[data-area^="dungeon"] .stage { background: radial-gradient(ellipse, #383440, #26242e); }
+.room {
+  position: relative;
+  width: min(100%, 150cqh);
+}
+canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; }
+
+#warden-hud {
+  position: absolute;
+  top: min(1rem, 3%);
+  left: 50%;
+  width: min(19rem, 74%);
+  transform: translateX(-50%);
+  display: grid;
+  gap: 3px;
+  padding: 4px 8px;
+  border: 1px solid var(--copper);
+  background: #261b23ee;
+  text-align: center;
+  font-size: clamp(0.65rem, 2.3cqh, 0.875rem);
+  pointer-events: none;
+}
+#warden-health { width: 100%; height: 0.7rem; accent-color: #e77555; }
+#warden-cue { min-height: 1.2em; color: #ffcf95; }
+
+#action {
+  position: absolute;
+  z-index: 1;
+  left: clamp(min(8rem, 40%), var(--action-x), max(calc(100% - 8rem), 60%));
+  top: max(2.25rem, var(--action-y));
+  width: max-content;
+  max-width: min(16rem, 80%);
+  margin: 0;
+  padding: 4px 8px;
+  transform: translate(-50%, -100%);
+  border: 1px solid #c29b62;
+  background: #1f2223ee;
+  color: #f4e6ca;
+  font-size: 0.85rem;
+  text-align: center;
+  pointer-events: none;
+}
+.ending {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max-content;
+  max-width: 95%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border: 1px solid #c29b62;
+  background: #241e28;
+  text-align: center;
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 12px;
+  padding: 5px 12px;
+  border-top: 1px solid var(--copper);
+  position: relative;
+}
+.play-hints {
+  min-width: 0;
+  font-size: 0.8rem;
+}
+.game-actions { justify-content: end; }
+#feedback:empty, #hotbar-name:empty { display: none; }
+.hotbar {
+  width: min(27.5rem, 55vw);
+  position: relative;
+}
+#hotbar-name {
+  position: absolute;
+  z-index: 1;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  width: max-content;
+  max-width: 85vw;
+  transform: translateX(-50%);
+  padding: 4px 10px;
+  color: var(--parchment);
+  border: 1px solid var(--copper);
+  background: #211713;
+  box-shadow: 0 2px 0 #110e0c;
+  pointer-events: none;
+}
+@media (max-width: 43rem) {
+  .controls {
+    grid-template-columns: 1fr auto;
+  }
+  .hotbar {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    justify-self: center;
+    width: min(25rem, 100%);
+  }
+  .play-hints {
+    line-height: 1.25;
+  }
+}
+
+/* The interface floats above the world, so panels never change its viewport. */
+.game { display: block; position: relative; isolation: isolate; }
+.stage { width: 100%; height: 100%; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.room { width: max(100cqw, 150cqh); flex: none; }
+.hud, .controls { display: contents; }
+.hud-status, .hud-actions, .hotbar, .game-actions, .play-hints {
+  position: absolute;
+  z-index: 3;
+}
+.hud-status {
+  top: 1rem; left: 1rem; display: grid;
+  grid-template-columns: auto auto; gap: .2rem .8rem;
+  padding: .4rem .55rem; border: 1px solid #615b48;
+  background: #101411d9; box-shadow: 0 3px 10px #090d0bee;
+}
+#room-number { display: none; }
+#fireball-status, #key { grid-column: 1 / -1; font-size: .75rem; }
+.hud-status #fireball-status, .hud-status #key { display: none; }
+#wood, .hud-hands { display: none; }
+.hud-actions { top: 1rem; right: 1rem; }
+.game-actions { right: .75rem; bottom: .75rem; }
+.hotbar { bottom: .85rem; left: 50%; transform: translateX(-50%); width: min(30rem, 62vw); }
+.play-hints { bottom: 5.25rem; left: 50%; transform: translateX(-50%); pointer-events: none; }
+#feedback:not(:empty) { padding: .35rem .75rem; background: #191a19ee; border: 1px solid #766747; text-align: center; }
+#warden-hud { position: fixed; top: 1rem; z-index: 2; }
+.inventory { padding-block: 4.6rem; }
+@media (max-width: 48rem) {
+  .game-actions { right: .5rem; bottom: 3.6rem; }
+  .hotbar { width: min(30rem, 94vw); }
+}
