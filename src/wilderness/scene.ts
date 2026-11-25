@@ -1,3 +1,7 @@
+import { den, denWalkable, inDen } from './denLayout';
+import { denScenery } from './denScene';
+import { legacyItem } from './itemInstances';
+import { rarity } from './weapons';
 import { allocate, moveSpeed, type Stat } from './progression';
 import * as T from 'three';
 import { browserFrameScheduler, createGameLoop } from '../game/core/loop';
@@ -21,7 +25,7 @@ export function startWilderness(
   uiOpen:()=>boolean,
   onInventory:()=>void,
   onStatus:()=>void,
-  onCombat:(notification:string,prompt:string,cooldown:number)=>void,
+  onCombat:(notification:string,prompt:string,cooldown:number,bossHealth:number)=>void,
   onSaveChange:()=>void,
 ) {
   const context=canvas.getContext('webgl2',{antialias:true});
@@ -41,7 +45,8 @@ export function startWilderness(
   const water=terrain(scene);
   const {obstacles,rocks,fireY}=scenery(scene,save.seed);
   const nearby = obstacleGrid(obstacles);
-  const canWalk = (x:number,z:number) => walkable(x,z,nearby(x,z));
+  const canWalk = (x:number,z:number) => inDen(z) ? denWalkable(x,z) : walkable(x,z,nearby(x,z));
+  const updateDen=denScenery(scene);
   const start = canWalk(save.position.x,save.position.z) ? save.position : {...spawn,yaw:0};
   body.position.set(start.x,surface(start.x,start.z),start.z);
   body.rotation.y=start.yaw;
@@ -49,17 +54,20 @@ export function startWilderness(
   const animateGrass=meadow(scene,body.position,rocks,save.seed);
   const animateNight=atmosphere(scene,fireY);
   const encounters=createEncounters(scene,camera,body,save,canWalk,onSaveChange);
-  let blocking=false, frameDelta=0, prompt='', notification='', abilitySeconds=0;
-  function equip(id:WeaponId){
-    if(!save.arsenal.includes(id)||save.equipped===id) return;
+  let blocking=false, frameDelta=0, prompt='', notification='', abilitySeconds=0,bossHealth=0;
+  function equip(id:WeaponId,itemId?:string){
+    const best=save.items.filter(item=>item.type===id).sort((a,b)=>rarity[b.rarity].multiplier-rarity[a.rarity].multiplier)[0];
+    const item=itemId?save.items.find(entry=>entry.id===itemId&&entry.type===id):best;
+    if(!item||save.selectedItem===item.id) return;
     if(encounters.weaponLocked||knight.animating){
       encounters.feedback('Finish the current attack before switching weapons.');
       return;
     }
     save.equipped=id;
+    save.selectedItem=item.id;
     knight.equip(id);
     abilitySeconds=Math.ceil(encounters.abilityRemaining);
-    onCombat(notification,prompt,abilitySeconds);
+    onCombat(notification,prompt,abilitySeconds,bossHealth);
     onSaveChange();
   }
   const destination=body.position.clone();
@@ -97,9 +105,21 @@ export function startWilderness(
         if(id) equip(id);
       }
     }
+    if(e.code==='KeyR'&&!uiOpen()&&!e.repeat) encounters.drink();
     if(e.code==='KeyE'&&!uiOpen()&&!e.repeat){
       e.preventDefault();
-      encounters.interact();
+      const p=body.position;
+      const atGate=!inDen(p.z)&&Math.hypot(p.x-den.gate.x,p.z-den.gate.z)<3.4;
+      const atExit=inDen(p.z)&&Math.hypot(p.x-den.exit.x,p.z-den.exit.z)<2.8;
+      const wasInside=inDen(p.z);
+      if(save.health&&(atGate||atExit)){
+        const point=atGate?den.entry:{x:den.gate.x,z:den.gate.z+3.9};
+        p.set(point.x,surface(point.x,point.z),point.z);
+        body.rotation.y=atGate?Math.PI:0;
+        encounters.transition();
+        keys.clear();blocking=false;
+      } else encounters.interact();
+      if(wasInside!==inDen(p.z)) focus.copy(p);
       onPosition({x:body.position.x,z:body.position.z,yaw:body.rotation.y});
     }
     if(!uiOpen()&&['KeyW','KeyA','KeyS','KeyD','ShiftLeft','ShiftRight'].includes(e.code)){
@@ -148,10 +168,14 @@ export function startWilderness(
       if(!uiOpen()) {
         encounters.update(dt,blocking);
         const view=encounters.ui();
+        if(save.health&&Math.hypot(p.x-den.gate.x,p.z-den.gate.z)<3.4)
+          view.prompt='E · Enter Hollow Fang Den · Rank E · Suggested level 5';
+        if(save.health&&Math.hypot(p.x-den.exit.x,p.z-den.exit.z)<2.8)
+          view.prompt='E · Return to Blackwater Wilds';
         const seconds=Math.ceil(encounters.abilityRemaining);
-        if(view.prompt!==prompt||view.notification!==notification||seconds!==abilitySeconds){
-          prompt=view.prompt; notification=view.notification; abilitySeconds=seconds;
-          onCombat(notification,prompt,abilitySeconds);
+        if(view.prompt!==prompt||view.notification!==notification||seconds!==abilitySeconds||bossHealth!==encounters.bossHealth){
+          prompt=view.prompt; notification=view.notification; abilitySeconds=seconds; bossHealth=encounters.bossHealth;
+          onCombat(notification,prompt,abilitySeconds,bossHealth);
         }
       }
       destination.set(p.x,p.y+.75,p.z);
@@ -168,6 +192,7 @@ export function startWilderness(
       water.value=time;
       animateGrass(time);
       animateNight(time,body.position);
+      updateDen(time);
       encounters.render(frameDelta);
       renderer.render(scene,camera);
     },
@@ -188,6 +213,7 @@ export function startWilderness(
         Math.hypot((body.position.x+45)*.85,body.position.z)>=9.5 || !weapons[id].ability) return;
       save.fangs--;
       save.arsenal.push(id);
+      save.items.push(legacyItem(id));
       onSaveChange();
     },
     dispose(){

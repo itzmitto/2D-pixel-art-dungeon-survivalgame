@@ -1,3 +1,4 @@
+import { inDen } from './denLayout.ts';
 export const extent = 240;
 export const spawn = { x: -43, z: 4 };
 export const landmarks = [
@@ -7,6 +8,7 @@ export const landmarks = [
   { name: 'The Standing Stones', x: -117, z: 79, kind: 'ruin' },
   { name: 'Raven Camp', x: -189, z: 62, kind: 'camp' },
   { name: 'Hollowmouth Cave', x: -187, z: -122, kind: 'cave' },
+  { name: 'Hollow Fang Den', x: -187, z: -114, kind: 'gate' },
   { name: 'Greyfen Tower', x: 169, z: -168, kind: 'tower' },
   { name: 'Lantern Rest', x: 154, z: 103, kind: 'campfire' },
   { name: 'Southwater Crossing', x: 32, z: 107, kind: 'bridge' },
@@ -54,6 +56,7 @@ export const inForest = (x: number, z: number) => forests.some(f => ((x-f.x)/f.r
 export const bank = (x: number, z: number) => Math.abs(x - river(z));
 export const clearing = (x: number, z: number) => Math.hypot((x+45)*0.85, z);
 export const height = (x: number, z: number) => {
+  if(inDen(z)) return 0;
   const base = 1.7 + 1.3*Math.sin(x*.048)*Math.cos(z*.04) + .65*Math.sin((x+z)*.09);
   const ridge = hills.reduce((sum,h)=>sum+h.rise*Math.max(0,1-((x-h.x)**2+(z-h.z)**2)/h.radius**2)**2,0);
   const edge = Math.min(1, Math.max(0, (bank(x,z)-4)/8));

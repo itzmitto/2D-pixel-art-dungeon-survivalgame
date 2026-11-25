@@ -9,7 +9,7 @@ const trails=[
   ...[path,southPath].map(trail=>samples.map(x=>[x,trail(x)].join(',')).join(' ')),
   ...branchTrails.map(trail=>trail.map(point=>point.join(',')).join(' ')),
 ];
-const icons={ruin:'◆',bridge:'═',campfire:'✦',camp:'△',cave:'●',tower:'■'};
+const icons={ruin:'◆',bridge:'═',campfire:'✦',camp:'△',cave:'●',tower:'■',gate:'◇'};
 const bound=(value:number, half:number)=>Math.max(-extent+half,Math.min(extent-half,value));
 
 export function WorldMap({position,discovered,close}:{
@@ -72,7 +72,7 @@ export function WorldMap({position,discovered,close}:{
         <button onClick={()=>setView(v=>({...v,x:bound(position.x,v.size/2),z:bound(position.z,v.size/2)}))}>Center</button>
       </div>
       <p>North is up · Drag to pan · Gold arrow: you · Dark green: forest · Olive: grassland · Rings: hills · Blue: river · Tan: trail</p>
-      <p>═ Bridge · ✦ Campfire · △ Camp · ● Cave · ■ Tower · ◆ Ruin</p>
+      <p>═ Bridge · ✦ Campfire · △ Camp · ● Cave · ■ Tower · ◆ Ruin · ◇ Dungeon gate</p>
     </section>
   </div>;
 }

@@ -1,3 +1,4 @@
+import { denWalkable } from './denLayout.ts';
 import { legacyItem, type WeaponItem } from './itemInstances.ts';
 import type { Drop } from './huntData.ts';
 import { isWeaponId, rarity, type Rarity, type WeaponId } from './weapons.ts';
@@ -44,7 +45,7 @@ export function readExploration(raw: string | null): Exploration | null {
       !('discovered' in value) || !Array.isArray(value.discovered)) return null;
     const {position,seed,discovered}=value;
     if (!('x' in position) || typeof position.x!=='number' || !Number.isFinite(position.x) || Math.abs(position.x)>=extent ||
-      !('z' in position) || typeof position.z!=='number' || !Number.isFinite(position.z) || Math.abs(position.z)>=extent ||
+      !('z' in position) || typeof position.z!=='number' || !Number.isFinite(position.z) || (Math.abs(position.z)>=extent&&!denWalkable(position.x,position.z)) ||
       !('yaw' in position) || typeof position.yaw!=='number' || !Number.isFinite(position.yaw)) return null;
     const known=discovered.filter((id: unknown): id is number =>
       typeof id==='number' && Number.isInteger(id) && id>=0 && id<cellsPerSide**2);
@@ -61,7 +62,7 @@ export function readExploration(raw: string | null): Exploration | null {
     const savedPending:unknown=Object.getOwnPropertyDescriptor(value,'pending')?.value;
     if(savedPending&&typeof savedPending==='object') for(const [id,point] of Object.entries(savedPending)){
       if(/^(wolf|dire|den)-[a-z0-9-]+$/.test(id) && point && typeof point.x==='number' && Math.abs(point.x)<extent &&
-        typeof point.z==='number' && Math.abs(point.z)<extent) pending[id]={x:point.x,z:point.z};
+        typeof point.z==='number' && (Math.abs(point.z)<extent||denWalkable(point.x,point.z))) pending[id]={x:point.x,z:point.z};
     }
     const storedArsenal:unknown=Object.getOwnPropertyDescriptor(value,'arsenal')?.value;
     const arsenal:WeaponId[]=[...new Set<WeaponId>(['longsword',...(Array.isArray(storedArsenal)?storedArsenal.filter(isWeaponId):[])])];

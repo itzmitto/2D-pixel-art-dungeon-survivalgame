@@ -1,3 +1,4 @@
+import { den, inDen } from './denLayout.ts';
 import { monsters, rollDrop, type MonsterKind, type Drop } from './huntData.ts';
 import { elementalRarity, instanceWeapon } from './itemInstances.ts';
 import { chestModels, worldChests, type Chest } from './treasure.ts';
@@ -59,7 +60,10 @@ export function createEncounters(
   const oldDefeats=new Set(save.defeated), collected=new Set(save.collected);
   const rand=randomSequence(save.seed ^ 0xa3615);
   const fx=createMagicEffects(group);
-  const chests:Chest[]=[...worldChests];
+  const chests:Chest[]=[...worldChests,
+    {id:'den-hidden',x:20,z:350,rarity:'Rare',weapon:'katana',gold:31,armor:4},
+    {id:'den-reward',x:0,z:311,rarity:'Legendary',weapon:'greatsword',gold:100,armor:7,boss:den.boss},
+  ];
   const chestViews=chestModels(group,chests,save.opened);
   const cooldowns=new Map<WeaponId,number>();
   let attackWeapon=weapons.longsword, queued:{weapon:Weapon;delay:number;yaw:number}|undefined;
@@ -75,13 +79,14 @@ export function createEncounters(
   const lootMaterial=new T.MeshStandardMaterial({color:'#bd9868',emissive:'#916024',emissiveIntensity:.7,roughness:.36});
   type Enemy = ReturnType<typeof models.make> & {
     id:string; kind:MonsterKind; spec:typeof monsters[MonsterKind]; home:T.Vector3; hp:number; hpBar:T.Group; fill:T.Mesh;
-    statuses:ReturnType<typeof statuses>; cooldown:number; windup:number; heading:number; phase:number; hitFlash:number; loot:T.Mesh;
+    statuses:ReturnType<typeof statuses>; cooldown:number; windup:number; heading:number; phase:number; hitFlash:number; charge:number; chargeWindup:boolean; chargeHit:boolean; loot:T.Mesh<T.BufferGeometry,T.MeshStandardMaterial>;
   };
   const enemies:Enemy[]=[];
   const spawns=[
     ...territories.map((center,i)=>({center,id:'wolf-'+i,kind:'wild' as const})),
     ...packTerritories.map((center,i)=>({center,id:'wolf-pack-'+i,kind:'wild' as const})),
     ...direTerritories.map((center,i)=>({center,id:'dire-'+i,kind:'dire' as const})),
+    ...den.encounters.map(entry=>({center:entry,id:entry.id,kind:entry.kind})),
   ];
   for(const {center,id,kind} of spawns){
     const spec=monsters[kind];
@@ -89,7 +94,7 @@ export function createEncounters(
       const a=rand()*Math.PI*2,r=2+rand()*9;
       return {x:center.x+Math.cos(a)*r,z:center.z+Math.sin(a)*r};
     });
-    const spot=candidates.find(({x,z})=>!safe(x,z)&&canWalk(x,z)&&enemies.every(enemy=>Math.hypot(enemy.home.x-x,enemy.home.z-z)>4));
+    const spot=id.startsWith('den-') ? (canWalk(center.x,center.z) ? center : undefined) : candidates.find(({x,z})=>!safe(x,z)&&canWalk(x,z)&&enemies.every(enemy=>Math.hypot(enemy.home.x-x,enemy.home.z-z)>4));
     if(!spot) continue;
     const actor=models.make(kind);
     actor.root.scale.setScalar(spec.scale);
@@ -111,8 +116,8 @@ export function createEncounters(
     loot.visible=oldDefeats.has(id)&&!collected.has(id);
     group.add(loot);
     if(save.drops[id]) loot.material.color.set(rarity[save.drops[id].rarity].color);
-    enemies.push({...actor,id,kind,spec,home,hp:oldDefeats.has(id)?0:spec.health,hpBar,fill,
-      statuses:statuses(spec.resistance),cooldown:0,windup:0,heading:rand()*6.28,phase:rand()*10,hitFlash:0,loot});
+    enemies.push({...actor,id,kind,spec,home,hp:(oldDefeats.has(id)||save.defeatedBosses.includes(id))?0:spec.health,hpBar,fill,
+      statuses:statuses(spec.resistance),cooldown:0,windup:0,heading:rand()*6.28,phase:rand()*10,hitFlash:0,charge:0,chargeWindup:false,chargeHit:false,loot});
   }
 
   const sparkGeometry=new T.BufferGeometry();
@@ -187,24 +192,30 @@ export function createEncounters(
     const guaranteed=/^wolf-[0-4]$/.test(enemy.id)&&!collected.has(enemy.id)?elementalIds[Number(enemy.id.slice(-1))]:undefined;
     save.drops[enemy.id]=rollDrop(enemy.kind,rand,lootBonus(save.stats),guaranteed);
     enemy.loot.material.color.set(rarity[save.drops[enemy.id].rarity].color);
-    if(enemy.spec.respawn) save.returns[enemy.id]=Date.now()+enemy.spec.respawn*1000;
+    if(enemy.spec.respawn&&!enemy.id.startsWith('den-')) save.returns[enemy.id]=Date.now()+enemy.spec.respawn*1000;
     oldDefeats.add(enemy.id);
     save.defeated=[...oldDefeats];
     save.kills++;
-    const levelUp=earnXP(save,enemy.spec.xp);
-    notify(enemy.spec.name+' defeated · +'+enemy.spec.xp+' XP'+(levelUp?' · '+levelUp:''));
+    const boss=enemy.kind==='guardian';
+    if(boss) {
+      if(!save.defeatedBosses.includes(enemy.id)) save.defeatedBosses.push(enemy.id);
+      if(!save.completedDungeons.includes(den.id)) save.completedDungeons.push(den.id);
+    }
+    const reward=enemy.spec.xp+(boss?160:0);
+    const levelUp=earnXP(save,reward);
+    notify((boss?den.name+' cleared':enemy.spec.name+' defeated')+' · +'+reward+' XP'+(levelUp?' · '+levelUp:''));
 
   }
 
-  function hitPlayer(enemy:Enemy, blocking:boolean){
+  function hitPlayer(enemy:Enemy, blocking:boolean, charge=false){
     const guard=blocking&&inArc(player.position,enemy.root.position,player.rotation.y,3,1.25);
     const shieldBlock=guard&&weapons[save.equipped].model.shield;
-    if(shieldBlock || (guard&&save.equipped==='longsword')){
+    if(!charge&&(shieldBlock || (guard&&save.equipped==='longsword'))){
       impact(player.position);
       notify('Blocked');
       return;
     }
-    const damage=magic.shield.absorb(Math.max(1,Math.round((guard ? Math.ceil(enemy.spec.damage*.46) : enemy.spec.damage)*(1-mitigation(save.stats,save.armor)))));
+    const damage=magic.shield.absorb(Math.max(1,Math.round((guard ? Math.ceil(enemy.spec.damage*.46) : enemy.spec.damage*(charge?1.3:1))*(1-mitigation(save.stats,save.armor)))));
     if(damage===0){notify('Water barrier absorbed the bite.');return;}
     save.health=Math.max(0,save.health-damage);
     impact(player.position);
@@ -231,6 +242,13 @@ export function createEncounters(
     Math.hypot(player.position.x-154,player.position.z-103)<4;
   return {
     feedback:notify,
+    transition(){magic.reset();queued=undefined;rangeTimer.cancel();},
+    get bossHealth(){
+      const boss=enemies.find(enemy=>enemy.kind==='guardian');
+      return boss&&boss.hp>0&&inDen(player.position.z)&&
+        Math.hypot(player.position.x-boss.root.position.x,player.position.z-boss.root.position.z)<34
+        ? boss.hp : 0;
+    },
     get weaponLocked(){return rangeTimer.busy || Boolean(queued) || magic.dashing;},
     get dashing(){return magic.dashing;},
     get abilityRemaining(){return Math.max(0,(cooldowns.get(save.equipped)??0)-time);},
@@ -347,7 +365,7 @@ export function createEncounters(
         const gap=Math.hypot(player.position.x-p.x,player.position.z-p.z);
         const active=gap<nearDistance&&enemy.hp>0;
         root.visible=active;
-        enemy.hpBar.visible=active&&gap<23&&(enemy.hp<spec.health||enemy.windup>0);
+        enemy.hpBar.visible=active&&gap<23&&(enemy.kind==='guardian'||enemy.hp<spec.health||enemy.windup>0);
         if(!active) continue;
         const homeGap=Math.hypot(p.x-enemy.home.x,p.z-enemy.home.z);
         const playerHome=Math.hypot(player.position.x-enemy.home.x,player.position.z-enemy.home.z);
@@ -356,13 +374,36 @@ export function createEncounters(
         enemy.hitFlash=Math.max(0,enemy.hitFlash-dt);
         let gait=0;
         if(enemy.statuses.halted){
-          enemy.windup=0;
+          enemy.windup=0; enemy.charge=0; enemy.chargeWindup=false;
+        } else if(enemy.charge>0){
+          enemy.charge=Math.max(0,enemy.charge-dt);
+          const x=p.x+Math.sin(enemy.heading)*dt*16,z=p.z+Math.cos(enemy.heading)*dt*16;
+          if(canWalk(x,z)){p.x=x;p.z=z;gait=1;}
+          else enemy.charge=0;
+          if(!enemy.chargeHit&&Math.hypot(p.x-player.position.x,p.z-player.position.z)<2.1){
+            enemy.chargeHit=true;
+            hitPlayer(enemy,blocking,true);
+          }
+          if(!enemy.charge) enemy.cooldown=1.8;
         } else if(enemy.windup>0){
           enemy.windup=Math.max(0,enemy.windup-dt);
           if(!enemy.windup){
             enemy.cooldown=spec.recovery;
-            if(aggro && gap<spec.reach+.35 && Math.abs(player.position.y-p.y)<1.9 &&
+            if(enemy.chargeWindup){
+              enemy.chargeWindup=false;
+              enemy.charge=.65;enemy.chargeHit=false;
+            } else if(aggro && gap<spec.reach+.35 && Math.abs(player.position.y-p.y)<1.9 &&
               clearLine(p.x,p.z,player.position.x,player.position.z)) hitPlayer(enemy,blocking);
+          }
+        } else if(enemy.kind==='guardian'&&aggro&&gap>4&&gap<15&&enemy.cooldown===0&&
+          clearLine(p.x,p.z,player.position.x,player.position.z)){
+          enemy.heading=Math.atan2(player.position.x-p.x,player.position.z-p.z);
+          enemy.windup=1.15;enemy.chargeWindup=true;
+          const aim={x:Math.sin(enemy.heading),z:Math.cos(enemy.heading)};
+          for(let i=1;i<=10;i++){
+            const point={x:p.x+aim.x*i,z:p.z+aim.z*i};
+            if(!canWalk(point.x,point.z)) break;
+            fx.emit(point,0xe69c51,'ring',1.15,1.15,{opacity:.55});
           }
         } else if(aggro&&gap<spec.reach&&enemy.cooldown===0&&clearLine(p.x,p.z,player.position.x,player.position.z)){
           enemy.windup=spec.windup;
@@ -384,7 +425,7 @@ export function createEncounters(
             tryStep(0)||tryStep(.87)||tryStep(-.87);
           }
         }
-        if(enemy.windup>0) enemy.heading=Math.atan2(player.position.x-p.x,player.position.z-p.z);
+        if(enemy.windup>0&&!enemy.chargeWindup) enemy.heading=Math.atan2(player.position.x-p.x,player.position.z-p.z);
         const angle=enemy.heading-root.rotation.y;
         root.rotation.y+=Math.atan2(Math.sin(angle),Math.cos(angle))*(1-Math.exp(-10*dt));
         p.y=surface(p.x,p.z)+Math.abs(Math.sin(time*14+enemy.phase))*.09*gait;

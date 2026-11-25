@@ -35,3 +35,7 @@
 .hunter-status li { display:flex; align-items:center; justify-content:space-between; gap:.8rem; padding:.3rem 0; border-top:1px solid #615844; }
 .hunter-status strong { text-transform:capitalize; }
 .wild-health progress { width:4.8rem; height:.5rem; accent-color:#c6a37b; }
+.guardian-health { position:absolute; top:1rem; left:50%; transform:translateX(-50%); display:grid; gap:.3rem; text-align:center; width:min(28vw,20rem); padding:.35rem; background:#1b1818eb; border:1px solid #71604b; }
+.guardian-health progress { width:100%; accent-color:#a84a42; }
+#wild-bag-title { padding-right:1rem; }
+.wild-map:has(#wild-bag-title) { max-height:90dvh; overflow:auto; }
