@@ -2,9 +2,16 @@
 
 ## Run locally
 
-1. Open the `dungeon-survival` project folder and open `index.html` directly in Chrome. On Kubuntu, run `xdg-open ./index.html` from the project folder to use your default browser.
-2. The game uses local files and ordinary scripts. No server, build, or `npm install` is required.
-3. Use the corner **Full screen** button to hide the browser bar. Click **Exit full screen** or press **Esc** to return. Reload the same tab with **Ctrl+R** after changing the code.
+The React/Vite entry point is `index.html`. The game world still runs in Canvas 2D, with the existing engine loaded from `public/legacy-runtime/` while its systems are migrated into TypeScript. The original direct-file version remains at `legacy-index.html` for save recovery and comparison.
+
+1. Install Node.js 20 or newer.
+2. Run `npm install` once, then `npm run dev`.
+3. Open the local URL printed by Vite. Use the corner **Full screen** button to hide browser chrome.
+4. Run `npm run typecheck`, `npm run build`, and `npm test` for terminal checks. `npm run build` creates the production bundle in `dist/`.
+
+To keep an existing save, use **Export save** in the old `legacy-index.html` version before switching origins, then use **Import save** in the Vite game and reload. Import checks the JSON shape before changing browser storage; it does not clear the current save on an invalid file. The import/export buttons are available in the upper-right corner.
+
+After changing code, reload the Vite tab. The old direct-file game can still be opened with `xdg-open ./legacy-index.html` on Kubuntu.
 
 | Control | Action |
 | --- | --- |
@@ -63,10 +70,14 @@ The towers are drawn with the existing pixel terrain palette and Canvas renderer
 
 ## Code layout
 
+- `src/main.tsx` mounts the React application. `src/storage/saveTransfer.ts` validates safe save import/export.
+- `src/styles/` contains the strict TypeScript application styles and the interface CSS module.
+- `public/images/` contains the local PNG assets and credits used by the Canvas game.
+- `public/legacy-runtime/` contains the current plain-JavaScript game engine, served as ordered classic scripts to preserve its global-system dependencies during the migration. This engine has not yet been ported to TypeScript or React-owned game state.
 - `js/world/regions.js` defines wilderness terrain, landmarks, gates and migration coordinates. `js/world/towers.js` defines tower floors and connections.
 - `js/world/collision.js`, `js/world/camera.js`, and `js/world/terrain.js` handle walking, camera movement and terrain rendering. `js/world.js` handles interactions, encounters, loot and building placement.
 - `js/entities/` holds party placement, wolf behavior and seeded encounter pools.
 - `js/ui/hud.js` updates the floating HUD. `js/inventory.js` handles inventory, chest transfers and recipe patterns.
 - `js/input.js` handles controls and fullscreen. `js/movement.js` handles walking, sprinting and mouse routes.
 - `js/sprites.js` and `js/render.js` load local art and draw the game. `js/save.js` migrates and stores progress.
-- `main.js` initializes the game and runs the frame loop. `styles/` contains the HUD and inventory layout.
+- `main.js` initializes the game and runs the frame loop. `legacy-index.html` preserves direct startup of the original implementation.
