@@ -24,6 +24,12 @@ export interface DrawOptions {
   readonly height?: number;
 }
 
+export const SPRITE_IDS = [
+  'knight', 'dragon', 'wolf', 'wolfIdle', 'wolfAttack', 'snake', 'warden', 'supplyClosed', 'supplyOpen',
+  'rewardClosed', 'rewardOpen', 'grass', 'trees', 'stump', 'rocks', 'dungeonStone', 'workbench', 'chest',
+  'bed', 'torch', 'cottage', 'houseDoor', 'porch', 'houseWall', 'houseFloor', 'rug',
+] as const satisfies readonly SpriteId[];
+
 export const SPRITE_SHEETS: Readonly<Record<SpriteId, SpriteSheetDefinition>> = {
   knight: { path: '/images/characters/knight-walk.png', frameWidth: 40, frameHeight: 40, columns: 6, rows: 4 },
   dragon: { path: '/images/pets/vonkje-flight.png', frameWidth: 256, frameHeight: 204, columns: 4, rows: 1 },
@@ -59,17 +65,18 @@ export class SpriteRegistry {
   constructor(private readonly imageFactory: () => HTMLImageElement = () => new Image()) {}
 
   async loadAll(): Promise<void> {
-    await Promise.all(Object.entries(SPRITE_SHEETS).map(async ([id, definition]) => {
+    await Promise.all(SPRITE_IDS.map(async (id) => {
+      const definition = SPRITE_SHEETS[id];
       const image = this.imageFactory();
-      image.src = definition.path;
       await new Promise<void>((resolve) => {
         image.onload = () => {
           const validSize = image.naturalWidth === definition.frameWidth * definition.columns &&
             image.naturalHeight === definition.frameHeight * definition.rows;
-          if (validSize) this.#images.set(id as SpriteId, image);
+          if (validSize) this.#images.set(id, image);
           resolve();
         };
         image.onerror = () => resolve();
+        image.src = definition.path;
       });
     }));
   }
