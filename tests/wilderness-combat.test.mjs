@@ -58,3 +58,28 @@ test('live wolf encounter grants XP and collectible loot once and keeps both aft
     else globalThis.document=prior;
   }
 });
+
+test('wolf windup can be blocked from the front, then defeat and respawn the knight', () => {
+  const prior = globalThis.document;
+  globalThis.document = { createElement: () => ({ getContext: () => null }) };
+  const scene=new T.Scene(), hero=new T.Group(), save=newExploration();
+  const encounter=createEncounters(scene,new T.PerspectiveCamera(),hero,save,()=>true,()=>{});
+  try {
+    const actor=scene.getObjectByName('wolf-1');
+    hero.position.set(actor.position.x,actor.position.y,actor.position.z-1.4);
+    hero.rotation.y=0;
+    for(let frame=0;frame<42;frame++) encounter.update(1/60,true);
+    assert.equal(save.health,10);
+    assert.equal(encounter.ui().notification,'Blocked');
+    hero.rotation.y=Math.PI;
+    for(let frame=0;frame<800&&save.health;frame++) encounter.update(1/60,true);
+    assert.equal(save.health,0);
+    encounter.interact();
+    assert.equal(save.health,10);
+    assert.equal(hero.position.x,-43);
+  } finally {
+    encounter.dispose();
+    if (prior===undefined) delete globalThis.document;
+    else globalThis.document=prior;
+  }
+});

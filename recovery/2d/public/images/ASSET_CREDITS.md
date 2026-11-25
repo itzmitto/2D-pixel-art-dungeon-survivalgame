@@ -7,3 +7,7 @@ The **Wolf Enemy** pack by **Twizzydoesntcode**, supplied in `Wolf Enemy.zip`, p
 ## 3D wilderness prototype
 
 The terrain, river, grass, trees, ruins, particles and Dark Knight model are original procedural geometry and shaders in `src/wilderness/`. The prototype imports no external models or textures.
+
+## Blackwater Wilds expansion
+
+The Blackwater Wolf, bridge, camps, cave facade and tower exterior are original procedural geometry from the active wilderness modules. No third-party art was added for the expansion.
