@@ -200,15 +200,48 @@ function drawEnemy({ kind, x, y, walkTime, facing, flash, attackPose }) {
   ctx.restore();
 }
 
+const terrainBackdrops = new Map();
+
+function drawTerrainBackdrop(name, variantFor) {
+  const { image, width, height } = PNG_SPRITES[name];
+  if (!image) return false;
+  let backdrop = terrainBackdrops.get(area);
+  if (backdrop?.image !== image) {
+    const layer = document.createElement("canvas");
+    layer.width = room[0].length * width;
+    layer.height = room.length * height;
+    const paint = layer.getContext("2d");
+    if (!paint) return false;
+    room.forEach((row, y) => {
+      [...row].forEach((tile, x) => {
+        const frame = variantFor(tile, x, y);
+        paint.drawImage(image, frame * width, 0, width, height, x * width, y * height, width, height);
+      });
+    });
+    backdrop = { image, layer };
+    terrainBackdrops.set(area, backdrop);
+  }
+  ctx.drawImage(backdrop.layer, 0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+  return true;
+}
+
+function dungeonTileFrame(tile, x, y) {
+  return (x * 17 + y * 31) % 4 + (tile === "#" || tile === "T" ? 4 : 0);
+}
+
+function grassTileFrame(_tile, x, y) {
+  return (x * 29 + y * 17 + x * y) % 8;
+}
+
 function drawRoom(time) {
   const torches = [];
+  const painted = drawTerrainBackdrop("dungeonStone", dungeonTileFrame);
   room.forEach((row, j) => {
     [...row].forEach((tile, i) => {
       const x = i * TILE;
       const y = j * TILE;
       const isWall = tile === "#" || tile === "T";
-      const variant = (i * 17 + j * 31) % 4;
-      if (!drawTerrainTile("dungeonStone", x, y, variant + (isWall ? 4 : 0)) && isWall) {
+      if (!painted && isWall) {
         rect("#23212c", x, y, 32, 32);
         rect("#656071", x + 1, y + 1, 30, 5);
         rect("#494452", x + 1, y + 6, 30, 20);
@@ -217,7 +250,8 @@ function drawRoom(time) {
         rect("#322d3c", x + 23, y + 17, 2, 9);
         rect("#302a36", x + 1, y + 26, 30, 5);
       }
-      if (!PNG_SPRITES.dungeonStone.image && !isWall) {
+      if (!painted && !isWall) {
+        const variant = dungeonTileFrame(tile, i, j);
         rect(["#373541", "#3b3845", "#413c46", "#3c3942"][variant], x, y, TILE, TILE);
       }
       if (tile === "T") torches.push({ x: x + 16, y: y + 14 });
@@ -316,7 +350,6 @@ function drawHouse(time) {
 function drawGrass(i, j, variant) {
   const x = i * TILE;
   const y = j * TILE;
-  if (drawTerrainTile("grass", x, y, (i * 29 + j * 17 + i * j) % 8)) return;
   const seed = (i * 117 + j * 91 + i * j * 17) % 97;
   rect(["#426843", "#476e46", "#4b7448", "#406342"][variant], x, y, TILE, TILE);
   for (let n = 0; n < 5; n++) {
@@ -547,12 +580,13 @@ function drawKnightPreview() {
 
 function drawForest() {
   const builtTorches = [];
+  const painted = drawTerrainBackdrop("grass", grassTileFrame);
   room.forEach((row, j) => {
     [...row].forEach((tile, i) => {
       const x = i * TILE;
       const y = j * TILE;
       const variant = (i * 19 + j * 11) % 4;
-      drawGrass(i, j, variant);
+      if (!painted) drawGrass(i, j, variant);
       if ("=PR".includes(tile)) drawPath(i, j, variant);
       if (tile === "#" || tile === "Y") {
         const spent = tile === "Y" && exhausted(RESOURCES.Y, i, j);
