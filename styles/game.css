@@ -165,3 +165,33 @@ canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; 
     line-height: 1.25;
   }
 }
+
+/* The interface floats above the world, so panels never change its viewport. */
+.game { display: block; position: relative; isolation: isolate; }
+.stage { width: 100%; height: 100%; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.room { width: max(100cqw, 150cqh); flex: none; }
+.hud, .controls { display: contents; }
+.hud-status, .hud-actions, .hotbar, .game-actions, .play-hints {
+  position: absolute;
+  z-index: 3;
+}
+.hud-status {
+  top: 1rem; left: 1rem; display: grid;
+  grid-template-columns: auto auto; gap: .2rem .8rem;
+  padding: .55rem .75rem; border: 1px solid #766747;
+  background: #191a19ef; box-shadow: 0 4px 12px #130f0fbb;
+}
+#room-number { grid-column: 1 / -1; color: #e2cc9a; font-family: Georgia, serif; }
+#fireball-status, #key { grid-column: 1 / -1; font-size: .75rem; }
+#wood, .hud-hands { display: none; }
+.hud-actions { top: 1rem; right: 1rem; }
+.game-actions { right: .75rem; bottom: .75rem; }
+.hotbar { bottom: .85rem; left: 50%; transform: translateX(-50%); width: min(30rem, 62vw); }
+.play-hints { bottom: 5.25rem; left: 50%; transform: translateX(-50%); pointer-events: none; }
+#feedback:not(:empty) { padding: .35rem .75rem; background: #191a19ee; border: 1px solid #766747; text-align: center; }
+#warden-hud { position: fixed; top: 1rem; z-index: 2; }
+.inventory { padding-block: 4.6rem; }
+@media (max-width: 48rem) {
+  .game-actions { right: .5rem; bottom: 3.6rem; }
+  .hotbar { width: min(30rem, 94vw); }
+}

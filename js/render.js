@@ -229,7 +229,7 @@ function drawWarden(warden) {
 function drawDungeonChest(id, x, y) {
   const unlocked = chestUnlocked(id);
   const open = unlocked && (progress.chestId === id || !chestSlots(progress, id).some(Boolean));
-  const spriteName = id === "dungeon3" ? (open ? "rewardOpen" : "rewardClosed") :
+  const spriteName = CHEST_STATIONS[id].boss ? (open ? "rewardOpen" : "rewardClosed") :
     (open ? "supplyOpen" : "supplyClosed");
   const { width, height } = PNG_SPRITES[spriteName];
   if (!drawPng(spriteName, x + 16, y + 26 - height, 0, 0, 1, width * 2, height * 2)) drawFurniture("chest", x, y);
@@ -520,6 +520,12 @@ function collectWorldScenery(time, add) {
         const zone = regionAt({ x: x + 16, y: y + 16 });
         add(y + 27, () => drawWorldTree(col, row, x, y, zone));
       }
+      if (tile === "D" || tile === "S") add(y + 12, () => {
+        for (let i = 0; i < 5; i++) {
+          rect("#392f2e", x + 6, y + 4 + i * 5, 20, 4);
+          rect("#ad8c62", x + 6, y + 4 + i * 5, 20, 1);
+        }
+      });
       if (tile === "Q") add(y + 28, () => drawRock(x, y, variant));
       if (tile === "G" || tile === "X") add(y + 16, () => drawRuinGate(tile, x, y));
       if (tile === "L" || tile === "T") {
@@ -531,8 +537,17 @@ function collectWorldScenery(time, add) {
     }
   }
 
-  for (const hut of VILLAGE_HUTS) {
-    if (buildingInView(hut)) add((hut.bottom + 1) * TILE, () => drawBuildingExterior(hut));
+  for (const hut of [...VILLAGE_HUTS, ...TOWER_LANDMARKS]) {
+    if (buildingInView(hut)) add((hut.bottom + 1) * TILE, () => {
+      drawBuildingExterior(hut);
+      if (hut.door) {
+        drawHouseDoor(hut.door.x, hut.door.y, 0);
+        ctx.fillStyle = "#efca92";
+        ctx.font = "8px Georgia";
+        ctx.textAlign = "center";
+        ctx.fillText(hut.name, hut.door.x, hut.top * TILE + 5);
+      }
+    });
   }
   if (buildingInView(COTTAGE)) {
     const { door, workbench, chest, bed } = COTTAGE;
@@ -589,7 +604,7 @@ function draw(time) {
   const add = (y, paint) => entries.push({ y, paint });
   collectWorldScenery(time, add);
   drawBuildPreview();
-  const warden = enemies.find(enemy => enemy.kind === "warden" && enemy.health > 0);
+  const warden = enemies.find(enemy => enemy.kind === "warden" && enemy.zone === region && enemy.health > 0);
   if (warden && pointInView(warden.x, warden.y, TILE * 5)) drawWardenTelegraph(warden);
   const bob = Math.round(Math.sin(time * 4) * 2);
   if (key && !hasKey && pointInView(key.x, key.y, TILE)) sprite("key", key.x, key.y + bob);

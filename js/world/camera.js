@@ -7,6 +7,8 @@ let cameraFollowX = 0;
 let cameraFollowY = 0;
 
 function cameraTarget(position) {
+  const floor = towerFloorAt(position);
+  if (floor) return { x: 0, y: floor.top * TILE };
   return {
     x: Math.max(0, Math.min(WORLD_WIDTH - VIEW_WIDTH, position.x - VIEW_WIDTH / 2)),
     y: Math.max(0, Math.min(WORLD_HEIGHT - VIEW_HEIGHT, position.y - VIEW_HEIGHT / 2)),
@@ -32,6 +34,8 @@ function updateCamera(dt) {
 }
 
 function visibleTileBounds(padding = 0) {
+  const floor = towerFloorAt(player);
+  if (floor) return { left: 0, right: floor.rows[0].length, top: floor.top, bottom: floor.top + floor.rows.length };
   return {
     left: Math.max(0, Math.floor((camera.x - padding) / TILE)),
     right: Math.min(WORLD_MAP[0].length, Math.ceil((camera.x + VIEW_WIDTH + padding) / TILE)),

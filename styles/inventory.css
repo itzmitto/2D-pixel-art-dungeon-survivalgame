@@ -264,3 +264,23 @@
 .inventory-hints { margin: 0; color: var(--muted); }
 #panel-feedback { flex-basis: 100%; margin: 0; }
 #panel-feedback:empty { display: none; }
+
+:root {
+  --wood-dark: #1d1e1c;
+  --wood-rim: #464438;
+  --copper: #766747;
+  --copper-light: #d8bc83;
+}
+#backpack, .panel-heading, .panel-footer, .inventory-section {
+  background-color: #252624;
+  background-image: linear-gradient(125deg,#33342e,#20211e);
+}
+.slot, #hud-hotbar .slot {
+  background: linear-gradient(145deg,#3b3c35,#20211f 54%,#292a25);
+  border-color: #69614e;
+  box-shadow: inset 0 0 0 2px #191a19, 0 2px 5px #111b;
+}
+.slot[aria-pressed="true"], #hud-hotbar .slot[aria-pressed="true"] {
+  border-color: #dcbd80;
+  box-shadow: inset 0 0 0 2px #826b42, 0 2px 5px #111b;
+}

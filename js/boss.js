@@ -10,7 +10,8 @@ const wardenHealth = document.querySelector("#warden-health");
 const wardenCue = document.querySelector("#warden-cue");
 
 function updateWardenHud() {
-  const warden = region === "arena" && enemies.find(enemy => enemy.id === WARDEN_ID && enemy.health > 0);
+  const warden = enemies.find(enemy => enemy.kind === "warden" && enemy.zone === region && enemy.health > 0);
+  document.querySelector("#boss-name").textContent = region === "watchTop" ? "The Bellkeeper" : "Cyclops Warden";
   wardenHud.hidden = !warden;
   if (!warden) return;
   wardenHealth.max = ENEMIES.warden.health;

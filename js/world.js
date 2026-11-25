@@ -13,9 +13,10 @@ const CHEST_STATIONS = {
     ...CHEST_LOCATIONS.dungeon2, name: "Reserve chest",
     loot: [["wood", 10], ["stone", 6], ["copper", 8], ["wolfFang", 1], ["serpentScale", 3], ["potion", 2]],
   },
-  dungeon3: { ...CHEST_LOCATIONS.dungeon3, name: "Reward chest", loot: [] },
+  dungeon3: { ...CHEST_LOCATIONS.dungeon3, name: "Reward chest", loot: [], boss: WARDEN_ID },
+  ...TOWER_CHESTS,
 };
-const DUNGEON_DROPS = { wolf: { item: "wolfFang", count: 2 }, snake: { item: "serpentScale", count: 2 } };
+
 const LEGACY_RESOURCES = {
   Y: { state: "trees", hits: 3, item: "wood", count: 3 },
   M: { state: "mines", hits: 2, item: "stone", count: 3 },
@@ -51,11 +52,13 @@ function wardenDefeated(state = progress) {
 }
 
 function chestUnlocked(id) {
-  return id !== "dungeon3" || wardenDefeated();
+  const boss = CHEST_STATIONS[id]?.boss;
+  return !boss || progress.dungeonEnemies[boss]?.health === 0;
 }
 
 function enemyMayEngage(enemy) {
-  return enemy.zone === region;
+  return enemy.zone === region && !TOWER_CONNECTIONS.some(([, arrival]) =>
+    towerFloorAt(arrival)?.id === region && distance(player, arrival) < 20);
 }
 
 function enemyMaxHealth(enemy) {
@@ -90,7 +93,7 @@ function enemyDrop(id, { x, y, drop }) {
 }
 
 function loadEnemies() {
-  return WORLD_ENEMY_SPAWNS.flatMap(spawn => {
+  return encounterSpawns(progress).flatMap(spawn => {
     const { id, kind } = spawn;
     const saved = progress.dungeonEnemies[id];
     if (saved?.health === 0) {
@@ -121,19 +124,20 @@ function recordEnemyDamage({ id, kind, x, y, health }) {
   if (progress.dungeonEnemies[id]?.health === 0) return;
   if (health > 0) {
     progress.dungeonEnemies[id] = { health };
-  } else if (id === WARDEN_ID) {
+  } else if (kind === "warden") {
     progress.dungeonEnemies[id] = { health: 0 };
-    progress.dungeonCompleted = true;
-    progress.dungeonChests.dungeon3[0] = { item: "emberCore", count: 1 };
+    if (id === WARDEN_ID) progress.dungeonCompleted = true;
+    const reward = bossReward(id);
+    reward.loot.forEach((stack, index) => { progress.dungeonChests[reward.chest][index] = stack; });
   } else {
-    const defeat = { health: 0, x, y, drop: DUNGEON_DROPS[kind] };
+    const defeat = { health: 0, x, y, drop: MOB_LOOT[kind] };
     progress.dungeonEnemies[id] = defeat;
     groundLoot.push(enemyDrop(id, defeat));
   }
   storeProgress();
-  if (id === WARDEN_ID) {
+  if (kind === "warden") {
     updateWardenHud();
-    if (health === 0) showFeedback("Cyclops Warden defeated. The reward chest and shortcut are open.");
+    if (health === 0) showFeedback("Boss defeated. The reward chest is open.");
   }
 }
 
@@ -218,6 +222,16 @@ function pickUp(drop) {
 }
 
 function updateWorld(dt) {
+  if (!inventoryOpen()) {
+    const crossing = TOWER_CONNECTIONS.find(([door]) => distance(player, door) < 12);
+    if (crossing) {
+      fireballs = [];
+      swing = undefined;
+      placeParty(crossing[1]);
+      storeProgress();
+      return;
+    }
+  }
   if (player.x !== progress.position.x || player.y !== progress.position.y) {
     progress.position = { x: player.x, y: player.y };
     positionDirty = true;

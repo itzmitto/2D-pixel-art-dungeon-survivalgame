@@ -26,7 +26,7 @@ function newProgress() {
     pet: { pet: null },
     held: null, panelMode: null, chestId: null, selectedHotbar: 0, overflow: { bag: {}, chest: {} },
     trees: {}, mines: {}, buildings: {}, collected: {}, dungeonCompleted: false,
-    dungeonEnemies: {}, dungeonChests, legacyTrailLoot: false, position: { ...COTTAGE.spawn },
+    encounterSeed: Math.floor(Math.random() * 0x80000000), dungeonEnemies: {}, dungeonChests, legacyTrailLoot: false, position: { ...COTTAGE.spawn },
   };
 }
 
@@ -194,7 +194,7 @@ function loadDungeonProgress(saved, loaded) {
   loaded.dungeonCompleted = saved.dungeonCompleted === true;
   if (loaded.dungeonCompleted || saved.collected?.[DUNGEON_KEY] === true) loaded.collected[DUNGEON_KEY] = true;
   if (saved.collected?.[DUNGEON_POTION] === true) loaded.collected[DUNGEON_POTION] = true;
-  for (const spawn of WORLD_ENEMY_SPAWNS) {
+  for (const spawn of encounterSpawns(loaded)) {
     const { id, kind, zone } = spawn;
     const state = saved.dungeonEnemies?.[id] ?? saved.dungeonSlimes?.[id];
     if (!state || !Number.isInteger(state.health) || state.health < 0 || state.health >= enemyMaxHealth(spawn)) continue;
@@ -202,18 +202,18 @@ function loadDungeonProgress(saved, loaded) {
       loaded.dungeonEnemies[id] = { health: state.health };
       continue;
     }
-    if (id === WARDEN_ID) {
+    if (kind === "warden") {
       loaded.dungeonEnemies[id] = { health: 0 };
       continue;
     }
     const legacy = !(saved.version >= SAVE_VERSION);
     const width = legacy ? 15 * TILE : WORLD_WIDTH;
-    const height = legacy ? 10 * TILE : WORLD_HEIGHT;
+    const height = legacy ? 10 * TILE : (TOWER_FLOORS.at(-1).top + 10) * TILE;
     const validPosition = state.x >= 8 && state.x <= width - 8 && state.y >= 8 && state.y <= height - 8;
     const destination = validPosition ? (legacy ? legacyWorldPoint(id.split(":")[0], state) : state) : spawn;
     const position = safeWorldPoint(destination, loaded, zone);
     const drop = validStack(state.drop) ? { item: state.drop.item, count: state.drop.count } :
-      !(saved.version >= DUNGEON_LOOT_VERSION) ? { item: "gel", count: 1 } : DUNGEON_DROPS[kind];
+      !(saved.version >= DUNGEON_LOOT_VERSION) ? { item: "gel", count: 1 } : MOB_LOOT[kind];
     loaded.dungeonEnemies[id] = { health: 0, ...position, drop };
     if (saved.collected?.[id] === true) loaded.collected[id] = true;
   }
@@ -242,6 +242,7 @@ function loadProgress() {
     for (const drop of FOREST_LOOT) {
       if (saved.collected?.[drop.id] === true) loaded.collected[drop.id] = true;
     }
+    if (Number.isSafeInteger(saved.encounterSeed)) loaded.encounterSeed = saved.encounterSeed;
     loadBuildings(saved, loaded);
     loadDungeonProgress(saved, loaded);
     loaded.position = loadPosition(saved, loaded);

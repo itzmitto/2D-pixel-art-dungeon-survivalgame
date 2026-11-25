@@ -467,6 +467,7 @@ function selectHotbar(index) {
 }
 
 function updateInventory() {
+  document.querySelector("#hud-defense").textContent = "Armor " + totalDefense();
   document.querySelector("#wood").textContent = "Wood " + itemCount("wood");
   updateBuildControls();
   for (const [hand, shortcut] of [["left", "J"], ["right", "K"]]) {

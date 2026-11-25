@@ -258,6 +258,8 @@ function makeWorldMap() {
 const WORLD_MAP = makeWorldMap();
 
 function regionAt({ x, y }) {
+  const floor = towerFloorAt({ y });
+  if (floor) return floor.id;
   const col = Math.floor(x / TILE);
   const row = Math.floor(y / TILE);
   if (inTileBounds(col, row, COTTAGE) && "IUWBO".includes(WORLD_MAP[row]?.[col] || "#")) return "cottage";

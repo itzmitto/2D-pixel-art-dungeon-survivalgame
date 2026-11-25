@@ -4,7 +4,7 @@
 
 1. Open the `dungeon-survival` project folder and open `index.html` directly in Chrome. On Kubuntu, run `xdg-open ./index.html` from the project folder to use your default browser.
 2. The game uses local files and ordinary scripts. No server, build, or `npm install` is required.
-3. Click **Full screen** to hide the browser bar. Click **Exit full screen** or press **Esc** to return. Reload the same tab with **Ctrl+R** after changing the code.
+3. Use the corner **Full screen** button to hide the browser bar. Click **Exit full screen** or press **Esc** to return. Reload the same tab with **Ctrl+R** after changing the code.
 
 | Control | Action |
 | --- | --- |
@@ -81,3 +81,11 @@ Use transparent PNGs and keep frame registration consistent when replacing sprit
 - `js/input.js` handles controls and full screen. `js/movement.js` handles walking, sprinting, and mouse routes.
 - `js/sprites.js` and `js/render.js` load and draw the local art. `js/save.js` migrates saves and stores world and inventory progress.
 - `main.js` initializes the game and runs the frame loop. `styles/` layouts the game and inventory.
+
+## Towers
+
+Follow the northern forest to **Briar Watch**. Walk through its door, open the provisions chest for early crafting materials, then take the stairs in the northeast to the Bellkeeper's room. The same stairs lead back down after the fight. The reward chest unlocks once and retains its contents.
+
+**Fen Spire** stands south of the forest. Its cistern has a central flooded channel, narrow crossings, and a cache on the far side. Walk back to the marked exit to return outside. Tower layouts live in `js/world/towers.js`. Seeded spawn pools and mob drops live in `js/entities/encounters.js`.
+
+The towers use the cottage and ruin sprites, and the Bellkeeper uses the Cyclops sprite. Dedicated tower exteriors, stair and doorway markers, and a distinct Bellkeeper sprite can replace those visuals when licensed local art is available.

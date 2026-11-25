@@ -3,7 +3,15 @@
 const SOLID_TILES = new Set("#~YQHBWOC");
 
 function worldTile(x, y) {
-  return WORLD_MAP[y]?.[x];
+  const floor = towerFloorAt({ y: y * TILE });
+  if (y === 36 && (x === 27 || x === 28)) return "=";
+  if (!floor && TOWER_CONNECTIONS.some(([from, arrival]) => towerFloorAt(from) &&
+      arrival.x === (x + 0.5) * TILE && arrival.y === (y + 0.5) * TILE)) return "=";
+  if (floor) return floor.rows[y - floor.top]?.[x];
+  if (TOWER_LANDMARKS.some(hut => inTileBounds(x, y, hut))) {
+    return TOWER_LANDMARKS.some(hut => hut.door.x === worldCenter(x,y).x && hut.door.y === worldCenter(x,y).y) ? "D" : "H";
+  }
+  return towerTrail(x, y) ? "=" : WORLD_MAP[y]?.[x];
 }
 
 function gateOpen(tile, state = progress) {
@@ -36,10 +44,13 @@ function safeWorldPoint(point, state, zone) {
   const valid = point && Number.isFinite(point.x) && Number.isFinite(point.y);
   if (!valid) return { ...COTTAGE.spawn };
   if ((!zone || regionAt(point) === zone) && !blocked(point.x, point.y, 8, true, state)) return { x: point.x, y: point.y };
+  const floor = towerFloorAt(point);
+  const rows = floor?.rows ?? WORLD_MAP;
+  const top = floor?.top ?? 0;
   let closest;
   let nearest = Infinity;
-  for (let y = 1; y < WORLD_MAP.length - 1; y++) {
-    for (let x = 1; x < WORLD_MAP[y].length - 1; x++) {
+  for (let y = top + 1; y < top + rows.length - 1; y++) {
+    for (let x = 1; x < rows[0].length - 1; x++) {
       const position = worldCenter(x, y);
       const gap = distance(point, position);
       if (gap >= nearest || (zone && regionAt(position) !== zone) || blocked(position.x, position.y, 8, true, state)) continue;

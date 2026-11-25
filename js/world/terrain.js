@@ -141,7 +141,7 @@ function drawTerrain(time) {
         paintCobble(x, y, variant);
       } else {
         const zone = regionAt({ x: x + TILE / 2, y: y + TILE / 2 });
-        if ("#%TCKVGX".includes(tile)) {
+        if ("#%TCKVGXDS".includes(tile)) {
           paintRuinTile(x, y, variant, zone, tile === "#");
           if (zone === "arena" && tile === "%") paintArenaInlay(x, y, variant);
           continue;
