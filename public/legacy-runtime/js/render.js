@@ -491,14 +491,17 @@ function drawArmor(x, y, row, column, context = ctx) {
   }
 }
 
-const knightPreview = document.querySelector("#knight-preview");
-const previewContext = knightPreview.getContext("2d");
+let previousPreview;
 let lastPreviewEquipment, lastPreviewImage;
 
 function drawKnightPreview() {
-  if (!inventoryOpen() || !previewContext) return;
+  if (!inventoryOpen()) return;
+  const knightPreview = document.getElementById("knight-preview");
+  const previewContext = knightPreview?.getContext("2d");
+  if (!previewContext) return;
   const signature = [...Object.values(progress.armor), ...Object.values(progress.hands)].join("|");
-  if (signature === lastPreviewEquipment && PNG_SPRITES.knight.image === lastPreviewImage) return;
+  if (knightPreview === previousPreview && signature === lastPreviewEquipment && PNG_SPRITES.knight.image === lastPreviewImage) return;
+  previousPreview = knightPreview;
   lastPreviewEquipment = signature;
   lastPreviewImage = PNG_SPRITES.knight.image;
   previewContext.clearRect(0, 0, knightPreview.width, knightPreview.height);

@@ -1,3 +1,4 @@
+import { runtimeServices } from '../../game/core/bridge';
 import { useEffect, useRef, useState } from 'react';
 import { useGameSnapshot } from '../../hooks/useGameSnapshot';
 import { HUD } from '../hud/HUD';
@@ -40,7 +41,9 @@ export function GameCanvas() {
   useEffect(() => {
     let mounted = true;
     void loadRuntime().then(() => {
-      if (mounted) window.vonkje?.start(canvasRef.current);
+      if (!mounted || !canvasRef.current) return;
+      if (!window.vonkje) throw new Error('The game runtime did not initialize.');
+      window.vonkje.start(canvasRef.current, runtimeServices);
     }).catch((error: unknown) => {
       if (mounted) setLoadError(error instanceof Error ? error.message : 'The game could not start.');
     });

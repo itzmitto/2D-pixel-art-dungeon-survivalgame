@@ -71,20 +71,8 @@ function stackLimit(item) {
 }
 
 // All target grids are searched for matching stacks before any free slot is used.
-function insertStack(grids, { item, count }) {
-  for (const fillEmpty of [false, true]) {
-    for (const grid of grids) {
-      for (let i = 0; count > 0 && i < grid.length; i++) {
-        const current = grid[i];
-        if (fillEmpty ? current : current?.item !== item) continue;
-        const added = Math.min(count, stackLimit(item) - (current?.count || 0));
-        if (!added) continue;
-        grid[i] = { item, count: (current?.count || 0) + added };
-        count -= added;
-      }
-    }
-  }
-  return count;
+function insertStack(grids, stack) {
+  return services.insertStack(grids, stack);
 }
 
 function playerGrids(state = progress) {

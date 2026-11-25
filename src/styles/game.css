@@ -196,3 +196,18 @@ canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; 
   .game-actions { right: .5rem; bottom: 3.6rem; }
   .hotbar { width: min(30rem, 94vw); }
 }
+
+.fullscreen-toggle, .backpack-toggle { position: absolute; right: 1rem; z-index: 3; }
+.fullscreen-toggle { top: 3.7rem; }
+.backpack-toggle { top: 5.7rem; }
+.interaction-prompt, .loot-notification {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: .3rem .65rem;
+  background: #191a19ee;
+  pointer-events: none;
+}
+.interaction-prompt { bottom: 7rem; }
+.loot-notification { bottom: 5rem; }
+.health-display { display: inline-flex; gap: 4px; color: #ff8187; }

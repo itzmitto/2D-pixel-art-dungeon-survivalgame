@@ -18,8 +18,14 @@ export function SaveTransfer() {
     if (!file) return;
     try {
       const save = parseSaveFile(await file.text());
+      const current = localStorage.getItem('vonkje-survival-v1');
+      if (current !== null) {
+        const backup = `vonkje-survival-v1:backup:${crypto.randomUUID()}`;
+        localStorage.setItem(backup, current);
+      }
       localStorage.setItem('vonkje-survival-v1', JSON.stringify(save));
-      setMessage('Save imported. Reload the game to apply it.');
+      window.vonkje?.stop();
+      window.location.reload();
     } catch { setMessage('That save file is invalid. Your current save was not changed.'); }
   };
   return <div className={styles.saveTools} aria-label="Save transfer">

@@ -31,10 +31,10 @@ export function Inventory() {
   return <>
     <button id="backpack-toggle" className="backpack-toggle" type="button" aria-expanded={open}
       onClick={() => window.vonkje?.toggleInventory()}>Inventory <kbd>Tab</kbd></button>
-    {open && <aside id="backpack" className="inventory" aria-label="Inventory and storage" onKeyDown={navigateSlots}>
+    {open && <div className="inventory"><aside id="backpack" aria-label="Inventory and storage" onKeyDown={navigateSlots}>
       <header className="panel-heading">
         <h2 id="panel-title">{progress.panelMode === 'chest' ? 'Storage chest' : progress.panelMode === 'workbench' ? 'Field kit' : 'Inventory'}</h2>
-        <button id="close-backpack" type="button" onClick={() => window.vonkje?.closeInventory()}>Close <kbd>Esc</kbd></button>
+        <button id="close-backpack" autoFocus type="button" onClick={() => window.vonkje?.closeInventory()}>Close <kbd>Esc</kbd></button>
       </header>
       <div className="panel-body">
         <div className="panel-storage">
@@ -72,6 +72,6 @@ export function Inventory() {
         <p id="panel-feedback" role="status">{snapshot.panelMessage}</p>
         {progress.held && <span className="held-stack">Holding {ITEMS[progress.held.item].label} × {progress.held.count}</span>}
       </footer>
-    </aside>}
+    </aside></div>}
   </>;
 }

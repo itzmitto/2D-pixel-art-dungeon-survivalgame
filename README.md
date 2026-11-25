@@ -4,12 +4,12 @@
 
 The React/Vite entry point is `index.html`. The game world still runs in Canvas 2D, with the existing engine loaded from `public/legacy-runtime/` while its systems are migrated into TypeScript. The original direct-file version remains at `legacy-index.html` for save recovery and comparison.
 
-1. Install Node.js 20 or newer.
+1. Install Node.js 22.18 or newer.
 2. Run `npm install` once, then `npm run dev`.
 3. Open the local URL printed by Vite. Use the corner **Full screen** button to hide browser chrome.
 4. Run `npm run typecheck`, `npm run build`, and `npm test` for terminal checks. `npm run build` creates the production bundle in `dist/`.
 
-To keep an existing save, use **Export save** in the old `legacy-index.html` version before switching origins, then use **Import save** in the Vite game and reload. Import checks the JSON shape before changing browser storage; it does not clear the current save on an invalid file. The import/export buttons are available in the upper-right corner.
+Use **Export save** and **Import save** in the upper-right corner. Import checks the JSON before changing browser storage. See Migration status below for recovering a save from the original file version.
 
 After changing code, reload the Vite tab. The old direct-file game can still be opened with `xdg-open ./legacy-index.html` on Kubuntu.
 
@@ -68,16 +68,12 @@ The game reuses the local knight, golden Vonkje, wolf, snake, terrain, chest and
 
 The towers are drawn with the existing pixel terrain palette and Canvas renderer. No replacement image assets were generated or downloaded. Dedicated optional assets that would add more variety are `images/structures/briar-watch.png`, `images/structures/fen-spire.png`, `images/animals/deer-idle.png`, and `images/animals/raven-idle.png`. Add local files only when their terms permit use in the game, and record imported art in [the asset credits](images/ASSET_CREDITS.md).
 
-## Code layout
+## Migration status
 
-- `src/main.tsx` mounts the React application. `src/storage/saveTransfer.ts` validates safe save import/export.
-- `src/styles/` contains the strict TypeScript application styles and the interface CSS module.
-- `public/images/` contains the local PNG assets and credits used by the Canvas game.
-- `public/legacy-runtime/` contains the current plain-JavaScript game engine, served as ordered classic scripts to preserve its global-system dependencies during the migration. This engine has not yet been ported to TypeScript or React-owned game state.
-- `js/world/regions.js` defines wilderness terrain, landmarks, gates and migration coordinates. `js/world/towers.js` defines tower floors and connections.
-- `js/world/collision.js`, `js/world/camera.js`, and `js/world/terrain.js` handle walking, camera movement and terrain rendering. `js/world.js` handles interactions, encounters, loot and building placement.
-- `js/entities/` holds party placement, wolf behavior and seeded encounter pools.
-- `js/ui/hud.js` updates the floating HUD. `js/inventory.js` handles inventory, chest transfers and recipe patterns.
-- `js/input.js` handles controls and fullscreen. `js/movement.js` handles walking, sprinting and mouse routes.
-- `js/sprites.js` and `js/render.js` load local art and draw the game. `js/save.js` migrates and stores progress.
-- `main.js` initializes the game and runs the frame loop. `legacy-index.html` preserves direct startup of the original implementation.
+React renders the HUD, boss bar, interaction prompts, notifications, inventory, equipment, crafting, hotbar and save controls. It subscribes to a typed snapshot. The runtime batches changes and keeps the same snapshot when the visible state is unchanged.
+
+The Vite runtime uses TypeScript for the frame scheduler, camera calculations and stack insertion. Canvas rendering, input handlers, world and tower transitions, combat, save migration and most inventory transactions still run in `public/legacy-runtime/`. The other typed modules in `src/game/` have terminal tests but are not yet connected to live gameplay. Typechecking covers the React app and the migrated modules listed in `tsconfig.engine.json`.
+
+The original direct-file recovery version remains in `legacy-index.html` with its original scripts in `js/`. For an older save stored under a file URL, copy the value of `vonkje-survival-v1` from that version's browser storage into a JSON file and import it from the Vite page. Import backs up the current Vite save under a separate browser storage key, then reloads the game.
+
+The next migration step is to connect the typed inventory transactions and their save handling, replacing the remaining classic slot, crafting and chest operations together.

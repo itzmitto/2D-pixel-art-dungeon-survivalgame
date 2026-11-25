@@ -15,7 +15,7 @@ function filesBelow(path) {
 }
 
 test('React entrypoint serves every classic game system from the production public tree', () => {
-  const entry = read('src/main.tsx');
+  const entry = read('src/components/game/GameCanvas.tsx');
   const runtimeFiles = new Set(filesBelow('public/legacy-runtime').map((path) => path.replace('public/', '/')));
   const referenced = [...entry.matchAll(/'((?:\/legacy-runtime)[^']+)'/g)].map((match) => match[1]);
   assert.ok(referenced.length >= 18);
@@ -38,8 +38,8 @@ test('PNG assets remain local and retain the source dimensions used by sprite sh
 test('legacy runtime exposes a single frame-loop cleanup hook and keeps save migrations', () => {
   const main = read('public/legacy-runtime/main.js');
   const saves = read('public/legacy-runtime/js/save.js');
-  assert.match(main, /window\.vonkjeStop = stopGame/);
-  assert.match(main, /cancelAnimationFrame\(gameFrame\)/);
+  assert.match(main, /window\.vonkje =/);
+  assert.match(main, /loop\.stop\(\)/);
   assert.match(saves, /SAVE_VERSION = 8/);
   assert.match(saves, /function loadProgress\(/);
   assert.match(read('public/legacy-runtime/js/world/collision.js'), /function safeWorldPoint\(/);

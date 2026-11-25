@@ -2,7 +2,6 @@
 
 const pressed = new Set();
 const heldShift = new Set();
-const game = document.querySelector("#game");
 const BUILD_ITEMS = ["fence", "floor", "torch"];
 const walkKeys = ["w", "a", "s", "d"];
 const arrowKeys = ["arrowup", "arrowleft", "arrowdown", "arrowright"];
@@ -81,7 +80,7 @@ function updateBuildControls() {
 }
 
 function updateFullscreenButton() {
-  const active = document.fullscreenElement === game;
+  const active = Boolean(document.fullscreenElement && document.fullscreenElement === canvas.closest("#game"));
   if (fullscreenStatus !== active) {
     fullscreenStatus = active;
     publishUi();
@@ -89,6 +88,8 @@ function updateFullscreenButton() {
 }
 
 async function toggleFullscreen() {
+  const game = canvas?.closest("#game");
+  if (!game) return;
   try {
     if (document.fullscreenElement === game) await document.exitFullscreen();
     else await game.requestFullscreen();

@@ -1,3 +1,6 @@
+import { createGameLoop, browserFrameScheduler } from './loop.ts';
+import * as camera from '../world/camera.ts';
+import { insertStack } from '../items/inventoryModel.ts';
 import type { ItemId } from '../types/items.ts';
 import type { ItemStack, SlotRef } from '../items/inventoryModel.ts';
 
@@ -47,8 +50,8 @@ export interface GameSnapshot {
 }
 
 export interface GameEngineBridge {
-  getSnapshot(): GameSnapshot;
-  start(canvas: HTMLCanvasElement | null): void;
+  getSnapshot(): GameSnapshot | null;
+  start(canvas: HTMLCanvasElement, services: RuntimeServices): void;
   subscribe(listener: () => void): () => void;
   selectHotbar(index: number): void;
   toggleInventory(): void;
@@ -64,43 +67,49 @@ export interface GameEngineBridge {
   stop(): void;
 }
 
-const listeners = new Set<() => void>();
-let detachFromEngine: (() => void) | undefined;
-let waitingForReady = false;
-
-function notifySubscribers(): void {
-  for (const listener of listeners) listener();
+export function createSnapshotStore() {
+  let snapshot: GameSnapshot | null = null;
+  let signature = '';
+  const listeners = new Set<() => void>();
+  return {
+    getSnapshot: () => snapshot,
+    subscribe(listener: () => void) {
+      listeners.add(listener);
+      return () => { listeners.delete(listener); };
+    },
+    publish(view: Omit<GameSnapshot, 'revision'>) {
+      const next = JSON.stringify(view);
+      if (next === signature) return;
+      signature = next;
+      snapshot = { ...structuredClone(view), revision: (snapshot?.revision ?? 0) + 1 };
+      for (const listener of listeners) listener();
+    },
+  };
 }
 
-function connectToEngine(): void {
-  waitingForReady = false;
-  detachFromEngine?.();
-  detachFromEngine = window.vonkje?.subscribe(notifySubscribers);
-  notifySubscribers();
-}
+export const runtimeServices = {
+  createSnapshotStore,
+  createLoop: (update: (dt: number) => void, render: (time: number) => void) =>
+    createGameLoop({ scheduler: browserFrameScheduler, update, render }),
+  camera,
+  insertStack,
+};
+export type RuntimeServices = typeof runtimeServices;
 
 export function subscribe(listener: () => void): () => void {
-  listeners.add(listener);
-  if (window.vonkje) connectToEngine();
-  else if (!waitingForReady) {
-    waitingForReady = true;
-    window.addEventListener('vonkje-ready', connectToEngine, { once: true });
-  }
+  let unsubscribe: (() => void) | undefined;
+  const connect = () => {
+    unsubscribe = window.vonkje?.subscribe(listener);
+    listener();
+  };
+  if (window.vonkje?.getSnapshot()) connect();
+  else window.addEventListener('vonkje-ready', connect, { once: true });
   return () => {
-    listeners.delete(listener);
-    if (!listeners.size) {
-      detachFromEngine?.();
-      detachFromEngine = undefined;
-      if (waitingForReady) window.removeEventListener('vonkje-ready', connectToEngine);
-      waitingForReady = false;
-    }
+    window.removeEventListener('vonkje-ready', connect);
+    unsubscribe?.();
   };
 }
 
 export function getSnapshot(): GameSnapshot | null {
   return window.vonkje?.getSnapshot() ?? null;
-}
-
-export function engineBridge(): GameEngineBridge | undefined {
-  return window.vonkje;
 }
