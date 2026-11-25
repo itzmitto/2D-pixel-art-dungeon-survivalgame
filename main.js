@@ -43,11 +43,12 @@ function updateHud() {
   hearts.setAttribute("aria-label", formatNumber(player.hearts) + " of 3 hearts");
   game.dataset.area = area;
   roomNumber.textContent = {
-    forest: "Forest", house: "House", dungeon1: "Dungeon 1 of 2", dungeon2: "Dungeon 2 of 2",
+    forest: "Forest", house: "House", dungeon1: "Dungeon 1 of 3", dungeon2: "Dungeon 2 of 3", dungeon3: "Warden's hall",
   }[area];
   keyLabel.hidden = !key;
   keyLabel.textContent = hasKey ? "Key found" : "Key missing";
   updateInventory();
+  updateWardenHud();
 }
 
 function finish(outcome, message) {
@@ -72,7 +73,6 @@ function update(dt) {
   protection = Math.max(0, protection - dt);
   if (updateArea(updatePlayer(dt))) return;
   followDragon(dt);
-  updateHarvestEffects();
   updateEnemies(dt);
 }
 

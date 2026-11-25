@@ -8,6 +8,7 @@ const FIREBALL_DAMAGE = 2;
 const ENEMIES = {
   wolf: { health: 4, speed: 68, rushSpeed: 68, reach: 16, sight: 152, damage: 1 },
   snake: { health: 4, speed: 38, rushSpeed: 96, reach: 15, sight: 104, damage: 0.75 },
+  warden: { health: 24, radius: 14 },
 };
 const WEAPONS = {
   axe: { damage: 2, range: 26, cooldown: 0.38, sprite: "axe" },
@@ -15,9 +16,10 @@ const WEAPONS = {
   stoneSword: { damage: 3, range: 30, cooldown: 0.38, sprite: "stoneSword" },
   copperSword: { damage: 4, range: 32, cooldown: 0.38, sprite: "copperSword" },
   copperSpear: { damage: 3, range: 47, cooldown: 0.65, sprite: "copperSpear" },
+  fangBlade: { damage: 3, range: 30, cooldown: 0.25, swingTime: 0.12, sprite: "fangBlade" },
 };
-const ARMOR = { copperHelmet: 1, copperChestplate: 2, copperBoots: 1 };
-const PET_UPGRADES = { copperPendant: 0.2 };
+const ARMOR = { copperHelmet: 1, copperChestplate: 2, copperBoots: 1, scaleArmor: 3 };
+const PET_UPGRADES = { copperPendant: 0.2, emberCharm: 0.4 };
 
 function totalDefense() {
   return Object.values(progress.armor).reduce((total, item) => total + (ARMOR[item] || 0), 0);
@@ -79,6 +81,7 @@ const SWING_TIME = 0.16;
 let meleeCooldown, swing;
 
 function damageEnemy(enemy, damage) {
+  if (enemy.health <= 0) return;
   enemy.health = Math.max(0, enemy.health - damage);
   enemy.flash = ENEMY_FLASH_TIME;
   recordEnemyDamage(enemy);
@@ -104,14 +107,14 @@ function melee(hand) {
   }
   if (meleeCooldown > 0) return;
   const { x, y } = facingTile;
-  const { damage, range, cooldown } = WEAPONS[weapon];
+  const { damage, range, cooldown, swingTime = SWING_TIME } = WEAPONS[weapon];
   meleeCooldown = cooldown;
-  swing = { x, y, time: SWING_TIME, hand, weapon };
+  swing = { x, y, time: swingTime, duration: swingTime, hand, weapon };
   for (const enemy of enemies) {
     const dx = enemy.x - player.x;
     const dy = enemy.y - player.y;
     const gap = Math.hypot(dx, dy);
-    if (enemy.health > 0 && gap <= range && dx * x + dy * y >= gap * 0.45 &&
+    if (enemy.health > 0 && gap <= range + enemy.radius - 8 && dx * x + dy * y >= gap * 0.45 &&
         clearAttackPath(player, enemy)) damageEnemy(enemy, damage);
   }
 }
@@ -125,9 +128,23 @@ function updateCombat(dt) {
   }
 }
 
+function damagePlayer(rawDamage) {
+  if (protection > 0 || phase !== "playing") return;
+  const damage = Math.max(0.5, rawDamage - totalDefense() * 0.125);
+  player.hearts = Math.max(0, player.hearts - damage);
+  protection = 1.1;
+  updateHud();
+  status.textContent = formatNumber(player.hearts) + " hearts left.";
+  if (player.hearts === 0) finish("lost", "You ran out of hearts");
+}
+
 function updateEnemies(dt) {
   for (const enemy of enemies) {
     if (enemy.health === 0) continue;
+    if (enemy.kind === "warden") {
+      updateWarden(enemy, dt);
+      continue;
+    }
     const spec = ENEMIES[enemy.kind];
     const gap = distance(enemy, player);
     if (gap > spec.sight) {
@@ -143,15 +160,8 @@ function updateEnemies(dt) {
     if (enemy.x !== x) enemy.facing = Math.sign(enemy.x - x);
     enemy.walkTime = enemy.x !== x || enemy.y !== y ? enemy.walkTime + dt : 0;
     if (protection === 0 && distance(player, enemy) < spec.reach && clearAttackPath(enemy, player)) {
-      const damage = Math.max(0.5, spec.damage - totalDefense() * 0.125);
-      player.hearts = Math.max(0, player.hearts - damage);
-      protection = 1.1;
-      updateHud();
-      status.textContent = formatNumber(player.hearts) + " hearts left.";
-      if (player.hearts === 0) {
-        finish("lost", "You ran out of hearts");
-        break;
-      }
+      damagePlayer(spec.damage);
+      if (phase !== "playing") break;
     }
   }
 }

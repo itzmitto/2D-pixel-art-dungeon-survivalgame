@@ -5,10 +5,10 @@ const TILE = 32;
 const ROOM_ONE = [
   "###T#######T###",
   "#.............#",
-  "#.....T.....K.#",
+  "#.###.T.....K.#",
   "#..C..#.......#",
   "T.....#...##..T",
-  "#.........#...#",
+  "#.###.....#...#",
   "#...T.....T...#",
   "#.............#",
   "AP............E",
@@ -25,6 +25,18 @@ const ROOM_TWO = [
   "##.#.####.....#",
   "##.#..........#",
   "AP............#",
+  "###T#######T###",
+];
+const WARDEN_ROOM = [
+  "###T#######T###",
+  "#.............#",
+  "#....#...#..C.#",
+  "#.............#",
+  "T.............T",
+  "A.............E",
+  "#.............#",
+  "#....#...#....#",
+  "#.............#",
   "###T#######T###",
 ];
 // Each area uses the same tile grid and collision rules.
@@ -52,7 +64,7 @@ const HOUSE = [
   "#######U#######",
   "###############",
 ];
-const AREAS = { forest: FOREST, house: HOUSE, dungeon1: ROOM_ONE, dungeon2: ROOM_TWO };
+const AREAS = { forest: FOREST, house: HOUSE, dungeon1: ROOM_ONE, dungeon2: ROOM_TWO, dungeon3: WARDEN_ROOM };
 const WORLD_WIDTH = FOREST[0].length * TILE;
 const WORLD_HEIGHT = FOREST.length * TILE;
 
@@ -70,9 +82,19 @@ function arrivalAt(x, y, dx, dy) {
   return { ...centerOf({ x, y }), direction: { x: dx, y: dy } };
 }
 
-const stationResume = {
-  chest: arrivalAt(10, 4, 0, -1),
-  workbench: arrivalAt(4, 4, 0, -1),
+const WORKBENCH_ARRIVAL = arrivalAt(4, 4, 0, -1);
+const WARDEN_ID = "dungeon3:warden";
+const CHEST_STATIONS = {
+  house: { name: "House chest", tile: "O", arrival: arrivalAt(10, 4, 0, -1) },
+  dungeon1: {
+    name: "Supply chest", tile: "C", arrival: arrivalAt(3, 4, 0, -1),
+    loot: [["wood", 14], ["stone", 8], ["copper", 8], ["wolfFang", 2], ["serpentScale", 1], ["potion", 2]],
+  },
+  dungeon2: {
+    name: "Reserve chest", tile: "C", arrival: arrivalAt(9, 6, 0, -1),
+    loot: [["wood", 10], ["stone", 6], ["copper", 8], ["wolfFang", 1], ["serpentScale", 3], ["potion", 2]],
+  },
+  dungeon3: { name: "Reward chest", tile: "C", arrival: arrivalAt(12, 3, 0, -1), loot: [] },
 };
 const houseApproach = arrivalAt(4, 5, 0, 1);
 const caveApproach = arrivalAt(12, 3, 0, 1);
@@ -90,7 +112,11 @@ const PORTALS = {
   },
   dungeon2: {
     A: { to: "dungeon1", arrival: arrivalAt(13, 8, -1, 0), back: "E", dx: -1 },
-    E: { to: "forest", arrival: caveApproach, back: "G", dx: 1, completesDungeon: true },
+    E: { to: "dungeon3", arrival: arrivalAt(1, 5, 1, 0), back: "A", dx: 1 },
+  },
+  dungeon3: {
+    A: { to: "dungeon2", arrival: arrivalAt(13, 1, -1, 0), back: "E", dx: -1 },
+    E: { to: "forest", arrival: caveApproach, back: "G", dx: 1, ready: wardenDefeated },
   },
 };
 const DUNGEON_KEY = "dungeon1:key";
@@ -100,17 +126,18 @@ const DUNGEON_SPAWNS = {
   dungeon1: [["wolf", 10, 7], ["snake", 10, 2]],
   dungeon2: [["snake", 2, 3], ["wolf", 10, 7], ["snake", 12, 3]],
 };
+const DUNGEON_DROPS = { wolf: { item: "wolfFang", count: 2 }, snake: { item: "serpentScale", count: 2 } };
 const FOLLOW_DELAY = 0.28;
 const FOLLOW_DISTANCE = 23;
 let area, room, key, potion;
 let areaPortals, arrivalGuard;
 let player, dragon, enemies, trail, elapsed, hasKey, protection, phase;
 let groundLoot = [];
-let harvestEffects = [];
-const RESOURCES = {
-  Y: { action: "chop", tool: "axe", state: "trees", hits: 3, item: "wood", count: 3 },
-  M: { action: "mine", tool: "pickaxe", state: "mines", hits: 2, item: "stone", count: 3 },
-  N: { action: "mine", tool: "pickaxe", state: "mines", hits: 3, item: "copper", count: 3 },
+// Keep old stumps, depleted nodes, and unclaimed drops from saves that had gathering.
+const LEGACY_RESOURCES = {
+  Y: { state: "trees", hits: 3, item: "wood", count: 3 },
+  M: { state: "mines", hits: 2, item: "stone", count: 3 },
+  N: { state: "mines", hits: 3, item: "copper", count: 3 },
 };
 
 function resourceDrop(resource, x, y) {
@@ -121,10 +148,10 @@ function resourceDrop(resource, x, y) {
 }
 
 function forestLoot() {
-  const drops = [...FOREST_LOOT];
+  const drops = progress.legacyTrailLoot ? [...FOREST_LOOT] : [];
   FOREST.forEach((row, y) => {
     [...row].forEach((tile, x) => {
-      const resource = RESOURCES[tile];
+      const resource = LEGACY_RESOURCES[tile];
       if (resource && exhausted(resource, x, y)) drops.push(resourceDrop(resource, x, y));
     });
   });
@@ -144,7 +171,6 @@ function enterArea(nextArea, health, arrival = houseApproach, back = "") {
   }));
   arrivalGuard = back ? { tile: back, keys: new Set(pressed) } : null;
   groundLoot = area === "forest" ? forestLoot() : [];
-  harvestEffects = [];
   swing = undefined;
   const { direction, ...spawn } = arrival;
   facingTile = aim = direction;
@@ -168,13 +194,22 @@ function enterArea(nextArea, health, arrival = houseApproach, back = "") {
 }
 
 function dungeonSpawns(mapArea) {
+  if (mapArea === "dungeon3") return [{ id: WARDEN_ID, kind: "warden", ...centerOf({ x: 7, y: 5 }) }];
   return (DUNGEON_SPAWNS[mapArea] || []).map(([kind, x, y], index) => ({
     id: mapArea + ":slime:" + index, kind, ...centerOf({ x, y }),
   }));
 }
 
-function enemyDrop(id, { x, y }) {
-  return { id, x, y, item: "gel", count: 1 };
+function enemyDrop(id, { x, y, drop }) {
+  return { id, x, y, ...drop };
+}
+
+function wardenDefeated() {
+  return progress.dungeonEnemies[WARDEN_ID]?.health === 0;
+}
+
+function chestUnlocked(id) {
+  return id !== "dungeon3" || wardenDefeated();
 }
 
 function loadEnemies() {
@@ -182,17 +217,32 @@ function loadEnemies() {
     const { id, kind } = spawn;
     const saved = progress.dungeonEnemies[id];
     if (saved?.health === 0) {
-      if (!progress.collected[id]) groundLoot.push(enemyDrop(id, saved));
+      if (saved.drop && !progress.collected[id]) groundLoot.push(enemyDrop(id, saved));
       return [];
     }
-    return [{ ...spawn, radius: 8, health: saved?.health ?? ENEMIES[kind].health, facing: 1, flash: 0, walkTime: 0 }];
+    const spec = ENEMIES[kind];
+    return [{ ...spawn, radius: spec.radius ?? 8, health: saved?.health ?? spec.health, facing: 1, flash: 0, walkTime: 0 }];
   });
 }
 
-function recordEnemyDamage({ id, x, y, health }) {
-  progress.dungeonEnemies[id] = health === 0 ? { health, x, y } : { health };
-  if (health === 0) groundLoot.push(enemyDrop(id, { x, y }));
+function recordEnemyDamage({ id, kind, x, y, health }) {
+  if (progress.dungeonEnemies[id]?.health === 0) return;
+  if (health > 0) {
+    progress.dungeonEnemies[id] = { health };
+  } else if (id === WARDEN_ID) {
+    progress.dungeonEnemies[id] = { health: 0 };
+    progress.dungeonCompleted = true;
+    progress.dungeonChests.dungeon3[0] = { item: "emberCore", count: 1 };
+  } else {
+    const defeat = { health: 0, x, y, drop: DUNGEON_DROPS[kind] };
+    progress.dungeonEnemies[id] = defeat;
+    groundLoot.push(enemyDrop(id, defeat));
+  }
   storeProgress();
+  if (id === WARDEN_ID) {
+    updateWardenHud();
+    if (health === 0) showFeedback("Cyclops Warden defeated. The reward chest and cave exit are open.");
+  }
 }
 
 function distance(a, b) {
@@ -210,7 +260,7 @@ function blocked(x, y, radius, canUsePortals = true) {
       const column = Math.floor(edgeX / TILE);
       const row = Math.floor(edgeY / TILE);
       const tile = room[row]?.[column];
-      const resource = area === "forest" && RESOURCES[tile];
+      const resource = area === "forest" && LEGACY_RESOURCES[tile];
       if (area === "forest" && ((resource && !exhausted(resource, column, row)) ||
           progress.buildings[tileId(column, row)] === "fence")) return true;
       if (!tile || "#TCHBQWO".includes(tile)) return true;
@@ -232,27 +282,6 @@ function tileId(x, y) {
 
 function exhausted(resource, x, y) {
   return progress[resource.state][tileId(x, y)] === resource.hits;
-}
-
-function harvest(x, y) {
-  const resource = RESOURCES[room[y][x]];
-  const id = tileId(x, y);
-  const counts = progress[resource.state];
-  counts[id] = (counts[id] || 0) + 1;
-  const center = centerOf({ x, y });
-  harvestEffects.push({ ...center, tool: resource.tool, started: elapsed });
-  const remaining = resource.hits - counts[id];
-  if (remaining === 0) {
-    groundLoot.push(resourceDrop(resource, x, y));
-    showFeedback(ITEMS[resource.item].label + " dropped · press E to pick up.");
-  } else {
-    showFeedback(remaining === 1 ? "1 hit left" : remaining + " hits left");
-  }
-  storeProgress();
-}
-
-function updateHarvestEffects() {
-  harvestEffects = harvestEffects.filter(effect => elapsed - effect.started < 0.32);
 }
 
 function targetTile() {
@@ -303,17 +332,10 @@ function nearby(symbol) {
 function getAction() {
   if (phase !== "playing" || inventoryOpen()) return "";
   if (nearbyLoot()) return "pickup";
-  if (area === "forest") {
-    const { x, y } = targetTile();
-    const resource = RESOURCES[room[y]?.[x]];
-    if (resource && !exhausted(resource, x, y) && distance(player, centerOf({ x, y })) < 42 &&
-        (itemCount(resource.tool) || Object.values(progress.hands).includes(resource.tool))) {
-      return resource.action;
-    }
-  }
+  const chest = CHEST_STATIONS[area];
+  if (chest && nearby(chest.tile)) return chestUnlocked(area) ? "chest" : "lockedChest";
   if (area === "house") {
     if (nearby("W")) return "workbench";
-    if (nearby("O")) return "chest";
     if (nearby("B") && player.hearts < 3) return "rest";
   }
   return "";
@@ -325,15 +347,14 @@ function interact() {
     case "pickup":
       pickUp(nearbyLoot());
       break;
-    case "chop":
-    case "mine": {
-      const { x, y } = targetTile();
-      harvest(x, y);
+    case "lockedChest":
+      showFeedback("Defeat the Cyclops Warden to unlock the reward chest.");
       break;
-    }
     case "workbench":
+      openInventory("workbench");
+      break;
     case "chest":
-      openHousePanel(action);
+      openInventory("chest", area);
       break;
     case "rest":
       player.hearts = 3;
@@ -363,19 +384,16 @@ function pickUp(drop) {
 function updateAction() {
   const action = getAction();
   const hint = {
-    chop: "E — Chop tree",
     rest: "E — Rest",
-    workbench: "E — Open workbench", chest: "E — Open house chest",
+    workbench: "E — Open workbench",
+    lockedChest: "Reward chest locked · Defeat the Warden",
   }[action];
   let text = hint || "";
   if (action === "pickup") {
     const { item, count } = nearbyLoot();
     text = "E — Pick up · " + ITEMS[item].label + " × " + count;
   }
-  if (action === "mine") {
-    const { x, y } = targetTile();
-    text = "E — Mine " + ITEMS[RESOURCES[room[y][x]].item].label.toLowerCase();
-  }
+  if (action === "chest") text = "E — Open " + CHEST_STATIONS[area].name.toLowerCase();
   if (actionLabel.textContent !== text) actionLabel.textContent = text;
   actionLabel.hidden = !text;
   if (!text) return;
@@ -407,13 +425,6 @@ function followDragon(dt) {
   }
 }
 
-function completeDungeon() {
-  if (progress.dungeonCompleted) return;
-  progress.dungeonCompleted = true;
-  storeProgress();
-  showFeedback("Dungeon cleared");
-}
-
 function releaseArrivalKey(key) {
   arrivalGuard?.keys.delete(key);
 }
@@ -441,6 +452,5 @@ function updateArea({ dx, dy, routePortal }) {
     distance(player, portal.position) < 13 && portalOpen(portal));
   if (!portal) return false;
   enterArea(portal.to, player.hearts, portal.arrival, portal.back);
-  if (portal.completesDungeon) completeDungeon();
   return true;
 }

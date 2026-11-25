@@ -13,6 +13,7 @@
   <script src="js/render.js" defer></script>
   <script src="js/inventory.js" defer></script>
   <script src="js/combat.js" defer></script>
+  <script src="js/boss.js" defer></script>
   <script src="js/save.js" defer></script>
   <script src="js/input.js" defer></script>
   <script src="main.js" defer></script>
@@ -43,6 +44,11 @@
         <div class="room">
           <p id="action" hidden></p>
           <canvas id="dungeon" width="2880" height="1920" aria-label="Pixel world with a knight and a baby dragon"></canvas>
+          <div id="warden-hud" hidden>
+            <strong>Cyclops Warden</strong>
+            <progress id="warden-health" max="24" value="24" aria-label="Cyclops Warden health"></progress>
+            <span id="warden-cue"></span>
+          </div>
           <div id="ending" class="ending" hidden>
             <strong id="result"></strong>
             <button id="respawn" type="button" hidden>Return home</button>

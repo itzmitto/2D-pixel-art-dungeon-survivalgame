@@ -1,10 +1,16 @@
 "use strict";
 
 const SAVE_KEY = "vonkje-survival-v1";
-const SAVE_VERSION = 5;
+const SAVE_VERSION = 6;
+const SLOT_SAVE_VERSION = 5;
 const SAVED_SLOT_COUNTS = { bag: BAG_SLOTS, hotbar: HOTBAR_SLOTS, chest: CHEST_SLOTS, bagCraft: 4, benchCraft: 9 };
 
 function newProgress() {
+  const dungeonChests = Object.fromEntries(Object.entries(CHEST_STATIONS).filter(([, station]) => station.loot)
+    .map(([id, { loot }]) => [id, Array.from({ length: CHEST_SLOTS }, (_, i) => {
+      const [item, count] = loot[i] || [];
+      return item ? { item, count } : null;
+    })]));
   return {
     bag: [
       { item: "sword", count: 1 }, { item: "axe", count: 1 },
@@ -17,9 +23,9 @@ function newProgress() {
     hands: { left: null, right: null },
     armor: { helmet: null, chestplate: null, boots: null },
     pet: { pet: null },
-    held: null, panelMode: null, selectedHotbar: 0, overflow: { bag: {}, chest: {} },
+    held: null, panelMode: null, chestId: null, selectedHotbar: 0, overflow: { bag: {}, chest: {} },
     trees: {}, mines: {}, buildings: {}, collected: {}, dungeonCompleted: false,
-    dungeonEnemies: {},
+    dungeonEnemies: {}, dungeonChests, legacyTrailLoot: false,
   };
 }
 
@@ -47,7 +53,7 @@ function loadBuildings(saved, loaded) {
       } else if (tile === ".") {
         empty.push({ x, y, id });
       }
-      const resource = RESOURCES[tile];
+      const resource = LEGACY_RESOURCES[tile];
       if (!resource) return;
       const hits = saved[resource.state]?.[id];
       if (Number.isInteger(hits) && hits > 0 && hits <= resource.hits) {
@@ -119,8 +125,25 @@ function migrateLegacyInventory(saved, loaded) {
 function validSlotSource(source) {
   const { area, index } = source || {};
   if (area === "equipment") return Object.hasOwn(EQUIPMENT_SLOTS, index);
+  if (area === "chest" && source.chestId != null && !Object.hasOwn(CHEST_STATIONS, source.chestId)) return false;
   return Object.hasOwn(SAVED_SLOT_COUNTS, area) &&
     Number.isInteger(index) && index >= 0 && index < SAVED_SLOT_COUNTS[area];
+}
+
+function validStack(stack) {
+  return stack && Object.hasOwn(ITEMS, stack.item) && validCount(stack.count);
+}
+
+function loadGrid(savedSlots, slots, loaded, overflow) {
+  if (!Array.isArray(savedSlots)) return;
+  slots.fill(null);
+  for (const [index, stack] of savedSlots.entries()) {
+    if (!validStack(stack)) continue;
+    const { item, count } = stack;
+    const fitted = index < slots.length ? Math.min(count, stackLimit(item)) : 0;
+    if (fitted) slots[index] = { item, count: fitted };
+    addOverflow(loaded, overflow, item, count - fitted);
+  }
 }
 
 function loadSlotInventory(saved, loaded) {
@@ -133,15 +156,11 @@ function loadSlotInventory(saved, loaded) {
 
   loaded.bag.fill(null);
   for (const area of Object.keys(SAVED_SLOT_COUNTS)) {
-    const slots = saved[area];
-    if (!Array.isArray(slots)) continue;
-    for (const [index, stack] of slots.entries()) {
-      if (!stack || !Object.hasOwn(ITEMS, stack.item) || !validCount(stack.count)) continue;
-      const { item, count } = stack;
-      const fitted = index < loaded[area].length ? Math.min(count, stackLimit(item)) : 0;
-      if (fitted) loaded[area][index] = { item, count: fitted };
-      addOverflow(loaded, area === "chest" ? "chest" : "bag", item, count - fitted);
-    }
+    loadGrid(saved[area], loaded[area], loaded, area === "chest" ? "chest" : "bag");
+  }
+  for (const [id, slots] of Object.entries(loaded.dungeonChests)) {
+    // Empty saved slots are intentional. Only a chest absent from an older save gets starter loot.
+    loadGrid(saved.dungeonChests?.[id], slots, loaded, "bag");
   }
 
   loadEquipment(saved, loaded);
@@ -150,12 +169,16 @@ function loadSlotInventory(saved, loaded) {
     loaded.selectedHotbar = saved.selectedHotbar;
   }
   if (["bag", "chest", "workbench"].includes(saved.panelMode)) loaded.panelMode = saved.panelMode;
+  if (loaded.panelMode === "chest") {
+    loaded.chestId = Object.hasOwn(CHEST_STATIONS, saved.chestId) ? saved.chestId : "house";
+  }
   const held = saved.held;
-  if (held && Object.hasOwn(ITEMS, held.item) && validCount(held.count)) {
+  if (validStack(held)) {
     const count = Math.min(held.count, stackLimit(held.item));
     const source = validSlotSource(held.source) ? { area: held.source.area, index: held.source.index } : null;
+    if (source?.area === "chest") source.chestId = held.source.chestId ?? loaded.chestId ?? "house";
     loaded.held = { item: held.item, count, source };
-    addOverflow(loaded, held.source?.area === "chest" ? "chest" : "bag", held.item, held.count - count);
+    addOverflow(loaded, source?.chestId === "house" ? "chest" : "bag", held.item, held.count - count);
   }
 }
 
@@ -163,7 +186,7 @@ function loadDungeonProgress(saved, loaded) {
   loaded.dungeonCompleted = saved.dungeonCompleted === true;
   if (loaded.dungeonCompleted || saved.collected?.[DUNGEON_KEY] === true) loaded.collected[DUNGEON_KEY] = true;
   if (saved.collected?.[DUNGEON_POTION] === true) loaded.collected[DUNGEON_POTION] = true;
-  for (const mapArea of ["dungeon1", "dungeon2"]) {
+  for (const mapArea of Object.keys(loaded.dungeonChests)) {
     for (const { id, kind, x, y } of dungeonSpawns(mapArea)) {
       const state = saved.dungeonEnemies?.[id] ?? saved.dungeonSlimes?.[id];
       if (!state || !Number.isInteger(state.health) || state.health < 0 || state.health >= ENEMIES[kind].health) continue;
@@ -171,9 +194,15 @@ function loadDungeonProgress(saved, loaded) {
         loaded.dungeonEnemies[id] = { health: state.health };
         continue;
       }
+      if (id === WARDEN_ID) {
+        loaded.dungeonEnemies[id] = { health: 0 };
+        continue;
+      }
       const validPosition = state.x >= 8 && state.x <= WORLD_WIDTH - 8 &&
         state.y >= 8 && state.y <= WORLD_HEIGHT - 8 && Number.isFinite(state.x) && Number.isFinite(state.y);
-      loaded.dungeonEnemies[id] = { health: 0, ...(validPosition ? { x: state.x, y: state.y } : { x, y }) };
+      const drop = validStack(state.drop) ? { item: state.drop.item, count: state.drop.count } :
+        !(saved.version >= SAVE_VERSION) ? { item: "gel", count: 1 } : DUNGEON_DROPS[kind];
+      loaded.dungeonEnemies[id] = { health: 0, ...(validPosition ? { x: state.x, y: state.y } : { x, y }), drop };
       if (saved.collected?.[id] === true) loaded.collected[id] = true;
     }
   }
@@ -185,9 +214,10 @@ function loadProgress() {
     const saved = JSON.parse(localStorage.getItem(SAVE_KEY));
     if (!saved) return loaded;
 
-    if (saved.version >= SAVE_VERSION) loadSlotInventory(saved, loaded);
+    if (saved.version >= SLOT_SAVE_VERSION) loadSlotInventory(saved, loaded);
     else migrateLegacyInventory(saved, loaded);
 
+    loaded.legacyTrailLoot = saved.legacyTrailLoot === true || !(saved.version >= SAVE_VERSION);
     for (const drop of FOREST_LOOT) {
       if (saved.collected?.[drop.id] === true) loaded.collected[drop.id] = true;
     }
