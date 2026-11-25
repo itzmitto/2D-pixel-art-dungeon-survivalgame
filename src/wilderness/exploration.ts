@@ -56,12 +56,12 @@ export function readExploration(raw: string | null): Exploration | null {
     const ids=(key:string)=>{
       const list:unknown=Object.getOwnPropertyDescriptor(value,key)?.value;
       return Array.isArray(list) ? [...new Set(list.filter((id:unknown): id is string =>
-        typeof id==='string' && /^(wolf|dire|den|skeleton)-[a-z0-9-]+$/.test(id)))] : [];
+        typeof id==='string' && /^(wolf|dire|den|skeleton|goblin|elite)-[a-z0-9-]+$/.test(id)))] : [];
     };
     const pending: Exploration['pending']={};
     const savedPending:unknown=Object.getOwnPropertyDescriptor(value,'pending')?.value;
     if(savedPending&&typeof savedPending==='object') for(const [id,point] of Object.entries(savedPending)){
-      if(/^(wolf|dire|den|skeleton)-[a-z0-9-]+$/.test(id) && point && typeof point.x==='number' && Math.abs(point.x)<extent &&
+      if(/^(wolf|dire|den|skeleton|goblin|elite)-[a-z0-9-]+$/.test(id) && point && typeof point.x==='number' && Math.abs(point.x)<extent &&
         typeof point.z==='number' && (Math.abs(point.z)<extent||denWalkable(point.x,point.z))) pending[id]={x:point.x,z:point.z};
     }
     const storedArsenal:unknown=Object.getOwnPropertyDescriptor(value,'arsenal')?.value;

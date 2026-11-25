@@ -20,6 +20,7 @@ export function statuses(resistance:Resistance=ordinaryResistance) {
       pushTime=statusTuning.knockback*resistance.control;
       pushX=x;pushZ=z;
     },
+    get visual(){return frozen>0?'frozen':stun>0?'stunned':burn>0?'burning':slow>0?'slowed':null;},
     get halted(){return stun>0 || frozen>0;},
     get speed(){return slow>0?.48:1;},
     update(dt:number, damage:(amount:number)=>void, move:(x:number,z:number)=>void){
