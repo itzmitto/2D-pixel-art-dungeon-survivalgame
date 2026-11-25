@@ -1,3 +1,4 @@
+import { maxHealth } from './combatRules.ts';
 import { extent, spawn } from './layout.ts';
 
 export const cellSize = 20;
@@ -5,7 +6,10 @@ export const cellsPerSide = extent * 2 / cellSize;
 export const defaultSeed = 294;
 export const saveKey = 'vonkje-wilderness-v1';
 export type Position = { x: number; z: number; yaw: number };
-export type Exploration = { version: 1; seed: number; position: Position; discovered: number[] };
+export type Exploration = { version: 1; seed: number; position: Position; discovered: number[];
+  health: number; level: number; xp: number; gold: number; fangs: number;
+  defeated: string[]; collected: string[];
+};
 
 export function cellAt(x: number, z: number) {
   const col = Math.floor((x+extent)/cellSize), row = Math.floor((z+extent)/cellSize);
@@ -39,10 +43,22 @@ export function readExploration(raw: string | null): Exploration | null {
       !('yaw' in position) || typeof position.yaw!=='number' || !Number.isFinite(position.yaw)) return null;
     const known=discovered.filter((id: unknown): id is number =>
       typeof id==='number' && Number.isInteger(id) && id>=0 && id<cellsPerSide**2);
-    return {version:1,seed,position:{x:position.x,z:position.z,yaw:position.yaw},discovered:[...new Set(known)]};
+    const integer=(key:string,fallback:number,min:number,max:number)=>{
+      const number=Object.getOwnPropertyDescriptor(value,key)?.value as unknown;
+      return typeof number==='number' && Number.isSafeInteger(number) && number>=min && number<=max ? number : fallback;
+    };
+    const ids=(key:string)=>{
+      const list:unknown=Object.getOwnPropertyDescriptor(value,key)?.value;
+      return Array.isArray(list) ? [...new Set(list.filter((id:unknown): id is string =>
+        typeof id==='string' && /^wolf-[0-9]+$/.test(id)))] : [];
+    };
+    return {version:1,seed,position:{x:position.x,z:position.z,yaw:position.yaw},discovered:[...new Set(known)],
+      health:integer('health',maxHealth,0,maxHealth),level:integer('level',1,1,1e5),
+      xp:integer('xp',0,0,6e6),gold:integer('gold',0,0,1e9),fangs:integer('fangs',0,0,1e9),
+      defeated:ids('defeated'),collected:ids('collected')};
   } catch { return null; }
 }
 
 export function newExploration(): Exploration {
-  return {version:1,seed:defaultSeed,position:{...spawn,yaw:0},discovered:[]};
+  return {version:1,seed:defaultSeed,position:{...spawn,yaw:0},discovered:[],health:maxHealth,level:1,xp:0,gold:0,fangs:0,defeated:[],collected:[]};
 }
