@@ -1,5 +1,6 @@
+import { attackSpeed, earnXP, elemental, maxHunterHealth, mitigation, physical } from './progression.ts';
 import * as T from 'three';
-import { inArc, maxHealth, swingTimer, wolf, wolfLoot, xpNeeded } from './combatRules.ts';
+import { inArc, swingTimer, wolf, wolfLoot } from './combatRules.ts';
 import type { Exploration } from './exploration.ts';
 import { randomSequence, spawn, surface } from './layout.ts';
 import { wolfModels } from './wolves.ts';
@@ -38,6 +39,12 @@ export function createEncounters(
   scene:T.Scene, camera:T.Camera, player:T.Group, save:Exploration,
   canWalk:(x:number,z:number)=>boolean, changed:()=>void,
 ) {
+  const maxHealth=()=>maxHunterHealth(save);
+  function tunedWeapon(weapon:Weapon,magic=false):Weapon {
+    const speed=attackSpeed(save.stats);
+    return {...weapon,damage:weapon.damage*(magic||weapon.id==='staff'?elemental(save.stats):physical(save.stats)),
+      attackDuration:weapon.attackDuration/speed, impactTime:weapon.impactTime/speed,cooldown:weapon.cooldown/speed};
+  }
   const models=wolfModels();
   const group=new T.Group();
   scene.add(group);
@@ -162,14 +169,10 @@ export function createEncounters(
     save.pending[enemy.id]={x:enemy.loot.position.x,z:enemy.loot.position.z};
     oldDefeats.add(enemy.id);
     save.defeated=[...oldDefeats];
-    save.xp+=wolf.xp;
-    const before=save.level;
-    while(save.xp>=xpNeeded(save.level)){
-      save.xp-=xpNeeded(save.level);
-      save.level++;
-    }
-    if(save.level!==before) notify('Level '+save.level+' reached.');
-    else notify('Wolf defeated · +'+wolf.xp+' XP');
+    save.kills++;
+    const levelUp=earnXP(save,wolf.xp);
+    notify('Wolf defeated · +'+wolf.xp+' XP'+(levelUp?' · '+levelUp:''));
+
   }
 
   function hitPlayer(enemy:Enemy, blocking:boolean){
@@ -180,7 +183,7 @@ export function createEncounters(
       notify('Blocked');
       return;
     }
-    const damage=magic.shield.absorb(guard ? Math.ceil(wolf.damage*.46) : wolf.damage);
+    const damage=magic.shield.absorb(Math.max(1,Math.round((guard ? Math.ceil(wolf.damage*.46) : wolf.damage)*(1-mitigation(save.stats,save.armor)))));
     if(damage===0){notify('Water barrier absorbed the bite.');return;}
     save.health=Math.max(0,save.health-damage);
     impact(player.position);
@@ -202,13 +205,13 @@ export function createEncounters(
     get abilityRemaining(){return Math.max(0,(cooldowns.get(save.equipped)??0)-time);},
     attack(startAnimation:(weapon:Weapon)=>boolean){
       if(!save.health||queued||magic.dashing) return;
-      const weapon=weapons[save.equipped];
+      const weapon=tunedWeapon(weapons[save.equipped]);
       if(!rangeTimer.start(weapon)) return;
       if(!startAnimation(weapon)){rangeTimer.cancel();return;}
       attackWeapon=weapon;
     },
     cast(startAnimation:(weapon:Weapon,ability:boolean)=>boolean){
-      const weapon=weapons[save.equipped];
+      const weapon=tunedWeapon(weapons[save.equipped],true);
       if(!save.health||!weapon.ability||queued||magic.dashing||rangeTimer.busy||
         (cooldowns.get(weapon.id)??0)>time||!startAnimation(weapon,true)) return;
       cooldowns.set(weapon.id,time+weapon.abilityCooldown);
@@ -218,7 +221,7 @@ export function createEncounters(
       if(!save.health){
         player.position.set(spawn.x,surface(spawn.x,spawn.z),spawn.z);
         player.rotation.y=0;
-        save.health=maxHealth;
+        save.health=maxHealth();
         notify('Returned to Ember Clearing.');
         return;
       }
@@ -235,14 +238,14 @@ export function createEncounters(
           save.arsenal.push(reward);
           notify('Looted '+weapons[reward].name+', Wolf Fang and gold.');
         } else notify('Collected '+wolfLoot.item+' and '+wolfLoot.gold+' gold.');
-      } else if(atCamp()&&save.health<maxHealth){
-        save.health=maxHealth;
+      } else if(atCamp()&&save.health<maxHealth()){
+        save.health=maxHealth();
         notify('Rested at the campfire.');
       }
     },
     ui(){
       return {notification, prompt:!save.health?'E · Return to Ember Clearing':lootNearby()?'E · Collect wolf loot':
-        atCamp()&&save.health<maxHealth?'E · Rest at campfire':''};
+        atCamp()&&save.health<maxHealth()?'E · Rest at campfire':''};
     },
     update(dt:number,blocking:boolean){
       time+=dt;

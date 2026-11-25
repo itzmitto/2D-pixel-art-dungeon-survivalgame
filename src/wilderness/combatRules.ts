@@ -6,8 +6,7 @@ export const wolf = {
   awareness: 19, leash: 32, windup: .57, recovery: 1.1, reach: 1.85, xp: 20,
 } as const;
 export const wolfLoot = { gold: 4, item: 'Wolf Fang', count: 1 } as const;
-export const maxHealth = 10;
-export const xpNeeded = (level: number) => level * 60;
+export { xpNeeded } from './progression.ts';
 
 type Point = { x: number; z: number };
 export function inArc(origin: Point, target: Point, facing: number, range: number, halfAngle: number) {

@@ -30,3 +30,8 @@
 .weapon-list { display:flex; flex-wrap:wrap; list-style:none; padding:0; gap:.3rem; }
 .weapon-detail { display:grid; gap:.4rem; justify-items:start; padding:.55rem; background:#171b19; }
 .weapon-detail select { color:#f2e4ca; background:#262621; }
+.hunter-status { max-height:90dvh; overflow:auto; }
+.hunter-status ul { padding:0; list-style:none; }
+.hunter-status li { display:flex; align-items:center; justify-content:space-between; gap:.8rem; padding:.3rem 0; border-top:1px solid #615844; }
+.hunter-status strong { text-transform:capitalize; }
+.wild-health progress { width:4.8rem; height:.5rem; accent-color:#c6a37b; }

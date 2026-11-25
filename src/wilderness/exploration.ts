@@ -1,5 +1,5 @@
 import { isWeaponId, type WeaponId } from './weapons.ts';
-import { maxHealth } from './combatRules.ts';
+import { freshStats, maxHunterHealth, progression, statNames, type Hunter } from './progression.ts';
 import { extent, spawn } from './layout.ts';
 
 export const cellSize = 20;
@@ -7,8 +7,8 @@ export const cellsPerSide = extent * 2 / cellSize;
 export const defaultSeed = 294;
 export const saveKey = 'vonkje-wilderness-v1';
 export type Position = { x: number; z: number; yaw: number };
-export type Exploration = { version: 1; seed: number; position: Position; discovered: number[];
-  health: number; level: number; xp: number; gold: number; fangs: number;
+export type Exploration = Hunter & { version: 1; seed: number; position: Position; discovered: number[];
+  gold: number; fangs: number; armor: number;
   arsenal: WeaponId[]; equipped: WeaponId; hotbar: (WeaponId|null)[];
   defeated: string[]; collected: string[]; pending: Record<string,{x:number;z:number}>;
 };
@@ -69,13 +69,32 @@ export function readExploration(raw: string | null): Exploration | null {
       return isWeaponId(id)&&arsenal.includes(id)?id:null;
     });
     const equipped=isWeaponId(storedEquipped)&&arsenal.includes(storedEquipped)?storedEquipped:'longsword';
+    const level=integer('level',1,1,1e5);
+    const stats=freshStats();
+    const storedStats:unknown=Object.getOwnPropertyDescriptor(value,'stats')?.value;
+    let budget=(level-1)*progression.pointsPerLevel;
+    if(storedStats&&typeof storedStats==='object') for(const key of statNames){
+      const count:unknown=Object.getOwnPropertyDescriptor(storedStats,key)?.value;
+      if(typeof count==='number'&&Number.isSafeInteger(count)&&count>=0){
+        stats[key]=Math.min(budget,count,progression.statCap);
+        budget-=stats[key];
+      }
+    }
+    const namedIds=(key:string)=>{
+      const list:unknown=Object.getOwnPropertyDescriptor(value,key)?.value;
+      return Array.isArray(list)?[...new Set(list.filter((id:unknown):id is string=>
+        typeof id==='string'&&/^[a-z0-9-]{1,48}$/.test(id)))]:[];
+    };
     return {version:1,seed,arsenal,equipped,hotbar,position:{x:position.x,z:position.z,yaw:position.yaw},discovered:[...new Set(known)],
-      health:integer('health',maxHealth,0,maxHealth),level:integer('level',1,1,1e5),
+      health:integer('health',maxHunterHealth({level,stats}),0,maxHunterHealth({level,stats})),level,stats,
+      armor:integer('armor',0,0,25),statPoints:integer('statPoints',budget,0,budget),
+      kills:integer('kills',ids('defeated').length,0,1e9),
+      completedDungeons:namedIds('completedDungeons'),defeatedBosses:namedIds('defeatedBosses'),
       xp:integer('xp',0,0,6e6),gold:integer('gold',0,0,1e9),fangs:integer('fangs',0,0,1e9),
       defeated:ids('defeated'),collected:ids('collected'),pending};
   } catch { return null; }
 }
 
 export function newExploration(): Exploration {
-  return {version:1,seed:defaultSeed,arsenal:['longsword'],equipped:'longsword',hotbar:['longsword',null,null,null,null],position:{...spawn,yaw:0},discovered:[],health:maxHealth,level:1,xp:0,gold:0,fangs:0,defeated:[],collected:[],pending:{}};
+  return {version:1,seed:defaultSeed,arsenal:['longsword'],equipped:'longsword',hotbar:['longsword',null,null,null,null],position:{...spawn,yaw:0},discovered:[],health:progression.baseHealth,level:1,stats:freshStats(),statPoints:0,kills:0,armor:0,completedDungeons:[],defeatedBosses:[],xp:0,gold:0,fangs:0,defeated:[],collected:[],pending:{}};
 }

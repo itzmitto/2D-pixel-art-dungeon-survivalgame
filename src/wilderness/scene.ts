@@ -1,3 +1,4 @@
+import { allocate, moveSpeed, type Stat } from './progression';
 import * as T from 'three';
 import { browserFrameScheduler, createGameLoop } from '../game/core/loop';
 import { atmosphere } from './atmosphere';
@@ -19,6 +20,7 @@ export function startWilderness(
   onMapKey:(closeOnly:boolean)=>void,
   uiOpen:()=>boolean,
   onInventory:()=>void,
+  onStatus:()=>void,
   onCombat:(notification:string,prompt:string,cooldown:number)=>void,
   onSaveChange:()=>void,
 ) {
@@ -77,12 +79,13 @@ export function startWilderness(
   resize();
   window.addEventListener('keydown',e=>{
     if(e.ctrlKey||e.altKey||e.metaKey) return;
-    if(e.code==='KeyM'||e.code==='Tab'||(e.code==='Escape'&&uiOpen())){
+    if(e.code==='KeyM'||e.code==='Tab'||e.code==='KeyP'||(e.code==='Escape'&&uiOpen())){
       e.preventDefault();
       keys.clear();
       blocking=false;
       if(!e.repeat){
         if(e.code==='Tab') onInventory();
+        else if(e.code==='KeyP') onStatus();
         else onMapKey(e.code==='Escape');
       }
       return;
@@ -126,7 +129,7 @@ export function startWilderness(
       const z=Number(keys.has('KeyS'))-Number(keys.has('KeyW'));
       const length=encounters.dashing?0:Math.hypot(x,z);
       const sprinting=keys.has('ShiftLeft')||keys.has('ShiftRight');
-      const speed=blocking?3:sprinting?12:6;
+      const speed=(blocking?3:sprinting?12:6)*moveSpeed(save.stats);
       const p=body.position;
       const beforeX=p.x,beforeZ=p.z;
       if(length){
@@ -174,6 +177,7 @@ export function startWilderness(
   loop.start();
   return {
     equip,
+    allocate(stat:Stat){if(allocate(save,stat)) onSaveChange();},
     assign(slot:number,id:WeaponId|null){
       if(!Number.isInteger(slot)||slot<0||slot>=save.hotbar.length||(id&&!save.arsenal.includes(id))) return;
       save.hotbar=save.hotbar.map((item,i)=>i===slot?id:id&&item===id?null:item);
