@@ -1,11 +1,14 @@
 import { useId, useRef, useState } from 'react';
-import { bridges, extent, forests, hills, landmarks, path, river, southPath } from './layout';
+import { branchTrails, bridges, extent, forests, hills, landmarks, path, river, southPath } from './layout';
 import { cellAt, cellsPerSide, cellSize, type Position } from './exploration';
 
 const span=extent*2;
 const samples=Array.from({length:span/2+1},(_,i)=>-extent+i*2);
 const riverLine=samples.map(z=>[river(z),z].join(',')).join(' ');
-const trails=[path,southPath].map(trail=>samples.map(x=>[x,trail(x)].join(',')).join(' '));
+const trails=[
+  ...[path,southPath].map(trail=>samples.map(x=>[x,trail(x)].join(',')).join(' ')),
+  ...branchTrails.map(trail=>trail.map(point=>point.join(',')).join(' ')),
+];
 const icons={ruin:'◆',bridge:'═',campfire:'✦',camp:'△',cave:'●',tower:'■'};
 const bound=(value:number, half:number)=>Math.max(-extent+half,Math.min(extent-half,value));
 

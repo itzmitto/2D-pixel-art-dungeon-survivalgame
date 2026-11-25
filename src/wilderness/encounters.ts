@@ -1,8 +1,8 @@
 import * as T from 'three';
-import { inArc, longsword, maxHealth, swingTimer, wolf, wolfLoot, xpNeeded } from './combatRules';
-import type { Exploration } from './exploration';
-import { randomSequence, spawn, surface } from './layout';
-import { wolfModels } from './wolves';
+import { inArc, longsword, maxHealth, swingTimer, wolf, wolfLoot, xpNeeded } from './combatRules.ts';
+import type { Exploration } from './exploration.ts';
+import { randomSequence, spawn, surface } from './layout.ts';
+import { wolfModels } from './wolves.ts';
 
 const territories = [
   { x:-66,z:-20 }, { x:-97,z:-68 }, { x:-162,z:67 }, { x:-170,z:-111 },
@@ -65,6 +65,7 @@ export function createEncounters(
     const id='wolf-'+index, actor=models.make();
     const home=new T.Vector3(spot.x,surface(spot.x,spot.z),spot.z);
     actor.root.position.copy(home);
+    actor.root.name=id;
     group.add(actor.root);
     const hpBar=new T.Group();
     const background=new T.Mesh(barGeometry,backing), fill=new T.Mesh(barGeometry,red);
@@ -105,14 +106,14 @@ export function createEncounters(
   slash.visible=false;
   group.add(slash);
   let slashTime=0;
-  function impact(point:T.Vector3){
+  function impact(point:T.Vector3, showDamage=false){
     for(let i=0;i<8;i++){
       const spark=bursts[sparkCursor++%bursts.length];
       spark.p.copy(point); spark.p.y+=.85;
       spark.v.set((rand()-.5)*6,1.5+rand()*3,(rand()-.5)*6);
       spark.life=.32+rand()*.16;
     }
-    if(numbers.length){
+    if(showDamage&&numbers.length){
       const number=numbers[numberCursor++%numbers.length];
       number.sprite.position.copy(point);
       number.base=point.y+2.2;
@@ -131,7 +132,7 @@ export function createEncounters(
   function hitEnemy(enemy:Enemy){
     enemy.hp=Math.max(0,enemy.hp-longsword.damage);
     enemy.hitFlash=.22;
-    impact(enemy.root.position);
+    impact(enemy.root.position,true);
     if(enemy.hp) return;
     enemy.loot.position.copy(enemy.root.position);
     enemy.loot.visible=true;

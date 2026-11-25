@@ -19,3 +19,7 @@
 .wild-map svg { touch-action: none; cursor: grab; aspect-ratio: 1; max-height: 66dvh; }
 .wild-map svg:active { cursor: grabbing; }
 .wild-map-controls { display: flex; gap: .4rem; margin-bottom: .35rem; }
+@media (max-width: 640px) {
+  .wild-health { align-items: flex-start; flex-direction: column; gap: .15rem; font-size: .78rem; }
+  .wild nav { flex-direction: column; align-items: flex-end; gap: .3rem; }
+}

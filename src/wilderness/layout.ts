@@ -30,7 +30,24 @@ export const river = (z: number) => 32 + 11 * Math.sin(z / 34);
 export const path = (x: number) => x >= 45 ? Math.max(-169, -(x - 45) * 1.43 + 4 * Math.sin((x - 45) / 25))
   : x >= 19 ? 0 : 5 * Math.sin((x - 19) / 30);
 export const southPath = (x: number) => 107 + 9*Math.sin((x-32)/29)*Math.min(1,Math.abs(x-32)/25);
-export const trailDistance = (x: number,z: number) => Math.min(Math.abs(z-path(x)),Math.abs(z-southPath(x)));
+export const branchTrails = [
+  [[-169,-4],[-176,-40],[-198,-81],[-188,-115]],
+  [[-176,100],[-185,85],[-189,67]],
+  [[-110,99],[-117,85]],
+  [[154,99],[154,107]],
+] as const;
+export function trailDistance(x: number,z: number) {
+  let distance=Math.min(Math.abs(z-path(x)),Math.abs(z-southPath(x)));
+  for(const trail of branchTrails){
+    for(let i=1;i<trail.length;i++){
+      const [ax,az]=trail[i-1], [bx,bz]=trail[i];
+      const vx=bx-ax,vz=bz-az;
+      const t=Math.max(0,Math.min(1,((x-ax)*vx+(z-az)*vz)/(vx*vx+vz*vz)));
+      distance=Math.min(distance,Math.hypot(x-ax-vx*t,z-az-vz*t));
+    }
+  }
+  return distance;
+}
 export const landmarkDistance = (x: number,z: number) =>
   Math.min(...landmarks.map(location=>Math.hypot(x-location.x,z-location.z)));
 export const inForest = (x: number, z: number) => forests.some(f => ((x-f.x)/f.rx)**2 + ((z-f.z)/f.rz)**2 < 1);
