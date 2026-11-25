@@ -1,7 +1,8 @@
 import * as T from 'three';
-import { bank, clearing, extent, height, path, randomSequence } from './layout';
+import { bank, clearing, extent, height, landmarkDistance, trailDistance, randomSequence } from './layout';
+import { obstacleGrid } from './spatial';
 
-export function meadow(scene:T.Scene, player:T.Vector3, rocks:readonly {x:number;z:number;r:number}[]) {
+export function meadow(scene:T.Scene, player:T.Vector3, rocks:readonly {x:number;z:number;r:number}[], seed:number) {
   const clock={value:0};
   const geometry=new T.BufferGeometry();
   const vertices: number[] = [], triangles: number[] = [];
@@ -31,18 +32,19 @@ export function meadow(scene:T.Scene, player:T.Vector3, rocks:readonly {x:number
     s.fragmentShader='varying float bladeHeight;\n'+s.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
       diffuseColor.rgb*=mix(.49,1.28,bladeHeight);`);
   };
-  const rand=randomSequence(733), brush=new T.Object3D();
+  const rand=randomSequence(seed ^ 733), brush=new T.Object3D();
   const patches:{mesh:T.InstancedMesh; x:number; z:number; capacity:number}[]=[];
   const tint=new T.Color();
+  const nearbyRocks=obstacleGrid(rocks);
   const span=24;
   for(let z=-extent;z<extent;z+=span) for(let x=-extent;x<extent;x+=span) {
     const mesh=new T.InstancedMesh(geometry,material,960);
     let count=0;
     for(let i=0;i<960;i++) {
       const px=x+rand()*span,pz=z+rand()*span;
-      const trail=Math.abs(pz-path(px));
+      const trail=trailDistance(px,pz);
       const coverage=Math.min(1,Math.max(0,(trail-1.8)/3),Math.max(0,(clearing(px,pz)-6)/5));
-      if(rand()>coverage || bank(px,pz)<8 || rocks.some(o=>Math.abs(o.x-px)<o.r && Math.hypot(o.x-px,o.z-pz)<o.r)) continue;
+      if(rand()>coverage || bank(px,pz)<8 || landmarkDistance(px,pz)<3 || nearbyRocks(px,pz).some(o=>Math.abs(o.x-px)<o.r && Math.hypot(o.x-px,o.z-pz)<o.r)) continue;
       brush.position.set(px,height(px,pz)-.06,pz);
       brush.scale.set(.65+rand()*.85,.32+rand()*1.15,1);
       brush.rotation.y=rand()*Math.PI*2;

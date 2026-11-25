@@ -131,7 +131,7 @@ test('typed sprite manifest points only to local PNGs with the declared sheet di
   const { SPRITE_SHEETS, SPRITE_IDS } = await import('../src/game/rendering/sprites.ts');
   for (const id of SPRITE_IDS) {
     const definition = SPRITE_SHEETS[id];
-    const path = new URL(`../public${definition.path}`, import.meta.url);
+    const path = new URL(`../recovery/2d/public${definition.path}`, import.meta.url);
     assert.equal(fs.existsSync(path), true, `Missing sprite sheet for ${id}`);
     const bytes = fs.readFileSync(path);
     assert.equal(bytes.readUInt32BE(16), definition.frameWidth * definition.columns, `${id} width mismatch`);

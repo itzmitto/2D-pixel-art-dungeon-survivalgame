@@ -1,8 +1,11 @@
 import * as T from 'three';
-import { bank, clearing, extent, height, path, river } from './layout';
+import { bank, clearing, extent, height, trailDistance, river } from './layout';
 
 export function terrain(scene: T.Scene) {
-  const geo = new T.PlaneGeometry(extent*2,extent*2,224,224).rotateX(-Math.PI/2);
+  const material = new T.MeshStandardMaterial({vertexColors:true,roughness:1});
+  const span=40;
+  for(let cz=-extent;cz<extent;cz+=span) for(let cx=-extent;cx<extent;cx+=span){
+  const geo = new T.PlaneGeometry(span,span,26,26).rotateX(-Math.PI/2).translate(cx+span/2,0,cz+span/2);
   const p = geo.attributes.position;
   const colors: number[] = [];
   const green = new T.Color('#344a29'), brown = new T.Color('#685441'), bankColor = new T.Color('#41463d');
@@ -10,16 +13,17 @@ export function terrain(scene: T.Scene) {
   for(let i=0;i<p.count;i++) {
     const x=p.getX(i),z=p.getZ(i);
     p.setY(i,height(x,z));
-    const blend = Math.max(0,1-Math.max(0,Math.min(Math.abs(z-path(x))-1.5,clearing(x,z)-9))/3);
+    const blend = Math.max(0,1-Math.max(0,Math.min(trailDistance(x,z)-1.5,clearing(x,z)-9))/3);
     color.copy(green).lerp(brown,blend).lerp(bankColor,Math.max(0,1-(bank(x,z)-5)/6)*.7)
       .multiplyScalar(.83+.12*Math.sin(x*.31+z*.17)+.09*Math.cos(z*.7-x*.47));
     colors.push(color.r,color.g,color.b);
   }
   geo.setAttribute('color',new T.Float32BufferAttribute(colors,3));
   geo.computeVertexNormals();
-  const ground = new T.Mesh(geo,new T.MeshStandardMaterial({vertexColors:true,roughness:1}));
+  const ground = new T.Mesh(geo,material);
   ground.receiveShadow=true;
   scene.add(ground);
+  }
   const waterGeo=new T.PlaneGeometry(15,extent*2,4,180).rotateX(-Math.PI/2);
   const wp=waterGeo.attributes.position;
   for(let i=0;i<wp.count;i++) wp.setX(i,wp.getX(i)+river(wp.getZ(i)));

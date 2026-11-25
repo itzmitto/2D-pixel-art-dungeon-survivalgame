@@ -22,7 +22,7 @@ test('snapshot publication is stable, detached from mutations and unsubscribes',
   assert.equal(updates, 2);
 });
 
-test('active classic runtime starts with typed services and publishes inventory and HUD changes', () => {
+test('archived classic runtime starts with typed services and publishes inventory and HUD changes', () => {
   const source = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
   const paths = [...source('src/components/game/GameCanvas.tsx').matchAll(/'(\/legacy-runtime[^']+)'/g)];
   const window = new EventTarget();
@@ -34,7 +34,7 @@ test('active classic runtime starts with typed services and publishes inventory 
     document: Object.assign(new EventTarget(), { querySelector: () => null }),
     localStorage: { getItem: k => memory.get(k) ?? null, setItem: (k,v) => memory.set(k,v) },
   });
-  for (const [, path] of paths) vm.runInContext(source('public' + path), context, { filename: path });
+  for (const [, path] of paths) vm.runInContext(source('recovery/2d/public' + path), context, { filename: path });
   let tick, starts = 0, stops = 0, running = false;
   const services = { ...runtimeServices, createLoop(update) {
     tick = update;
