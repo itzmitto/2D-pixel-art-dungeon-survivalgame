@@ -155,7 +155,8 @@ export function createKnightModel() {
   }
   capeGeometry.setAttribute('color',new T.Float32BufferAttribute(capeColors,3));
   capeGeometry.boundingSphere = new T.Sphere(new T.Vector3(0,-.3,-.5),1.45);
-  capeGeometry.attributes.position.setUsage(T.DynamicDrawUsage);
+  const positions = capeGeometry.attributes.position;
+  if (positions instanceof T.BufferAttribute) positions.setUsage(T.DynamicDrawUsage);
   cape.castShadow = true;
   cape.receiveShadow = true;
   cape.name = 'Burgundy cape';

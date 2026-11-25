@@ -6,4 +6,4 @@ The **Wolf Enemy** pack by **Twizzydoesntcode**, supplied in `Wolf Enemy.zip`, p
 
 ## 3D wilderness prototype
 
-The terrain, river, grass, trees, ruins, particles and temporary knight model are original procedural geometry and shaders in `src/wilderness/`. The prototype imports no external models or textures.
+The terrain, river, grass, trees, ruins, particles and Dark Knight model are original procedural geometry and shaders in `src/wilderness/`. The prototype imports no external models or textures.

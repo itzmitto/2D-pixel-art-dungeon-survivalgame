@@ -5,9 +5,9 @@ import { createKnightModel } from './model.ts';
 // elbow pitch, wrist yaw, and sword pitch and roll.
 const poses = [
   { time: 0, channels: [0,0,0,0,0,0,0,0] },
-  { time: .21, channels: [-.42,-.62,-.65,.64,-1.08,-.18,.98,-1.42] },
-  { time: .36, channels: [.53,1.28,-1.13,.43,-.26,.28,1.6,-2.25] },
-  { time: .49, channels: [.40,1.02,-.89,.29,-.58,.41,1.06,-1.92] },
+  { time: .21, channels: [-.42,-.62,-.65,.64,-1.08,-.18,.98,1.5] },
+  { time: .36, channels: [.53,1.28,-1.13,.43,-.26,.28,1.6,2.40] },
+  { time: .49, channels: [.40,1.02,-.89,.29,-.58,.41,1.06,1.95] },
   { time: .73, channels: [0,0,0,0,0,0,0,0] },
 ];
 const swingDuration = poses[poses.length-1].time;
@@ -73,7 +73,7 @@ export function createDarkKnight() {
       arm.fore.rotation.x=-.2-.40*run+(i===1?swing[4]:0);
       arm.hand.rotation.y=i===1?swing[5]:0;
     }
-    arms[1].socket.rotation.set(-.38+swing[6],0,2.73+swing[7]);
+    arms[1].socket.rotation.set(-.38+swing[6],0,-1.93+swing[7]);
 
     const cloth=cape.geometry.attributes.position;
     for(let row=0;row<=12;row++){

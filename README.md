@@ -83,20 +83,15 @@ The next migration step is to connect the typed inventory transactions and their
 Run `npm install` and `npm run dev`, then open **3D wilderness** from the 2D game or add `?mode=3d` to the local URL. Use **2D game** to return to the existing game. The 3D mode requires WebGL2 and uses its own temporary exploration state. It does not read or write 2D saves.
 
 - **WASD** walks relative to the fixed camera direction. **Shift** sprints.
+- **Left click** on the playfield swings the Dark Knight’s longsword once. The swing is an animation preview and deals no damage.
 - Scroll over the world to zoom. **M** opens and closes the world map, and **Escape** closes it. Movement stops while it is open.
 - Follow the trail from Ember Clearing to Blackwater Crossing. Cross the bridge and follow the far bank trail toward Moonwatch Ruin. The Standing Stones are southwest of the crossing.
-- Health, armor and the empty hotbar are prototype interface elements. Combat, Vonkje, storage, crafting, loot, tower interiors, bosses and progression remain in 2D.
+- Health, armor and the empty hotbar are prototype interface elements. Enemy combat, Vonkje, storage, crafting, loot, tower interiors, bosses and progression remain in 2D.
 
 The Three.js scene builds its terrain, vegetation, river, landmarks and map from original procedural data in `src/wilderness/`. Grass uses instanced clumps with distance-based density and shader-driven wind and player interaction. The environment uses moon shadows, animated water, fog, mist, campfire lighting and particles. The [ABYSS project](https://github.com/saifali96/gcdAbyss) inspired the steep perspective and nighttime atmosphere.
 
-### Next 3D assets
+### Dark Knight
 
-The current knight is a labeled development model made from simple geometry. For the next pass, place licensed ZIP files in the project root next to `package.json`. Include license and attribution files and keep any referenced PNG textures with the model when using GLTF.
-
-| Priority | Category | Format and animations | Style and search terms |
-| --- | --- | --- | --- |
-| First | Rigged playable knight | GLB preferred, GLTF with PNG textures also suitable. Clips for idle, walk, run, sword slash, block, hit reaction and death. Prefer in-place locomotion and consistent orientation. | Readable silhouette from above, muted steel and leather, stylized low-poly medieval. Search for “rigged low poly medieval knight GLB in place animations”. |
-| Later | Forest and ruin kit | GLB or GLTF with PNG textures. Static conifers, boulders, broken masonry and tower sections need no animations. | Dark mossy stone and restrained colors. Search for “stylized dark medieval ruins conifers low poly GLTF”. |
-| Later | Golden dragon companion | Rigged GLB with idle, takeoff, sustained flight, turn, fire breath and landing clips. | Small, readable golden hatchling. Search for “rigged low poly dragon hatchling GLB flight animations”. |
+The Dark Knight is built in Three.js from custom faceted armor profiles, a segmented cape and a joint hierarchy. It needs no model or texture download. Its animation blends idle, walk and sprint and includes a click-triggered sword swing.
 
 See [asset credits](public/images/ASSET_CREDITS.md) for attribution.
