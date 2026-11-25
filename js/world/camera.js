@@ -11,7 +11,8 @@ function cameraTarget(position) {
   if (floor) return { x: 0, y: floor.top * TILE };
   return {
     x: Math.max(0, Math.min(WORLD_WIDTH - VIEW_WIDTH, position.x - VIEW_WIDTH / 2)),
-    y: Math.max(0, Math.min(WORLD_HEIGHT - VIEW_HEIGHT, position.y - VIEW_HEIGHT / 2)),
+    // Keep the knight in the lower third so the view follows from behind and exposes the trail ahead.
+    y: Math.max(0, Math.min(WORLD_HEIGHT - VIEW_HEIGHT, position.y - VIEW_HEIGHT * 0.69)),
   };
 }
 

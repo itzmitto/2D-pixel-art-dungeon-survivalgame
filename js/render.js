@@ -507,7 +507,6 @@ function drawWorldTree(col, row, x, y, zone) {
 
 function collectWorldScenery(time, add) {
   const { left, right, top, bottom } = visibleTileBounds(50);
-  const cutaway = insideCottage(player);
   for (let row = top; row < bottom; row++) {
     for (let col = left; col < right; col++) {
       const tile = worldTile(col, row);
@@ -528,6 +527,7 @@ function collectWorldScenery(time, add) {
       });
       if (tile === "Q") add(y + 28, () => drawRock(x, y, variant));
       if (tile === "G" || tile === "X") add(y + 16, () => drawRuinGate(tile, x, y));
+      if (tile === "F") add(y + 27, () => drawFieldFire(x + 16, y + 22, time));
       if (tile === "L" || tile === "T") {
         drawLight(x + 16, y + 8, 39 + Math.sin(time * 6 + col) * 2, "#e9a96645");
         add(y + 26, () => drawWorldLantern(x + 16, y + 26, tile === "T", time));
@@ -537,30 +537,16 @@ function collectWorldScenery(time, add) {
     }
   }
 
-  for (const hut of [...VILLAGE_HUTS, ...TOWER_LANDMARKS]) {
+  for (const hut of TOWER_LANDMARKS) {
     if (buildingInView(hut)) add((hut.bottom + 1) * TILE, () => {
-      drawBuildingExterior(hut);
-      if (hut.door) {
-        drawHouseDoor(hut.door.x, hut.door.y, 0);
-        ctx.fillStyle = "#efca92";
-        ctx.font = "8px Georgia";
-        ctx.textAlign = "center";
-        ctx.fillText(hut.name, hut.door.x, hut.top * TILE + 5);
-      }
+      drawTowerLandmark(hut, time);
     });
   }
-  if (buildingInView(COTTAGE)) {
-    const { door, workbench, chest, bed } = COTTAGE;
-    drawPng("porch", door.x - 15, door.y + 25);
-    if (cutaway) {
-      drawCottageCutaway(time);
-      for (const [point, name] of [[workbench, "workbench"], [chest, "chest"], [bed, "bed"]]) {
-        add(point.y + 8, () => drawFurniture(name, point.x - 16, point.y - 16));
-      }
-    } else {
-      drawLight(door.x, door.y + 22, 48, "#e1ae6555");
-      add((COTTAGE.bottom + 1) * TILE, () => drawBuildingExterior(COTTAGE, true));
-    }
+  if (pointInView(COTTAGE.workbench.x, COTTAGE.workbench.y, TILE)) {
+    add(COTTAGE.workbench.y + 10, () => drawFurniture("workbench", COTTAGE.workbench.x - 16, COTTAGE.workbench.y - 16));
+  }
+  if (pointInView(COTTAGE.chest.x, COTTAGE.chest.y, TILE)) {
+    add(COTTAGE.chest.y + 10, () => drawDungeonChest("house", COTTAGE.chest.x - 16, COTTAGE.chest.y - 16));
   }
 
   for (const [id, { position }] of Object.entries(CHEST_STATIONS)) {
@@ -571,7 +557,7 @@ function collectWorldScenery(time, add) {
 }
 
 function drawBuildPreview() {
-  if (inventoryOpen() || !selectedBuildItem() || regionAt(player) !== "village") return;
+  if (inventoryOpen() || !selectedBuildItem() || regionAt(player) !== "cottage") return;
   const site = buildSite();
   const x = site.x * TILE;
   const y = site.y * TILE;

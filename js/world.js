@@ -4,7 +4,7 @@ const WARDEN_ID = "dungeon3:warden";
 const DUNGEON_KEY = "dungeon1:key";
 const DUNGEON_POTION = "dungeon2:potion";
 const CHEST_STATIONS = {
-  house: { ...CHEST_LOCATIONS.house, name: "House chest" },
+  house: { ...CHEST_LOCATIONS.house, name: "Field cache" },
   dungeon1: {
     ...CHEST_LOCATIONS.dungeon1, name: "Supply chest",
     loot: [["wood", 14], ["stone", 8], ["copper", 8], ["wolfFang", 2], ["serpentScale", 1], ["potion", 2]],
@@ -84,7 +84,7 @@ function oldForestDrops() {
     });
   });
   return drops.filter(drop => !progress.collected[drop.id]).map(drop => ({
-    ...drop, ...safeWorldPoint(legacyWorldPoint("forest", drop), progress, "village"),
+    ...drop, ...safeWorldPoint(legacyWorldPoint("forest", drop), progress, "cottage"),
   }));
 }
 
@@ -152,7 +152,7 @@ function buildSite() {
 }
 
 function build() {
-  if (phase !== "playing" || inventoryOpen() || region !== "village") return;
+  if (phase !== "playing" || inventoryOpen() || region !== "cottage") return;
   const item = selectedBuildItem();
   if (!item) {
     showFeedback("Select a fence, floor tile or torch in the hotbar.");
@@ -180,15 +180,11 @@ function getAction() {
   const drop = nearbyLoot();
   if (drop) return { kind: "pickup", drop, hint: "E — Pick up · " + ITEMS[drop.item].label + " × " + drop.count };
   for (const [id, chest] of Object.entries(CHEST_STATIONS)) {
-    if (id === "house" && !insideCottage(player)) continue;
     if (distance(player, chest.position) >= 38) continue;
     if (!chestUnlocked(id)) return { kind: "locked", hint: "Reward chest locked · Defeat the Warden" };
     return { kind: "chest", id, hint: "E — Open " + chest.name.toLowerCase() };
   }
-  if (insideCottage(player)) {
-    if (distance(player, COTTAGE.workbench) < 38) return { kind: "bench", hint: "E — Open workbench" };
-    if (distance(player, COTTAGE.bed) < 36 && player.hearts < 3) return { kind: "rest", hint: "E — Rest" };
-  }
+  if (distance(player, COTTAGE.workbench) < 38) return { kind: "bench", hint: "E — Open field kit" };
   if (!hasKey && distance(player, WORLD_GATES.G) < 48) return { kind: "locked", hint: "Gate locked · Find the keep key" };
   return null;
 }
@@ -200,11 +196,6 @@ function interact() {
     case "locked": showFeedback(action.hint); break;
     case "bench": openInventory("workbench"); break;
     case "chest": openInventory("chest", action.id); break;
-    case "rest":
-      player.hearts = 3;
-      updateHud();
-      showFeedback("Rested · 3 hearts");
-      break;
   }
 }
 

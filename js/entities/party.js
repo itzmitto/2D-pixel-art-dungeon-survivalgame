@@ -7,9 +7,9 @@ let player, dragon, trail, facingTile;
 function placeParty(position, health = player?.hearts ?? 3) {
   clearMouseRoute();
   const spawn = safeWorldPoint(position, progress);
-  facingTile = aim = { x: 0, y: 1 };
+  facingTile = aim = { x: 0, y: -1 };
   player = { ...spawn, radius: 8, facing: 1, hearts: health, walkTime: 0 };
-  const dragonSpawn = [[-1, 0], [1, 0], [0, -1], [0, 1]].map(([x, y]) => ({
+  const dragonSpawn = [[0, 1], [-1, 0], [1, 0], [0, -1]].map(([x, y]) => ({
     x: spawn.x + x * FOLLOW_DISTANCE, y: spawn.y + y * FOLLOW_DISTANCE,
   })).find(point => !blocked(point.x, point.y, 8));
   dragon = { ...(dragonSpawn || spawn), facing: 1 };

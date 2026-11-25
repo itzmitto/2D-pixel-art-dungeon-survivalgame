@@ -72,7 +72,7 @@ function selectedBuildItem() {
 }
 
 function updateBuildControls() {
-  placeButton.disabled = phase !== "playing" || inventoryOpen() || region !== "village" || !selectedBuildItem();
+  placeButton.disabled = phase !== "playing" || inventoryOpen() || region !== "cottage" || !selectedBuildItem();
 }
 
 function updateFullscreenButton() {

@@ -1,8 +1,8 @@
 "use strict";
 
 const TILE = 32;
-const WORLD_COLUMNS = 64;
-const WORLD_ROWS = 38;
+const WORLD_COLUMNS = 96;
+const WORLD_ROWS = 64;
 const WORLD_WIDTH = WORLD_COLUMNS * TILE;
 const WORLD_HEIGHT = WORLD_ROWS * TILE;
 
@@ -11,9 +11,9 @@ function worldCenter(x, y) {
 }
 
 const ZONES = {
-  village: "Lantern Hollow",
-  cottage: "Cottage",
-  river: "Blackwater Bridge",
+  village: "Ashen Wilds",
+  cottage: "Field Camp",
+  river: "The Blackwater",
   forest: "Gloamwood",
   ruins: "Briar Keep",
   undercroft: "The Undercroft",
@@ -21,22 +21,17 @@ const ZONES = {
 };
 
 const COTTAGE = {
-  left: 5, top: 10, right: 9, bottom: 13,
-  door: worldCenter(7, 13),
-  workbench: worldCenter(6, 11),
-  bed: worldCenter(7, 11),
-  chest: worldCenter(8, 11),
-  spawn: worldCenter(7, 14),
-  workbenchArrival: worldCenter(6, 12),
-  chestArrival: worldCenter(8, 12),
+  left: 11, top: 14, right: 16, bottom: 18,
+  door: worldCenter(13, 18),
+  workbench: worldCenter(13, 15),
+  bed: worldCenter(14, 15),
+  chest: worldCenter(15, 15),
+  spawn: worldCenter(13, 19),
+  workbenchArrival: worldCenter(12, 16),
+  chestArrival: worldCenter(16, 16),
 };
-const VILLAGE_HUTS = [
-  { left: 3, top: 4, right: 6, bottom: 7 },
-  { left: 11, top: 5, right: 15, bottom: 8 },
-  { left: 4, top: 21, right: 8, bottom: 25 },
-  { left: 11, top: 23, right: 14, bottom: 26 },
-];
-const VILLAGE_BUILD_BOUNDS = { left: 1, top: 2, right: 17, bottom: 35 };
+const VILLAGE_HUTS = [];
+const VILLAGE_BUILD_BOUNDS = { left: 2, top: 2, right: WORLD_COLUMNS - 3, bottom: WORLD_ROWS - 3 };
 
 const WORLD_GATES = { G: worldCenter(49, 26), X: worldCenter(48, 32) };
 const KEY_POSITION = worldCenter(47, 20);
@@ -161,34 +156,23 @@ function makeWorldMap() {
   vertical(0, 0, WORLD_ROWS - 1, "#");
   vertical(WORLD_COLUMNS - 1, 0, WORLD_ROWS - 1, "#");
 
-  // The river seals the western village. Its bridge is two tiles wide.
-  for (let y = 1; y < WORLD_ROWS - 1; y++) {
-    const bank = 19 + Math.round(Math.sin(y * 0.36));
-    horizontal(y, bank, bank + 3, "~");
-  }
-  for (const y of [16, 17]) horizontal(y, 18, 23, "+");
-
-  fill({ left: 3, top: 15, right: 17, bottom: 17 }, ":");
-  horizontal(14, 6, 10, ":");
-  vertical(10, 5, 32, ":");
-  horizontal(8, 4, 10, ":");
-  horizontal(9, 10, 15, ":");
-  horizontal(20, 6, 14, ":");
-  vertical(6, 18, 20, ":");
-  horizontal(27, 6, 16, ":");
-  vertical(16, 17, 32, ":");
+  // A broad woodland trail network replaces the old settlement road.
+  vertical(20, 4, 58, "=");
+  horizontal(30, 8, 39, "=");
+  vertical(39, 12, 31, "=");
+  horizontal(21, 36, 52, "=");
+  vertical(52, 20, 34, "=");
+  horizontal(43, 43, 77, "=");
+  vertical(77, 8, 44, "=");
+  horizontal(10, 75, 88, "=");
+  vertical(9, 39, 57, "=");
+  horizontal(55, 8, 34, "=");
+  horizontal(7, 18, 32, "=");
+  horizontal(16, 14, 20, "=");
   VILLAGE_HUTS.forEach(hut => fill(hut, "H"));
-  fill(COTTAGE, "H");
-  fill({ left: 6, top: 11, right: 8, bottom: 12 }, "I");
-  place("W", [[6, 11]]);
-  place("B", [[7, 11]]);
-  place("O", [[8, 11]]);
-  place("U", [[7, 13]]);
-  place("L", [[3, 15], [8, 15], [12, 14], [15, 15], [17, 16], [17, 18], [4, 20], [11, 21], [15, 27]]);
-
-  horizontal(16, 24, 36, "=");
-  horizontal(17, 24, 27, "=");
-  vertical(32, 8, 32, "=");
+  // A low field kit and old home storage remain usable in a quiet clearing.
+  fill({ left: 12, top: 16, right: 14, bottom: 16 }, "I");
+  place("L", [[13, 18], [18, 16], [20, 30], [39, 21], [52, 27], [77, 43], [9, 55]]);
   horizontal(26, 31, 35, "=");
   horizontal(10, 25, 32, "=");
   vertical(25, 10, 16, "=");
@@ -207,6 +191,9 @@ function makeWorldMap() {
     [34, 7, 7, 4], [35, 12, 5, 4], [24, 19, 3, 7], [28, 22, 3, 5],
     [24, 29, 4, 6], [33, 28, 6, 3], [36, 33, 8, 3], [42, 1, 16, 2],
     [58, 11, 4, 6], [60, 17, 3, 6], [39, 12, 3, 5], [51, 18, 3, 4],
+    [2, 39, 6, 8], [13, 44, 7, 7], [23, 2, 9, 5], [31, 46, 8, 12],
+    [43, 2, 9, 10], [55, 46, 12, 9], [63, 4, 9, 10], [83, 18, 8, 8],
+    [86, 45, 8, 11], [36, 52, 10, 8], [73, 50, 12, 8], [2, 2, 12, 7],
   ];
   for (const [left, top, width, height] of groves) {
     for (let y = top; y < top + height; y++) {
@@ -246,7 +233,12 @@ function makeWorldMap() {
   place("T", [[36, 25], [43, 19], [48, 24], [52, 25], [52, 19], [49, 15], [43, 15],
     [44, 11], [50, 8], [56, 6], [59, 8], [59, 16], [59, 24], [58, 29], [49, 31], [60, 34]]);
 
-  // The west side of the river stays safe, and encounter centers stay clear of scenery.
+  // Keep the field-kit clearing and encounter centers open inside the wilderness.
+  for (let y = 13; y <= 21; y++) for (let x = 10; x <= 18; x++) map[y][x] = ".";
+  place("W", [[13, 15]]);
+  place("B", [[14, 15]]);
+  place("O", [[15, 15]]);
+  place("F", [[13, 18]]);
   for (const { x, y, zone } of WORLD_ENEMY_SPAWNS) {
     const col = Math.floor(x / TILE);
     const row = Math.floor(y / TILE);
@@ -262,8 +254,8 @@ function regionAt({ x, y }) {
   if (floor) return floor.id;
   const col = Math.floor(x / TILE);
   const row = Math.floor(y / TILE);
-  if (inTileBounds(col, row, COTTAGE) && "IUWBO".includes(WORLD_MAP[row]?.[col] || "#")) return "cottage";
-  if (col <= 17) return "village";
+  if (inTileBounds(col, row, COTTAGE)) return "cottage";
+  if (col <= 23 && row <= 22) return "village";
   if (col <= 23) return "river";
   if (col >= 48 && col <= 62 && row >= 27 && row <= 36) return "arena";
   if ((col >= 43 && col <= 59 && row >= 4 && row <= 13) || (col === 59 && row < 27) ||
@@ -275,5 +267,5 @@ function regionAt({ x, y }) {
 }
 
 function canBuildTile(x, y) {
-  return inTileBounds(x, y, VILLAGE_BUILD_BOUNDS) && WORLD_MAP[y]?.[x] === ".";
+  return inTileBounds(x, y, VILLAGE_BUILD_BOUNDS) && WORLD_MAP[y]?.[x] === "." && !inTileBounds(x, y, COTTAGE);
 }

@@ -52,8 +52,8 @@ function towerPoint(id, x, y) {
 }
 
 const TOWER_LANDMARKS = [
-  { name: "Briar Watch", left: 35, right: 39, top: 3, bottom: 6, door: worldCenter(37, 6) },
-  { name: "Fen Spire", left: 27, right: 31, top: 34, bottom: 36, door: worldCenter(29, 36) },
+  { name: "Briar Watch", left: 80, right: 84, top: 4, bottom: 7, door: worldCenter(82, 7) },
+  { name: "Fen Spire", left: 7, right: 11, top: 53, bottom: 57, door: worldCenter(9, 57) },
 ];
 const TOWER_CONNECTIONS = [
   [TOWER_LANDMARKS[0].door, towerPoint("watch", 2, 8), towerPoint("watch", 2, 7), worldCenter(37, 7)],
@@ -72,6 +72,7 @@ const TOWER_CHESTS = {
 
 function towerTrail(x, y) {
   return (x === 24 && y >= 16 && y <= 32) || (y === 32 && x >= 24 && x <= 26) || (x === 32 && y >= 7 && y <= 16) || (y === 7 && x >= 32 && x <= 37) ||
-    (x === 26 && y >= 32 && y <= 36) || (y === 32 && x >= 26 && x <= 28) ||
-    (y === 36 && x >= 26 && x <= 29);
+    (x === 26 && y >= 32 && y <= 36) || (y === 32 && x >= 26 && x <= 28) || (y === 36 && x >= 26 && x <= 29) ||
+    (x === 77 && y >= 7 && y <= 44) || (y === 7 && x >= 77 && x <= 82) ||
+    (x === 9 && y >= 39 && y <= 57) || (y === 55 && x >= 8 && x <= 34) || (x === 9 && y >= 55 && y <= 57);
 }
