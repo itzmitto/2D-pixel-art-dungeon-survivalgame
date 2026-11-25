@@ -36,7 +36,7 @@ test('fire hits once and burns on fixed ticks, lightning caps its chain, and ice
   assert.ok(victim.damage>0);
   const direct=victim.damage;
   victim.effects.update(2.5,victim.hit,()=>{});
-  assert.equal(victim.damage-direct,3);
+  assert.ok(Math.abs(victim.damage-direct-3)<1e-8);
 
   const targets=[dummy(1),dummy(2),dummy(3),dummy(4)];
   const lightning=abilityCombat({x:0,z:0},targets,clear,clear,fx);

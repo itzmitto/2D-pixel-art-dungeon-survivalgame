@@ -51,7 +51,7 @@ export function startWilderness(
   function equip(id:WeaponId){
     if(!save.arsenal.includes(id)||save.equipped===id) return;
     if(encounters.weaponLocked||knight.animating){
-      onCombat('Finish the current attack before switching weapons.',prompt,abilitySeconds);
+      encounters.feedback('Finish the current attack before switching weapons.');
       return;
     }
     save.equipped=id;

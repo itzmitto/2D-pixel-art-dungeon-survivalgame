@@ -3,7 +3,7 @@ import { inArc, maxHealth, swingTimer, wolf, wolfLoot, xpNeeded } from './combat
 import type { Exploration } from './exploration.ts';
 import { randomSequence, spawn, surface } from './layout.ts';
 import { wolfModels } from './wolves.ts';
-import { elementalIds, weaponDamage, weapons, type Weapon, type WeaponId } from './weapons.ts';
+import { abilityAnimationSeconds, elementalIds, weaponDamage, weapons, type Weapon, type WeaponId } from './weapons.ts';
 import { createMagicEffects } from './magicEffects.ts';
 import { abilityCombat } from './abilities.ts';
 import { statuses } from './statusEffects.ts';
@@ -196,6 +196,7 @@ export function createEncounters(
   const atCamp=()=> Math.hypot(player.position.x+45,player.position.z)<4 ||
     Math.hypot(player.position.x-154,player.position.z-103)<4;
   return {
+    feedback:notify,
     get weaponLocked(){return rangeTimer.busy || Boolean(queued) || magic.dashing;},
     get dashing(){return magic.dashing;},
     get abilityRemaining(){return Math.max(0,(cooldowns.get(save.equipped)??0)-time);},
@@ -211,7 +212,7 @@ export function createEncounters(
       if(!save.health||!weapon.ability||queued||magic.dashing||rangeTimer.busy||
         (cooldowns.get(weapon.id)??0)>time||!startAnimation(weapon,true)) return;
       cooldowns.set(weapon.id,time+weapon.abilityCooldown);
-      queued={weapon,delay:.69*weapon.impactTime/weapon.attackDuration,yaw:player.rotation.y};
+      queued={weapon,delay:abilityAnimationSeconds*weapon.impactTime/weapon.attackDuration,yaw:player.rotation.y};
     },
     interact(){
       if(!save.health){

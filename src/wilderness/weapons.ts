@@ -48,4 +48,5 @@ export const elementalIds=['greatsword','axe','staff','shield','katana'] as cons
 export function isWeaponId(value:unknown):value is WeaponId {
   return typeof value==='string'&&Object.hasOwn(weapons,value);
 }
+export const abilityAnimationSeconds = .69;
 export const weaponDamage=(weapon:Weapon)=>Math.round(weapon.damage*rarity[weapon.rarity].multiplier*10)/10;

@@ -11,3 +11,7 @@ The terrain, river, grass, trees, ruins, particles and Dark Knight model are ori
 ## Blackwater Wilds expansion
 
 The Blackwater Wolf, bridge, camps, cave facade and tower exterior are original procedural geometry from the active wilderness modules. No third-party art was added for the expansion.
+
+## Elemental weapons
+
+The greatsword, battle axe, magic staff, sword and shield, katana, and their effects were built from original Three.js geometry. They do not use imported artwork.

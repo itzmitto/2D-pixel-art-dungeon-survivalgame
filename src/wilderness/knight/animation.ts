@@ -1,7 +1,7 @@
 import * as T from 'three';
 import { createKnightModel } from './model.ts';
 
-import { weapons, elementalIds, type Weapon, type WeaponId } from '../weapons.ts';
+import { abilityAnimationSeconds, weapons, elementalIds, type Weapon, type WeaponId } from '../weapons.ts';
 import { weaponModel } from '../weaponModels.ts';
 
 type Motion = { speed: number; sprinting: boolean; blocking?: boolean; facing?: number };
@@ -32,7 +32,7 @@ export function createDarkKnight() {
     if (attack < duration) return false;
     poseWeapon=config;
     casting=ability;
-    duration=ability ? .69 : config.attackDuration;
+    duration=ability ? abilityAnimationSeconds : config.attackDuration;
     attack=0;
     return true;
   }
