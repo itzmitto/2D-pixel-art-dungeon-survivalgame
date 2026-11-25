@@ -1,6 +1,7 @@
 "use strict";
 
 const FIREBALL_COOLDOWN = 1;
+let fireballText = "Fireball ready";
 const FIREBALL_LIFETIME = 1;
 const FIREBALL_SPEED = 220;
 const FIREBALL_RADIUS = 4;
@@ -38,7 +39,7 @@ function updateFireballStatus() {
   const text = fireballCooldown > 0
     ? "Fireball · " + (Math.ceil(fireballCooldown * 10) / 10).toLocaleString("en") + " s"
     : "Fireball ready · " + formatNumber(fireballRecharge()) + " s recharge";
-  if (fireballStatus.textContent !== text) fireballStatus.textContent = text;
+  if (fireballText !== text) { fireballText = text; publishUi(); }
 }
 
 function shootFireball() {
@@ -134,7 +135,7 @@ function damagePlayer(rawDamage) {
   player.hearts = Math.max(0, player.hearts - damage);
   protection = 1.1;
   updateHud();
-  status.textContent = formatNumber(player.hearts) + " hearts left.";
+  showFeedback(formatNumber(player.hearts) + " hearts left.");
   if (player.hearts === 0) finish("lost", "You ran out of hearts");
 }
 

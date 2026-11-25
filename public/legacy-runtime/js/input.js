@@ -3,11 +3,12 @@
 const pressed = new Set();
 const heldShift = new Set();
 const game = document.querySelector("#game");
-const fullscreenToggle = document.querySelector("#fullscreen-toggle");
-const placeButton = document.querySelector("#build-place");
 const BUILD_ITEMS = ["fence", "floor", "torch"];
 const walkKeys = ["w", "a", "s", "d"];
 const arrowKeys = ["arrowup", "arrowleft", "arrowdown", "arrowright"];
+let inputAbortController = null;
+let fullscreenStatus = false;
+let canBuildStatus = false;
 
 function shiftKey(event) {
   return event.code || (event.location === 2 ? "ShiftRight" : "ShiftLeft");
@@ -17,7 +18,7 @@ function sprinting() {
   return heldShift.size > 0;
 }
 
-window.addEventListener("keydown", event => {
+function handleKeyDown(event) {
   if (event.key === "Shift") heldShift.add(shiftKey(event));
   if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return;
   const key = event.key.toLowerCase();
@@ -53,18 +54,18 @@ window.addEventListener("keydown", event => {
     case "j": melee("left"); break;
     case "k": melee("right"); break;
   }
-});
+}
 
-window.addEventListener("keyup", event => {
+function handleKeyUp(event) {
   if (event.key === "Shift") heldShift.delete(shiftKey(event));
-  const key = event.key.toLowerCase();
-  pressed.delete(key);
-});
-window.addEventListener("blur", () => {
+  pressed.delete(event.key.toLowerCase());
+}
+
+function handleWindowBlur() {
   pressed.clear();
   heldShift.clear();
   clearMouseRoute();
-});
+}
 
 function selectedBuildItem() {
   const item = selectedStack()?.item;
@@ -72,13 +73,19 @@ function selectedBuildItem() {
 }
 
 function updateBuildControls() {
-  placeButton.disabled = phase !== "playing" || inventoryOpen() || region !== "cottage" || !selectedBuildItem();
+  const canPlace = phase === "playing" && !inventoryOpen() && region === "cottage" && Boolean(selectedBuildItem());
+  if (canBuildStatus !== canPlace) {
+    canBuildStatus = canPlace;
+    publishUi();
+  }
 }
 
 function updateFullscreenButton() {
   const active = document.fullscreenElement === game;
-  fullscreenToggle.textContent = active ? "Exit full screen" : "Full screen";
-  fullscreenToggle.setAttribute("aria-pressed", String(active));
+  if (fullscreenStatus !== active) {
+    fullscreenStatus = active;
+    publishUi();
+  }
 }
 
 async function toggleFullscreen() {
@@ -94,34 +101,37 @@ function worldPoint(event) {
   const rect = canvas.getBoundingClientRect();
   const x = (event.clientX - rect.left) / rect.width;
   const y = (event.clientY - rect.top) / rect.height;
-  // The stage letterboxes the canvas itself. Only the canvas rectangle maps to the world.
   if (!(x >= 0 && x < 1 && y >= 0 && y < 1)) return null;
   return { x: camera.x + x * VIEW_WIDTH, y: camera.y + y * VIEW_HEIGHT };
 }
 
 function bindInput() {
+  if (inputAbortController) return;
+  inputAbortController = new AbortController();
+  const { signal } = inputAbortController;
+  window.addEventListener("keydown", handleKeyDown, { signal });
+  window.addEventListener("keyup", handleKeyUp, { signal });
+  window.addEventListener("blur", handleWindowBlur, { signal });
+  document.addEventListener("fullscreenchange", updateFullscreenButton, { signal });
   canvas.addEventListener("click", event => {
-    if (event.button === 0) melee("left");
-  });
+    if (event.button === 0 && phase === "playing" && !inventoryOpen()) melee("left");
+  }, { signal });
   canvas.addEventListener("contextmenu", event => {
     event.preventDefault();
     if (event.button !== 2 || phase !== "playing" || inventoryOpen()) return;
     const point = worldPoint(event);
     if (point) setMouseRoute(point);
-  });
-  fullscreenToggle.addEventListener("click", toggleFullscreen);
-  document.addEventListener("fullscreenchange", updateFullscreenButton);
-  updateFullscreenButton();
+  }, { signal });
   canvas.addEventListener("wheel", event => {
-    if (phase !== "playing" || event.ctrlKey || !event.deltaY) return;
+    if (phase !== "playing" || inventoryOpen() || event.ctrlKey || !event.deltaY) return;
     event.preventDefault();
     selectHotbar((progress.selectedHotbar + Math.sign(event.deltaY) + HOTBAR_SLOTS) % HOTBAR_SLOTS);
-  }, { passive: false });
-  placeButton.addEventListener("click", build);
-  respawnButton.addEventListener("click", () => reset());
-  document.querySelector("#new-game").addEventListener("click", () => {
-    if (!window.confirm("Start a new game? Your saved progress will be erased.")) return;
-    clearProgress();
-    reset();
-  });
+  }, { passive: false, signal });
+  updateFullscreenButton();
+}
+
+function unbindInput() {
+  inputAbortController?.abort();
+  inputAbortController = null;
+  handleWindowBlur();
 }

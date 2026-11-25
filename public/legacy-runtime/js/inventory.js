@@ -62,15 +62,8 @@ const RECIPES = {
   },
 };
 
-const backpack = document.querySelector("#backpack");
-const backpackToggle = document.querySelector("#backpack-toggle");
-const closeBackpack = document.querySelector("#close-backpack");
-const craftOutput = document.querySelector("#craft-output");
-const heldDisplay = document.querySelector("#held-stack");
-const drinkPotionButton = document.querySelector("#drink-potion");
-const recoverButton = document.querySelector("#recover-overflow");
-const slotViews = [];
-let hotbarNameTimer;
+let panelFeedbackMessage = "";
+let hotbarSelectionMessage = "";
 
 function stackLimit(item) {
   const definition = ITEMS[item];
@@ -273,7 +266,7 @@ function returnPendingItems() {
 }
 
 function inventoryOpen() {
-  return !backpack.hidden;
+  return progress.panelMode !== null;
 }
 
 function inventoryPausesWorld() {
@@ -286,37 +279,19 @@ function openInventory(mode = "bag", chestId = "house") {
   if (inventoryOpen() && (progress.panelMode !== mode || progress.chestId !== openingChest) && !closeInventory(false)) return;
   progress.panelMode = mode;
   progress.chestId = openingChest;
-  const area = craftingArea();
-  const title = openingChest ? CHEST_STATIONS[chestId].name : mode === "workbench" ? "Field Kit" : "Inventory";
-  document.querySelector("#panel-title").textContent = title;
-  document.querySelector("#chest-section").hidden = mode !== "chest";
-  document.querySelector("#craft-section").hidden = !area;
-  if (area) {
-    const size = area === "bagCraft" ? 2 : 3;
-    document.querySelector("#craft-title").textContent = size + " × " + size + " crafting";
-    document.querySelector("#craft-grid").dataset.size = String(size);
-    renderRecipeGuide(area);
-  }
-  document.querySelector("#recipe-guide").open = false;
   panelMessage("");
   clearMouseRoute();
-  backpack.hidden = false;
-  backpackToggle.setAttribute("aria-expanded", "true");
   swing = undefined;
   updateInventory();
-  closeBackpack.focus();
 }
 
-function closeInventory(focus = true) {
+function closeInventory() {
   if (!inventoryOpen()) return true;
   if (!returnPendingItems()) {
     panelMessage("Make space in storage for the held stack and crafting ingredients before closing.");
     return false;
   }
-  backpack.hidden = true;
-  backpackToggle.setAttribute("aria-expanded", "false");
   inventoryChanged();
-  if (focus) backpackToggle.focus();
   return true;
 }
 
@@ -338,8 +313,6 @@ function resumeInventory() {
   } else {
     progress.panelMode = null;
     progress.chestId = null;
-    backpack.hidden = true;
-    backpackToggle.setAttribute("aria-expanded", "false");
     updateInventory();
   }
 }
@@ -354,9 +327,10 @@ function recoverOverflow() {
       else delete progress.overflow[location][item];
     }
   }
+  const remaining = Object.values(progress.overflow.bag).some(Boolean) ||
+    (progress.chestId === "house" && Object.values(progress.overflow.chest).some(Boolean));
   inventoryChanged();
-  if (recoverButton.hidden) closeBackpack.focus();
-  panelMessage(recoverButton.hidden ? "Saved items recovered." : "Make more room to recover the remaining saved items.");
+  panelMessage(remaining ? "Make more room to recover the remaining saved items." : "Saved items recovered.");
 }
 
 function drinkPotion() {
@@ -364,7 +338,6 @@ function drinkPotion() {
   player.hearts = Math.min(3, player.hearts + 1);
   storeProgress();
   updateHud();
-  if (drinkPotionButton.disabled) closeBackpack.focus();
   panelMessage("Potion used.");
 }
 
@@ -375,79 +348,8 @@ function inventoryChanged() {
 }
 
 function panelMessage(message) {
-  document.querySelector("#panel-feedback").textContent = message;
-}
-
-function describeItem(item) {
-  const label = ITEMS[item].label;
-  const weapon = WEAPONS[item];
-  if (weapon) return label + " · " + weapon.damage + " damage · range " + weapon.range +
-    " · " + formatNumber(weapon.cooldown) + " s";
-  if (ARMOR[item]) return label + " · " + ARMOR[item] + " defense";
-  if (PET_UPGRADES[item]) return label + " · " + formatNumber(PET_UPGRADES[item]) + " s faster recharge";
-  return label;
-}
-
-function stackIcon(item) {
-  const icon = document.createElement("img");
-  icon.className = "slot-icon";
-  icon.src = "./images/items/" + item + ".png";
-  icon.alt = "";
-  icon.draggable = false;
-  return icon;
-}
-
-function paintStack(element, stack, number = "", label = "Slot", showQuantity = false) {
-  const tag = stack ? stack.item + ":" + stack.count : "";
-  if (element.dataset.stack !== tag) {
-    element.dataset.stack = tag;
-    element.replaceChildren();
-    if (number) {
-      const keyLabel = document.createElement("span");
-      keyLabel.className = "slot-number";
-      keyLabel.textContent = number;
-      element.append(keyLabel);
-    }
-    if (stack) {
-      element.append(stackIcon(stack.item));
-      if (showQuantity || stack.count > 1) {
-        const quantity = document.createElement("span");
-        quantity.className = "slot-count";
-        quantity.textContent = stack.count;
-        element.append(quantity);
-      }
-    }
-  }
-  element.title = stack ? describeItem(stack.item) + (showQuantity || stack.count > 1 ? " × " + stack.count : "") : label + " · Empty";
-  element.setAttribute("aria-label", label + (stack ? " · " + element.title : " · Empty"));
-}
-
-function renderRecipeGuide(area) {
-  const list = document.querySelector("#recipe-list");
-  list.replaceChildren();
-  for (const [item, rows] of Object.entries(RECIPES[area])) {
-    const card = document.createElement("div");
-    card.className = "recipe-card";
-    const name = document.createElement("strong");
-    name.textContent = ITEMS[item].label;
-    const pattern = document.createElement("div");
-    pattern.className = "recipe-pattern";
-    pattern.dataset.size = String(rows.length);
-    rows.flat().forEach((cell, index) => {
-      const square = document.createElement("span");
-      square.className = "recipe-cell";
-      paintStack(square, cell ? { item: cell[0], count: cell[1] } : null, "", "Cell " + (index + 1), true);
-      pattern.append(square);
-    });
-    const totals = new Map();
-    for (const cell of rows.flat()) {
-      if (cell) totals.set(cell[0], (totals.get(cell[0]) || 0) + cell[1]);
-    }
-    const ingredients = document.createElement("small");
-    ingredients.textContent = [...totals].map(([id, count]) => ITEMS[id].label + " × " + count).join(" · ");
-    card.append(name, pattern, ingredients);
-    list.append(card);
-  }
+  panelFeedbackMessage = message;
+  publishUi();
 }
 
 function selectedStack() {
@@ -455,155 +357,18 @@ function selectedStack() {
 }
 
 function selectHotbar(index) {
+  if (!Number.isInteger(index) || index < 0 || index >= HOTBAR_SLOTS) return;
   progress.selectedHotbar = index;
   storeProgress();
-  updateInventory();
-  const name = document.querySelector("#hotbar-name");
   const stack = selectedStack();
-  name.textContent = stack ? ITEMS[stack.item].label : "Empty slot " + (index + 1);
-  name.hidden = false;
-  window.clearTimeout(hotbarNameTimer);
-  hotbarNameTimer = window.setTimeout(() => { name.hidden = true; }, 1100);
+  hotbarSelectionMessage = stack ? ITEMS[stack.item].label : "Empty slot " + (index + 1);
+  updateInventory();
 }
 
 function updateInventory() {
-  document.querySelector("#hud-defense").textContent = "Armor " + totalDefense();
-  document.querySelector("#wood").textContent = "Wood " + itemCount("wood");
-  updateBuildControls();
-  for (const [hand, shortcut] of [["left", "J"], ["right", "K"]]) {
-    document.querySelector("#hud-" + hand + "-hand").textContent = shortcut + " · " +
-      (ITEMS[progress.hands[hand]]?.label || "Empty");
-  }
-
-  const craftArea = craftingArea();
-  for (const { button, target, number, label, hud, crafting } of slotViews) {
-    if (!hud && !inventoryOpen()) continue;
-    if (crafting) {
-      button.hidden = target.index >= (craftArea ? progress[craftArea].length : 0);
-      if (button.hidden) continue;
-      target.area = craftArea;
-    }
-    if (target.area === "hotbar") {
-      button.setAttribute("aria-pressed", String(target.index === progress.selectedHotbar));
-    }
-    paintStack(button, getSlot(target), number, label);
-  }
-  heldDisplay.hidden = !inventoryOpen() || !progress.held;
-  if (!inventoryOpen()) return;
-
-  document.querySelector("#bag-capacity").textContent = progress.bag.filter(Boolean).length + " / " + BAG_SLOTS;
-  document.querySelector("#armor-total").textContent = "Defense " + totalDefense();
-  document.querySelector("#pet-recharge").textContent = "Fireball recharge " + formatNumber(fireballRecharge()) + " s";
-  const output = matchingRecipe(craftArea);
-  paintStack(craftOutput, output ? { item: output.item, count: 1 } : null, "", "Crafting output");
-  craftOutput.setAttribute("aria-disabled", String(!output));
-  const held = progress.held;
-  paintStack(heldDisplay, held, "", "Held stack");
-  drinkPotionButton.disabled = player.hearts >= 3 || !itemCount("potion");
-  recoverButton.hidden = !Object.keys(progress.overflow.bag).length &&
-    !(progress.chestId === "house" && Object.keys(progress.overflow.chest).length);
-  drawKnightPreview();
-}
-
-function registerSlot(parent, target, label, options = {}) {
-  const { hud = false, crafting = false, number = "" } = options;
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "slot";
-  parent.append(button);
-  // The crafting view reuses its buttons, but held stacks keep their original slot reference.
-  const act = (single, quick = false) => {
-    if (hud) selectHotbar(target.index);
-    else if (inventoryOpen()) {
-      panelMessage("");
-      if (quick && progress.panelMode === "chest") quickTransfer({ ...target });
-      else slotAction({ ...target }, single);
-    }
-  };
-  button.addEventListener("click", event => act(false, event.shiftKey));
-  if (!hud) {
-    button.addEventListener("contextmenu", event => {
-      event.preventDefault();
-      act(true);
-    });
-    button.addEventListener("keydown", event => {
-      if (event.ctrlKey || event.metaKey || event.altKey) return;
-      if (event.key.toLowerCase() === "r" && !event.repeat) {
-        event.preventDefault();
-        act(true);
-      }
-    });
-  }
-  slotViews.push({ button, target, label, number, hud, crafting });
-}
-
-const PANEL_DIRECTIONS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
-
-function navigatePanel(event) {
-  const direction = PANEL_DIRECTIONS[event.key];
-  if (!direction || !inventoryOpen() || event.ctrlKey || event.metaKey || event.altKey) return;
-  event.preventDefault();
-  const current = document.activeElement;
-  const origin = current.getBoundingClientRect();
-  const [axisX, axisY] = direction;
-  let next;
-  let best = Infinity;
-  for (const control of backpack.querySelectorAll("button:enabled, summary")) {
-    if (control === current) continue;
-    const bounds = control.getBoundingClientRect();
-    if (!bounds.width || !bounds.height) continue;
-    const dx = bounds.left + (bounds.width - origin.width) / 2 - origin.left;
-    const dy = bounds.top + (bounds.height - origin.height) / 2 - origin.top;
-    const forward = dx * axisX + dy * axisY;
-    if (forward <= 1) continue;
-    const score = forward + 3 * Math.abs(dx * axisY - dy * axisX);
-    if (score < best) {
-      best = score;
-      next = control;
-    }
-  }
-  next?.focus();
+  publishUi();
 }
 
 function bindInventory() {
-  backpack.addEventListener("keydown", navigatePanel);
-  backpackToggle.addEventListener("click", () => inventoryOpen() ? closeInventory() : openInventory());
-  closeBackpack.addEventListener("click", () => closeInventory());
-  recoverButton.addEventListener("click", recoverOverflow);
-  drinkPotionButton.addEventListener("click", drinkPotion);
-  craftOutput.addEventListener("click", takeCraftOutput);
-  craftOutput.addEventListener("contextmenu", event => {
-    event.preventDefault();
-    takeCraftOutput();
-  });
-  document.addEventListener("pointermove", event => {
-    if (!inventoryOpen()) return;
-    heldDisplay.style.left = Math.min(event.clientX, window.innerWidth - 64) + "px";
-    heldDisplay.style.top = Math.min(event.clientY, window.innerHeight - 64) + "px";
-  });
-  const grids = [
-    ["bag", BAG_SLOTS, "bag-items", "Backpack"],
-    ["chest", CHEST_SLOTS, "chest-slots", "Chest"],
-    ["hotbar", HOTBAR_SLOTS, "inventory-hotbar", "Hotbar"],
-    ["hotbar", HOTBAR_SLOTS, "hud-hotbar", "Hotbar"],
-    ["benchCraft", 9, "craft-grid", "Ingredient"],
-  ];
-  for (const [area, count, id, name] of grids) {
-    const grid = document.querySelector("#" + id);
-    for (let index = 0; index < count; index++) {
-      registerSlot(grid, { area, index }, name + " " + (index + 1), {
-        hud: id === "hud-hotbar", crafting: id === "craft-grid", number: area === "hotbar" ? String(index + 1) : "",
-      });
-    }
-  }
-  const equipment = document.querySelector("#equipment-slots");
-  for (const [index, { label }] of Object.entries(EQUIPMENT_SLOTS)) {
-    const wrapper = document.createElement("div");
-    wrapper.className = "equipment-slot";
-    const title = document.createElement("span");
-    title.textContent = label;
-    wrapper.append(title);
-    registerSlot(wrapper, { area: "equipment", index }, label);
-    equipment.append(wrapper);
-  }
+  // Inventory controls are rendered and owned by React. The engine exposes transactions through its bridge.
 }

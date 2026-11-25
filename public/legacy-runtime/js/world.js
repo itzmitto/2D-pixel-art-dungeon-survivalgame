@@ -116,7 +116,7 @@ function startWorld(position) {
   elapsed = 0;
   positionDirty = false;
   timeSincePositionSave = 0;
-  status.textContent = "";
+  statusMessage = "";
   placeParty(position, 3);
 }
 
@@ -243,7 +243,7 @@ function updateWorld(dt) {
     progress.collected[DUNGEON_KEY] = true;
     storeProgress();
     updateHud();
-    status.textContent = "Keep key found. The gate to the undercroft is open.";
+    showFeedback("Keep key found. The gate to the undercroft is open.");
   }
   if (potion && player.hearts < 3 && distance(player, potion) < 16) {
     potion = undefined;
@@ -251,6 +251,6 @@ function updateWorld(dt) {
     player.hearts = Math.min(3, player.hearts + 1);
     storeProgress();
     updateHud();
-    status.textContent = "Potion used. " + player.hearts + " of 3 hearts.";
+    showFeedback("Potion used. " + player.hearts + " of 3 hearts.");
   }
 }
