@@ -1,0 +1,13 @@
+import { inDen } from './denLayout.ts';
+export const regions=[
+  {id:'velren',name:'Velren Forest',difficulty:'Levels 1–15',state:'Playable',detail:'Blackwater Wilds · Ember Clearing, the crossings and Hollow Fang Den.'},
+  {id:'aurelia',name:'Aurelia',difficulty:'Safe capital',state:'Planned',detail:'Central capital and safe district.'},
+  {id:'elaris',name:'Elaris Highlands',difficulty:'Levels 15–30',state:'Planned',detail:'A highland route beyond Velren.'},
+  {id:'mournshade',name:'Mournshade Marshes',difficulty:'Levels 30–50',state:'Planned',detail:'Marshlands beyond the surveyed forest.'},
+  {id:'sunken',name:'Sunken Bastion',difficulty:'Levels 50–75',state:'Planned',detail:'A future coastal stronghold.'},
+  {id:'crimson',name:'Crimson Wastes',difficulty:'Levels 75–100',state:'Planned',detail:'A future frontier of scorched valleys.'},
+  {id:'stormveil',name:'Stormveil Heights',difficulty:'Levels 100–150',state:'Planned',detail:'A future mountain route.'},
+  {id:'shadowspire',name:'Shadowspire Monolith',difficulty:'Levels 150–200+',state:'Planned',detail:'A future endgame region.'},
+] as const;
+export type RegionId=typeof regions[number]['id'];
+export const regionLabel=(z:number)=>inDen(z)?'Hollow Fang Den':'Velren Forest';

@@ -68,7 +68,7 @@ export function readExploration(raw: string | null): Exploration | null {
     const arsenal:WeaponId[]=[...new Set<WeaponId>(['longsword',...(Array.isArray(storedArsenal)?storedArsenal.filter(isWeaponId):[])])];
     const storedEquipped:unknown=Object.getOwnPropertyDescriptor(value,'equipped')?.value;
     const storedHotbar:unknown=Object.getOwnPropertyDescriptor(value,'hotbar')?.value;
-    const hotbar=Array.from({length:5},(_,i)=>{
+    const hotbar=Array.from({length:9},(_,i)=>{
       const id:unknown=Array.isArray(storedHotbar)?storedHotbar[i]:i===0?'longsword':null;
       return isWeaponId(id)&&arsenal.includes(id)?id:null;
     });
@@ -137,5 +137,5 @@ export function readExploration(raw: string | null): Exploration | null {
 }
 
 export function newExploration(): Exploration {
-  return {version:1,seed:defaultSeed,arsenal:['longsword'],items:[legacyItem('longsword')],selectedItem:'longsword',slotItems:['longsword',null,null,null,null],materials:{},potions:0,drops:{},returns:{},opened:[],equipped:'longsword',hotbar:['longsword',null,null,null,null],position:{...spawn,yaw:0},discovered:[],health:progression.baseHealth,level:1,stats:freshStats(),statPoints:0,kills:0,armor:0,completedDungeons:[],defeatedBosses:[],xp:0,gold:0,fangs:0,defeated:[],collected:[],pending:{}};
+  return {version:1,seed:defaultSeed,arsenal:['longsword'],items:[legacyItem('longsword')],selectedItem:'longsword',slotItems:['longsword',null,null,null,null,null,null,null,null],materials:{},potions:0,drops:{},returns:{},opened:[],equipped:'longsword',hotbar:['longsword',null,null,null,null,null,null,null,null],position:{...spawn,yaw:0},discovered:[],health:progression.baseHealth,level:1,stats:freshStats(),statPoints:0,kills:0,armor:0,completedDungeons:[],defeatedBosses:[],xp:0,gold:0,fangs:0,defeated:[],collected:[],pending:{}};
 }

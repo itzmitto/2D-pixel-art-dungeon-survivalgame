@@ -100,7 +100,7 @@ export function startWilderness(
     }
     if(!uiOpen()&&!e.repeat){
       if(e.code==='KeyQ'&&!blocking){e.preventDefault();encounters.cast(knight.playAttack);}
-      if(/^Digit[1-5]$/.test(e.code)){
+      if(/^Digit[1-9]$/.test(e.code)){
         const id=save.hotbar[Number(e.code.slice(-1))-1];
         if(id) equip(id,save.slotItems[Number(e.code.slice(-1))-1]??undefined);
       }
