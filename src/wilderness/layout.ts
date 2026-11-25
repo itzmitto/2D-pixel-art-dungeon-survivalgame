@@ -6,6 +6,8 @@ export const landmarks = [
   { name: 'Blackwater Crossing', x: 32, z: 0, kind: 'bridge' },
   { name: 'Moonwatch Ruin', x: 112, z: -96, kind: 'ruin' },
   { name: 'The Standing Stones', x: -117, z: 79, kind: 'ruin' },
+  { name: 'Brokenfang Den', x: -82, z: -24, kind: 'cave' },
+  { name: 'Gravespur Memorial', x: 205, z: -182, kind: 'ruin' },
   { name: 'Raven Camp', x: -189, z: 62, kind: 'camp' },
   { name: 'Hollowmouth Cave', x: -187, z: -122, kind: 'cave' },
   { name: 'Hollow Fang Den', x: -187, z: -114, kind: 'gate' },

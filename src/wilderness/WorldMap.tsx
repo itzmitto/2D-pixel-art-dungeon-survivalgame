@@ -1,3 +1,4 @@
+import { worldChests } from './treasure';
 import { memo, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { branchTrails, bridges, extent, hills, landmarks, path, river, southPath } from './layout';
 import { den, inDen } from './denLayout';
@@ -24,11 +25,12 @@ const symbols={
   cave:'M-6 4-3-3 0-5 4-2 6 4zM-2 4V1l2-2 2 2v3',
   tower:'M-4 5v-8l-1-1v-2h2v2h2v-2h2v2h2v-2h2v2l-1 1v8zM0 0v2',
   gate:'M-4 5v-5a4 4 0 1 1 8 0v5M-6 5H6M0-1v4',
+  chest:'M-5 5v-8l2-2h6l2 2v8z M-5 0H5 M0 0v2',
   boss:'M-5-5-3 1 0 5 3 1 5-5M-4-2 0-4 4-2M-2 1l2 2 2-2',
 };
 const descriptions:Record<keyof typeof symbols,string>={
   ruin:'Ancient ruin',bridge:'River crossing',campfire:'Safe campfire',camp:'Abandoned camp',
-  cave:'Cave landmark',tower:'Tower landmark · interior closed',gate:'Dungeon gate',boss:'Boss arena',
+  chest:'Discovered treasure',cave:'Cave landmark',tower:'Tower landmark · interior closed',gate:'Dungeon gate',boss:'Boss arena',
 };
 const AtlasTerrain=memo(function AtlasTerrain(){
   const texture=useMemo(terrainTexture,[]);
@@ -70,8 +72,8 @@ function PlayerMark({position,scale=1}:{position:Position;scale?:number}){
   </g>;
 }
 
-export function WorldMap({position,discovered,cleared,bossDefeated,close}:{
-  position:Position;discovered:number[];cleared:boolean;bossDefeated:boolean;close:()=>void;
+export function WorldMap({position,discovered,cleared,bossDefeated,opened,close}:{
+  position:Position;discovered:number[];cleared:boolean;bossDefeated:boolean;opened:readonly string[];close:()=>void;
 }){
   const mask=useId();
   const [region,setRegion]=useState<RegionId>('velren');
@@ -99,7 +101,10 @@ export function WorldMap({position,discovered,cleared,bossDefeated,close}:{
   </SystemPanel>;
 
   const selectedRegion=regions.find(item=>item.id===region)??regions[0];
-  const selected=landmarks.find(item=>item.name===selection&&seen.has(cellAt(item.x,item.z)));
+  const pins=[...landmarks,...worldChests.filter(chest=>seen.has(cellAt(chest.x,chest.z))&&
+    (opened.includes(chest.id)||Math.hypot(position.x-chest.x,position.z-chest.z)<17))
+    .map(chest=>({name:chest.rarity+' Chest · '+(opened.includes(chest.id)?'Claimed':'Nearby'),x:chest.x,z:chest.z,kind:'chest' as const}))];
+  const selected=pins.find(item=>item.name===selection&&seen.has(cellAt(item.x,item.z)));
   const caption=(kind:keyof typeof symbols)=>kind==='gate'
     ? 'Rank '+den.rank+' · Level '+den.level+' · '+(cleared?'Cleared':'Uncleared')+(bossDefeated?' · Fang Guardian defeated':'')
     : descriptions[kind];
@@ -131,7 +136,7 @@ export function WorldMap({position,discovered,cleared,bossDefeated,close}:{
             <g clipPath={`url(#${mask})`}><use href={`#${mask}-terrain`} pointerEvents="none"/></g>
             <rect x={-extent+1.3} y={-extent+1.3} width={span-2.6} height={span-2.6}
               fill="none" stroke="#d6ae73" strokeWidth="2" strokeDasharray="5 3" pointerEvents="none"/>
-            {landmarks.filter(item=>seen.has(cellAt(item.x,item.z))).map(item=><g
+            {pins.filter(item=>seen.has(cellAt(item.x,item.z))).map(item=><g
               key={item.name} className={'atlas-pin '+(item.name===selection?'selected':'')} role="button" tabIndex={0}
               aria-label={item.name+' · '+caption(item.kind)} onClick={()=>{setRegion('velren');select(item.name);}} onKeyDown={event=>activate(event,item.name)}
               transform={`translate(${item.x} ${item.z})`}>

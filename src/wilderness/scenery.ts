@@ -1,3 +1,4 @@
+import { huntScenery } from './huntScenery';
 import * as T from 'three';
 import { bank, bridges, clearing, extent, height, inForest, landmarkDistance, randomSequence, trailDistance } from './layout';
 
@@ -134,5 +135,6 @@ export function scenery(scene:T.Scene, seed:number) {
   }
   for(let i=0;i<3;i++) place(wood,-45,fireY+.23,0,1.5,.28,.28).rotation.y=i*1.1;
   obstacles.push({x:-45,z:0,r:1.04});
+  huntScenery(scene,obstacles);
   return {obstacles,rocks,fireY};
 }

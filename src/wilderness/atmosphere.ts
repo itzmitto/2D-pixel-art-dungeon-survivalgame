@@ -4,8 +4,8 @@ import { height, randomSequence } from './layout';
 export function atmosphere(scene:T.Scene, fireY:number) {
   scene.background=new T.Color('#182330');
   scene.fog=new T.FogExp2('#182330',.014);
-  scene.add(new T.HemisphereLight('#a6c5f7','#4d4a39',1.65));
-  const moon=new T.DirectionalLight('#b5cffc',2.0);
+  scene.add(new T.HemisphereLight('#a6c5f7','#635447',1.78));
+  const moon=new T.DirectionalLight('#b8d1fc',2.08);
   moon.castShadow=true;
   moon.shadow.mapSize.set(1024,1024);
   Object.assign(moon.shadow.camera,{left:-35,right:35,top:35,bottom:-35,near:1,far:140});

@@ -153,7 +153,7 @@ export default function Wilderness() {
     </footer>
     {panel==='status' && <CharacterStatus hero={hero} close={()=>showPanel(null)} spend={stat=>controller.current?.allocate(stat)}/>}
     {panel==='map' && <WorldMap position={position} discovered={discovered}
-      cleared={hero.completedDungeons.includes(den.id)} bossDefeated={hero.defeatedBosses.includes(den.boss)} close={()=>showPanel(null)}/>}
+      opened={hero.opened} cleared={hero.completedDungeons.includes(den.id)} bossDefeated={hero.defeatedBosses.includes(den.boss)} close={()=>showPanel(null)}/>}
     {panel==='bag' && <HunterInventory hero={hero} close={()=>showPanel(null)} canRedeem={canRedeem}
       equip={equip}
       assign={(slot,id)=>controller.current?.assign(slot,id)}
