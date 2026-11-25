@@ -42,6 +42,7 @@ export default function Wilderness() {
       save.items.push(...elementalIds.map(legacyItem));
       save.selectedItem='greatsword';
       save.hotbar=[...elementalIds];
+      save.slotItems=[...elementalIds];
       save.equipped='greatsword';
     } else try {
       const raw=localStorage.getItem(saveKey);
@@ -105,7 +106,7 @@ export default function Wilderness() {
   return <main className="wild" aria-label="Vonkje">
     <canvas ref={canvas} aria-label="Blackwater Wilds" />
     <div className="wild-health">
-      <span>Health {hero.health}/{maxHunterHealth(hero)} · Armor {hero.armor}</span>
+      <span>Health {Number(hero.health.toFixed(1))}/{maxHunterHealth(hero)} · Armor {hero.armor}</span>
       <span>Level {hero.level} · Rank {rank(hero.level)} <progress aria-label="Experience" value={hero.xp} max={xpNeeded(hero.level)}/></span>
       <span>{hero.gold} gold · {inDen(position.z)?den.name:'Blackwater Wilds'}</span>
     </div>
@@ -127,8 +128,8 @@ export default function Wilderness() {
         {equipped.ability && <span><kbd>Q</kbd> {equipped.abilityName} · {message.cooldown ? message.cooldown+' s' : 'Ready'}</span>}
       </div>
       <div className="wild-hotbar" aria-label="Weapon hotbar">{hero.hotbar.map((id,i)=>
-        <button key={i} type="button" disabled={!id||!!panel} aria-pressed={id!==null&&id===hero.equipped}
-          title={id?weapons[id].name:'Empty slot'} onClick={()=>id&&controller.current?.equip(id)}>
+        <button key={i} type="button" disabled={!id||!!panel} aria-pressed={id!==null&&hero.slotItems[i]===hero.selectedItem}
+          title={id?weapons[id].name:'Empty slot'} onClick={()=>id&&controller.current?.equip(id,hero.slotItems[i]??undefined)}>
           {i+1} {id?weapons[id].name:'—'}
         </button>)}</div>
       <small>WASD Walk · Shift Sprint · Click Slash · Right click Block · E Interact · Wheel Zoom · M Map</small>
@@ -147,10 +148,10 @@ export default function Wilderness() {
         <p>Damage {damage} · Range {detail.range} · Attack recovery {(detail.cooldown/attackSpeed(hero.stats)).toFixed(2)} s
           {detail.ability && ' · '+detail.abilityName+' '+detail.abilityCooldown+' s'}</p>
         <button type="button" disabled={hero.selectedItem===detailItem.id} onClick={()=>controller.current?.equip(detailItem.type,detailItem.id)}>Equip</button>
-        <label> Hotbar <select value={hero.hotbar.indexOf(detailItem.type)+1} onChange={e=>{
+        <label> Hotbar <select value={hero.slotItems.indexOf(detailItem.id)+1} onChange={e=>{
           const slot=Number(e.target.value)-1;
-          if(slot<0) controller.current?.assign(hero.hotbar.indexOf(detailItem.type),null);
-          else controller.current?.assign(slot,detailItem.type);
+          if(slot<0) controller.current?.assign(hero.slotItems.indexOf(detailItem.id),null);
+          else controller.current?.assign(slot,detailItem.id);
         }}><option value={0}>Unassigned</option>
           {hero.hotbar.map((id,i)=><option key={i} value={i+1}>{i+1}{id?' · '+weapons[id].name:''}</option>)}
         </select></label>

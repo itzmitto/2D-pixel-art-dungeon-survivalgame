@@ -102,7 +102,7 @@ export function startWilderness(
       if(e.code==='KeyQ'&&!blocking){e.preventDefault();encounters.cast(knight.playAttack);}
       if(/^Digit[1-5]$/.test(e.code)){
         const id=save.hotbar[Number(e.code.slice(-1))-1];
-        if(id) equip(id);
+        if(id) equip(id,save.slotItems[Number(e.code.slice(-1))-1]??undefined);
       }
     }
     if(e.code==='KeyR'&&!uiOpen()&&!e.repeat) encounters.drink();
@@ -203,9 +203,12 @@ export function startWilderness(
   return {
     equip,
     allocate(stat:Stat){if(allocate(save,stat)) onSaveChange();},
-    assign(slot:number,id:WeaponId|null){
-      if(!Number.isInteger(slot)||slot<0||slot>=save.hotbar.length||(id&&!save.arsenal.includes(id))) return;
-      save.hotbar=save.hotbar.map((item,i)=>i===slot?id:id&&item===id?null:item);
+    assign(slot:number,itemId:string|null){
+      if(!Number.isInteger(slot)||slot<0||slot>=save.hotbar.length) return;
+      const item=itemId===null?undefined:save.items.find(entry=>entry.id===itemId);
+      if(itemId!==null&&!item) return;
+      save.slotItems=save.slotItems.map((id,i)=>i===slot?itemId:id===itemId?null:id);
+      save.hotbar=save.slotItems.map(id=>save.items.find(entry=>entry.id===id)?.type??null);
       onSaveChange();
     },
     redeem(id:WeaponId){

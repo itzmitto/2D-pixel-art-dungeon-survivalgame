@@ -1,3 +1,4 @@
+import { den, inDen } from './denLayout';
 import { useId, useRef, useState } from 'react';
 import { branchTrails, bridges, extent, forests, hills, landmarks, path, river, southPath } from './layout';
 import { cellAt, cellsPerSide, cellSize, type Position } from './exploration';
@@ -25,6 +26,20 @@ export function WorldMap({position,discovered,close}:{
     const z=current.size===span?position.z:current.z;
     return {size,x:bound(x,size/2),z:bound(z,size/2)};
   });
+  if(inDen(position.z)) return <div className="wild-map-shade">
+    <section className="wild-map" role="dialog" aria-modal="true" aria-labelledby="wild-map-title">
+      <header><h2 id="wild-map-title">{den.name} · Rank {den.rank}</h2><button autoFocus onClick={close}>Close · Esc</button></header>
+      <svg viewBox="-30 300 60 91" role="img" aria-label="Den map showing the connected chambers and exit.">
+        <rect x="-30" y="300" width="60" height="91" fill="#181a21"/>
+        {den.chambers.filter(room=>room.x<18||position.z<356).map(room=>
+          <rect key={room.z+','+room.x} x={room.x-room.w/2} y={room.z-room.d/2}
+            width={room.w} height={room.d} fill="#555261"/>)}
+        <circle cx={position.x} cy={position.z} r="1.2" fill="#ffcf75"/>
+        <circle cx={den.exit.x} cy={den.exit.z} r="1.1" fill="#8faccc"/>
+      </svg>
+      <p>Gold: You · Blue: Exit to Blackwater Wilds</p>
+    </section>
+  </div>;
   return <div className="wild-map-shade">
     <section className="wild-map" role="dialog" aria-modal="true" aria-labelledby="wild-map-title">
       <header><h2 id="wild-map-title">The Blackwater Wilds</h2><button autoFocus type="button" onClick={close}>Close · Esc</button></header>

@@ -26,7 +26,9 @@ export function wolfModels() {
   const tail=bake(bobble(0,-.10,-.27,.112,.13,.39,-.36),bobble(0,-.24,-.54,.078,.09,.25,-.47));
   const direFur=fur.clone();direFur.color.set(0x59403b);
   const direScruff=scruff.clone();direScruff.color.set(0x9d8b75);
-  const resources=[body,muzzle,snout,eye,leg,tail,fur,scruff,nose,light,direFur,direScruff];
+  const crest=new T.ConeGeometry(.16,.43,5).rotateX(-.28);
+  const fang=new T.ConeGeometry(.046,.23,4).rotateZ(Math.PI);
+  const resources=[crest,fang,body,muzzle,snout,eye,leg,tail,fur,scruff,nose,light,direFur,direScruff];
   return {
     make(kind = "wild") {
       const pelt=kind==="wild"?fur:direFur, mane=kind==="wild"?scruff:direScruff;
@@ -42,6 +44,10 @@ export function wolfModels() {
       mesh(eye,light,.157,1.48,1.01); mesh(eye,light,-.157,1.48,1.01);
       const legs=[[-.215,.49],[.215,.49],[-.21,-.60],[.21,-.60]].map(([x,z])=>mesh(leg,x<0?pelt:mane,x,.72,z));
       const brush=mesh(tail,pelt,0,1.17,-.82);
+      if(kind==='guardian'){
+        for(const x of [-.18,0,.18]) mesh(crest,scruff,x,1.72,.44);
+        for(const x of [-.11,.11]) mesh(fang,scruff,x,1.24,1.17);
+      }
       return {root,legs,brush};
     },
     dispose(){resources.forEach(resource=>resource.dispose());},
