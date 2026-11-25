@@ -4,8 +4,11 @@ const FIREBALL_COOLDOWN = 1;
 const FIREBALL_LIFETIME = 1;
 const FIREBALL_SPEED = 220;
 const FIREBALL_RADIUS = 4;
-const SLIME_HITS = 4;
 const FIREBALL_DAMAGE = 2;
+const ENEMIES = {
+  wolf: { health: 4, speed: 68, rushSpeed: 68, reach: 16, sight: 152, damage: 1 },
+  snake: { health: 4, speed: 38, rushSpeed: 96, reach: 15, sight: 104, damage: 0.75 },
+};
 const WEAPONS = {
   axe: { damage: 2, range: 26, cooldown: 0.38, sprite: "axe" },
   sword: { damage: 2, range: 30, cooldown: 0.38, sprite: "sword" },
@@ -27,7 +30,7 @@ function fireballRecharge() {
 function formatNumber(value) {
   return value.toLocaleString("en", { maximumFractionDigits: 2 });
 }
-const SLIME_FLASH_TIME = 0.14;
+const ENEMY_FLASH_TIME = 0.14;
 let fireballs, fireballCooldown, aim;
 function updateFireballStatus() {
   const text = fireballCooldown > 0
@@ -53,8 +56,8 @@ function updateFireballs(dt) {
     updateFireballStatus();
   }
 
-  for (const slime of slimes) slime.flash = Math.max(0, slime.flash - dt);
-  slimes = slimes.filter(slime => slime.health > 0 || slime.flash > 0);
+  for (const enemy of enemies) enemy.flash = Math.max(0, enemy.flash - dt);
+  enemies = enemies.filter(enemy => enemy.health > 0 || enemy.flash > 0);
 
   fireballs = fireballs.filter(ball => {
     const travelTime = Math.min(dt, ball.life);
@@ -63,10 +66,10 @@ function updateFireballs(dt) {
     ball.life -= travelTime;
     if (blocked(ball.x, ball.y, FIREBALL_RADIUS)) return false;
 
-    const hit = slimes.find(slime => slime.health > 0 &&
-      distance(slime, ball) < slime.radius + FIREBALL_RADIUS);
+    const hit = enemies.find(enemy => enemy.health > 0 &&
+      distance(enemy, ball) < enemy.radius + FIREBALL_RADIUS);
     if (!hit) return ball.life > 1e-9;
-    damageSlime(hit, FIREBALL_DAMAGE);
+    damageEnemy(hit, FIREBALL_DAMAGE);
     return false;
   });
 }
@@ -75,10 +78,10 @@ function updateFireballs(dt) {
 const SWING_TIME = 0.16;
 let meleeCooldown, swing;
 
-function damageSlime(slime, damage) {
-  slime.health = Math.max(0, slime.health - damage);
-  slime.flash = SLIME_FLASH_TIME;
-  recordSlimeDamage(slime);
+function damageEnemy(enemy, damage) {
+  enemy.health = Math.max(0, enemy.health - damage);
+  enemy.flash = ENEMY_FLASH_TIME;
+  recordEnemyDamage(enemy);
 }
 
 // Volg de lijn van de slag in kleine stappen zodat muren en gesloten deuren beschermen.
@@ -104,12 +107,12 @@ function melee(hand) {
   const { damage, range, cooldown } = WEAPONS[weapon];
   meleeCooldown = cooldown;
   swing = { x, y, time: SWING_TIME, hand, weapon };
-  for (const slime of slimes) {
-    const dx = slime.x - player.x;
-    const dy = slime.y - player.y;
+  for (const enemy of enemies) {
+    const dx = enemy.x - player.x;
+    const dy = enemy.y - player.y;
     const gap = Math.hypot(dx, dy);
-    if (slime.health > 0 && gap <= range && dx * x + dy * y >= gap * 0.45 &&
-        clearAttackPath(player, slime)) damageSlime(slime, damage);
+    if (enemy.health > 0 && gap <= range && dx * x + dy * y >= gap * 0.45 &&
+        clearAttackPath(player, enemy)) damageEnemy(enemy, damage);
   }
 }
 
@@ -122,16 +125,23 @@ function updateCombat(dt) {
   }
 }
 
-function updateSlimes(dt) {
-  for (const slime of slimes) {
-    if (slime.health === 0) continue;
-    const gap = distance(slime, player);
-    if (gap > 0) {
-      const chase = Math.min(gap, 53 * dt) / gap;
-      move(slime, (player.x - slime.x) * chase, (player.y - slime.y) * chase, false);
+function updateEnemies(dt) {
+  for (const enemy of enemies) {
+    if (enemy.health === 0) continue;
+    const spec = ENEMIES[enemy.kind];
+    const gap = distance(enemy, player);
+    if (gap > spec.sight) {
+      enemy.walkTime = 0;
+      continue;
     }
-    if (distance(player, slime) < 16 && protection === 0) {
-      const damage = Math.max(0.5, 1 - totalDefense() * 0.125);
+    const { x, y } = enemy;
+    const speed = gap < 42 ? spec.rushSpeed : spec.speed;
+    const chase = Math.min(gap, speed * dt) / (gap || 1);
+    move(enemy, (player.x - x) * chase, (player.y - y) * chase, false);
+    if (enemy.x !== x) enemy.facing = Math.sign(enemy.x - x);
+    enemy.walkTime = enemy.x !== x || enemy.y !== y ? enemy.walkTime + dt : 0;
+    if (protection === 0 && distance(player, enemy) < spec.reach && clearAttackPath(enemy, player)) {
+      const damage = Math.max(0.5, spec.damage - totalDefense() * 0.125);
       player.hearts = Math.max(0, player.hearts - damage);
       protection = 1.1;
       updateHud();

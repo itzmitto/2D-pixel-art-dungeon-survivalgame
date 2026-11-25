@@ -22,7 +22,7 @@
 
 Press **E** at the broken house door to repair it for six wood. Walk north through the open doorway to enter the house, then walk south through the inside doorway to return to the porch.
 
-Follow the trail and walk into the cave opening to enter the dungeon. Walk over the key in room 1 to unlock the door to room 2. Walk through the unlocked door and the final exit to return to the forest at the cave. The entrances also let you walk back to the previous area. The key, used potion, defeated slimes, and their loot are saved across visits and reloads.
+Follow the trail and walk into the cave opening to enter the dungeon. Walk over the key in room 1 to unlock the door to room 2. Walk through the unlocked door and the final exit to return to the forest at the cave. The entrances also let you walk back to the previous area. The key, used potion, enemy health, and loot are saved across visits and reloads.
 
 ## Inventory, chest, and crafting
 
@@ -42,7 +42,7 @@ Closing a panel returns the held stack and unused ingredients to available slots
 
 Face a tree and press **E** three times with an axe in the backpack, hotbar, or either hand. Pick up the dropped wood with **E**. Repair the house door for six wood, then use the workbench to make a wooden pickaxe for four wood. Carry it to mine stone and copper ore in the clearing south of the cave path. Uncollected resources outdoors survive a reload.
 
-Armor reduces slime damage by one eighth of a heart per point of defense, to a minimum of half a heart per hit. The copper spear reaches farther and recovers more slowly than a sword. Vonkje’s copper dragon charm reduces fireball recharge from 1 second to 0.8 seconds.
+Shadow wolves give chase from farther away, while cave serpents rush at close range. Defeated enemies drop Monster essence, which you can pick up with **E**. Armor reduces damage by one eighth of a heart per point of defense, to a minimum of half a heart per hit. The copper spear reaches farther and recovers more slowly than a sword. Vonkje’s copper dragon charm reduces fireball recharge from 1 second to 0.8 seconds.
 
 ## Local sprites
 
@@ -50,9 +50,10 @@ Use transparent PNGs and keep frame registration consistent when replacing sprit
 
 | File | Layout |
 | --- | --- |
-| `images/characters/knight-walk.png` | 240×160 sheet. Six 40×40 frames per row, ordered down, left, right, up. The first frame in each row doubles as the idle pose. |
+| `images/characters/knight-walk.png` | 240×160 dark-steel knight sheet. Six 40×40 frames per row, ordered down, left, right, up. The first frame in each row doubles as the idle pose. |
 | `images/pets/vonkje-fly.png` | 320×64 sheet. Four 80×64 frames in one row facing right. The renderer mirrors the pose when Vonkje turns left. |
-| `images/house/` | Cottage exterior, porch, three doorway states, interior wall with hearth and shelves, and rug. |
+| `images/enemies/` | Shadow wolf and cave serpent. Each 168×32 sheet has four 42×32 frames facing right. |
+| `images/house/` | Cottage exterior, porch, three doorway states, interior floor and wall with hearth and shelves, and rug. |
 | `images/objects/` | The bed, workbench, chest, and torch each use a 32×32 PNG. |
 | `images/items/` | One 24×24 icon per item ID. |
 

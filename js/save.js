@@ -19,7 +19,7 @@ function newProgress() {
     pet: { pet: null },
     held: null, panelMode: null, selectedHotbar: 0, overflow: { bag: {}, chest: {} },
     trees: {}, mines: {}, buildings: {}, collected: {}, repaired: false, dungeonCompleted: false,
-    dungeonSlimes: {},
+    dungeonEnemies: {},
   };
 }
 
@@ -164,17 +164,16 @@ function loadDungeonProgress(saved, loaded) {
   if (loaded.dungeonCompleted || saved.collected?.[DUNGEON_KEY] === true) loaded.collected[DUNGEON_KEY] = true;
   if (saved.collected?.[DUNGEON_POTION] === true) loaded.collected[DUNGEON_POTION] = true;
   for (const mapArea of ["dungeon1", "dungeon2"]) {
-    for (const [index, position] of markers("S", AREAS[mapArea]).entries()) {
-      const id = slimeId(mapArea, index);
-      const state = saved.dungeonSlimes?.[id];
-      if (!state || !Number.isInteger(state.health) || state.health < 0 || state.health >= SLIME_HITS) continue;
+    for (const { id, kind, x, y } of dungeonSpawns(mapArea)) {
+      const state = saved.dungeonEnemies?.[id] ?? saved.dungeonSlimes?.[id];
+      if (!state || !Number.isInteger(state.health) || state.health < 0 || state.health >= ENEMIES[kind].health) continue;
       if (state.health > 0) {
-        loaded.dungeonSlimes[id] = { health: state.health };
+        loaded.dungeonEnemies[id] = { health: state.health };
         continue;
       }
       const validPosition = state.x >= 8 && state.x <= WORLD_WIDTH - 8 &&
         state.y >= 8 && state.y <= WORLD_HEIGHT - 8 && Number.isFinite(state.x) && Number.isFinite(state.y);
-      loaded.dungeonSlimes[id] = { health: 0, ...(validPosition ? { x: state.x, y: state.y } : position) };
+      loaded.dungeonEnemies[id] = { health: 0, ...(validPosition ? { x: state.x, y: state.y } : { x, y }) };
       if (saved.collected?.[id] === true) loaded.collected[id] = true;
     }
   }

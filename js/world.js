@@ -1,7 +1,7 @@
 "use strict";
 
 const TILE = 32;
-// # wall, T torch, P spawn, S slime, K key, A entrance, E exit, C chest, V potion.
+// # wall, T torch, P spawn, K key, A entrance, E exit, C chest, V potion.
 const ROOM_ONE = [
   "###T#######T###",
   "#.............#",
@@ -10,7 +10,7 @@ const ROOM_ONE = [
   "T.....#...##..T",
   "#.........#...#",
   "#...T.....T...#",
-  "#.........S...#",
+  "#.............#",
   "AP............E",
   "###T#######T###",
 ];
@@ -19,11 +19,11 @@ const ROOM_TWO = [
   "###T#######T###",
   "#.....#.......E",
   "#.##..#..###..#",
-  "#.S...#.......#",
+  "#.....#.......#",
   "####.T#..##...#",
   "##V#.....C....#",
   "##.#.####.....#",
-  "##.#......S...#",
+  "##.#..........#",
   "AP............#",
   "###T#######T###",
 ];
@@ -56,9 +56,9 @@ const AREAS = { forest: FOREST, house: HOUSE, dungeon1: ROOM_ONE, dungeon2: ROOM
 const WORLD_WIDTH = FOREST[0].length * TILE;
 const WORLD_HEIGHT = FOREST.length * TILE;
 
-function markers(symbol, map = room) {
+function markers(symbol) {
   const positions = [];
-  map.forEach((row, y) => {
+  room.forEach((row, y) => {
     [...row].forEach((tile, x) => {
       if (tile === symbol) positions.push({ x: (x + 0.5) * TILE, y: (y + 0.5) * TILE });
     });
@@ -95,11 +95,16 @@ const PORTALS = {
 };
 const DUNGEON_KEY = "dungeon1:key";
 const DUNGEON_POTION = "dungeon2:potion";
+// Preserve the original encounter order so saved defeats and drops keep their IDs.
+const DUNGEON_SPAWNS = {
+  dungeon1: [["wolf", 10, 7], ["snake", 10, 2]],
+  dungeon2: [["snake", 2, 3], ["wolf", 10, 7], ["snake", 12, 3]],
+};
 const FOLLOW_DELAY = 0.28;
 const FOLLOW_DISTANCE = 23;
 let area, room, key, potion;
 let areaPortals, arrivalGuard;
-let player, dragon, slimes, trail, elapsed, hasKey, protection, phase;
+let player, dragon, enemies, trail, elapsed, hasKey, protection, phase;
 let groundLoot = [];
 let harvestEffects = [];
 const RESOURCES = {
@@ -153,7 +158,7 @@ function enterArea(nextArea, health, arrival = houseApproach, back = "") {
   [potion] = markers("V");
   hasKey = Boolean(key && progress.collected[DUNGEON_KEY]);
   if (progress.collected[DUNGEON_POTION]) potion = undefined;
-  slimes = loadSlimes();
+  enemies = loadEnemies();
   fireballs = [];
   trail = [{ ...dragon, time: 0 }, { ...spawn, time: 0 }];
   elapsed = 0;
@@ -161,29 +166,31 @@ function enterArea(nextArea, health, arrival = houseApproach, back = "") {
   updateHud();
 }
 
-function slimeId(mapArea, index) {
-  return mapArea + ":slime:" + index;
+function dungeonSpawns(mapArea) {
+  return (DUNGEON_SPAWNS[mapArea] || []).map(([kind, x, y], index) => ({
+    id: mapArea + ":slime:" + index, kind, ...centerOf({ x, y }),
+  }));
 }
 
-function slimeDrop(id, { x, y }) {
+function enemyDrop(id, { x, y }) {
   return { id, x, y, item: "gel", count: 1 };
 }
 
-function loadSlimes() {
-  return markers("S").flatMap((position, index) => {
-    const id = slimeId(area, index);
-    const saved = progress.dungeonSlimes[id];
+function loadEnemies() {
+  return dungeonSpawns(area).flatMap(spawn => {
+    const { id, kind } = spawn;
+    const saved = progress.dungeonEnemies[id];
     if (saved?.health === 0) {
-      if (!progress.collected[id]) groundLoot.push(slimeDrop(id, saved));
+      if (!progress.collected[id]) groundLoot.push(enemyDrop(id, saved));
       return [];
     }
-    return [{ ...position, id, radius: 8, name: "slime", health: saved?.health ?? SLIME_HITS, flash: 0 }];
+    return [{ ...spawn, radius: 8, health: saved?.health ?? ENEMIES[kind].health, facing: 1, flash: 0, walkTime: 0 }];
   });
 }
 
-function recordSlimeDamage({ id, x, y, health }) {
-  progress.dungeonSlimes[id] = health === 0 ? { health, x, y } : { health };
-  if (health === 0) groundLoot.push(slimeDrop(id, { x, y }));
+function recordEnemyDamage({ id, x, y, health }) {
+  progress.dungeonEnemies[id] = health === 0 ? { health, x, y } : { health };
+  if (health === 0) groundLoot.push(enemyDrop(id, { x, y }));
   storeProgress();
 }
 

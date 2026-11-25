@@ -71,10 +71,6 @@ const SPRITES = {
   stoneSword: ["......zz.", ".....zsz.", "....zsu..", ".a.zsu...", "..zsu....", "..na.....", ".a..a...."],
   copperSword: ["......gc.", ".....gcn.", "....gcn..", ".a.gcn...", "..gcn....", "..na.....", ".a..a...."],
   copperSpear: ["..........ccg", ".........cgn.", "........cgn..", ".......ncn...", "......an.....", ".....an......", "....an.......", "...an........", "..an.........", ".an..........", "an..........."],
-  slime: [
-    "...xxxx...", "..xwwppx..", ".xwpppppx.", "xppxppxppx",
-    "xppppppppx", "xddppppddx", ".xxxxxxxx.",
-  ],
   key: ["..gg......", ".gyyg.....", "gy..yg....", "gy..yg....",
     ".gyyggggg.", "..gg..g.g."],
   fireball: [".ff..", "foof.", "foyof", ".oof.", "..f.."],
@@ -84,45 +80,74 @@ const SPRITES = {
   ],
 };
 
-const CLOTH_COLORS = {"X": "#28212c", "H": "#4c2d2e", "h": "#78483a", "k": "#a46b4c", "S": "#c88662", "s": "#e2a576", "l": "#f3bf8d", "T": "#365d56", "t": "#508675", "v": "#70a18a", "D": "#333346", "d": "#505168", "L": "#724333", "b": "#9d6440", "B": "#c28753", "g": "#e3bb72"};
+const KNIGHT_COLORS = {
+  a: "#171620", b: "#282b3a", c: "#404959", d: "#451e33", e: "#667a91", f: "#792b49",
+  g: "#9baec0", h: "#9d7148", i: "#b04e60", j: "#dce4e5", k: "#ebba74",
+};
 const KNIGHT_FALLBACK = [
   [
-    ".......XXXXXXXX.......", ".......kkkkkkkkX......", "......XkkkkkkkksX.....",
-    ".....HHhhhhhhhhhhX....", ".....HHhhhhhhhhhHX....", ".....HHXXssssXXsHsX...",
-    ".....ssXXssssXXsHsX...", ".....sssssllssssHsX...", ".....sssssssssssHX....",
-    "...XXssssSSSSSsssX....", ".XbbbtLsssssssssX.....", ".XbbXtLXXXXXXXXXt.....",
-    ".XbXtTLvvvvvvttLTX....", ".BBXtTLttttttttLTX....", "XBBttTLttttttttLTX....",
-    "XLbttSLttttttttLStX...", "XLbXtStttttttttTSX....", ".XLLLXtTTTggTTTtX.....",
-    "..XLLLXttttttttX......", "....X..XXXXXXXX.......", "......................",
+    "............................", "............................", "............................", ".............aaa............",
+    "...........aaeeeaa..........", "..........acgjjeeca.........", ".........aeeeeeeeeea........", ".........aeeeeeeeeec........",
+    "........acakkbbkkkca........", "........acbbaaaabbba........", ".........abbebbeeba.........", "........a.abbeebbb..........",
+    ".......abaaaaabaaaaaa.......", "......ggbgaggeegggbggga.....", "......bbbgceegeeeebbbba.....", "......bbgbceeeeeecabbba.....",
+    "......bbbaccceeccaabeba.....", "......bebaaccceccaabbba.....", "......abaabbbhhbbbaaab......", ".......aacddiddfddca.a......",
+    "........bccec.acccca........", "........bccec.acccca........", "........bbbbc.abbbca........", "........bgggg.aeeeea........",
+    "........bbbbbaabbbbb........", "............................", "............................", "............................",
   ],
   [
-    ".......XXXXXXXX.......", "......Xkkkkkkkk.......", ".....XskkkkkkkkX......",
-    "....XhhhhhhhhhhHH.....", "....XhhhhhhhhhhHH.....", "...XXXXsssssHHHHH.....",
-    "...XsXXsssssHHsss.....", "..XllsssssSSHHsss.....", "..XsssssssSSHHsss.....",
-    "...XXssssssXsssssXX...", ".....XXXsssssssLtbbbX.", ".....tXXXXXXXXXLtXbbX.",
-    "....XTTttvvvvvvLTtXbX.", "....XTTttttttttLTtXBB.", "....XTTttttttttLTttBBX",
-    "...XtSTttttttttLSttbLX", "....XSTtttttttttStXbLX", ".....XtTTTggTTTtXLLLX.",
-    "......XttttttttXLLLX..", ".......XXXXXXXX..X....", "......................",
+    "............................", "............................", "............................", "..........aaaaaa............",
+    ".........aeeeeecaa..........", "........aceeggggcc..........", "........aeeeeeeeeea.........", "........beeeeeeeeca.........",
+    "......abbbaaabbhcca.........", "......acebbbbbbhcca.........", ".......acbbebbbccc..........", "........acbbbbcccaa.........",
+    ".........aaaaaaaaaa.........", ".........aeeeggbbbaa........", "........aceggeebeeaa........", ".........aeeeeaebbba........",
+    ".........aceeeebebba........", ".........acccccaebba........", "........cccchhbbbbafa.......", "........ccaccccaaaafa.......",
+    "........ceccb.aeccbaia......", "........ceccb.aeccbaaa......", "........cbbbb.abbbbafa......", "........eeeeb.agggbada......",
+    ".......abbbbbabbbbbaaa......", "............................", "............................", "............................",
   ],
   [
-    ".......XXXXXXXX.......", ".......kkkkkkkkX......", "......XkkkkkkkksX.....",
-    ".....HHhhhhhhhhhhX....", ".....HHhhhhhhhhhhX....", ".....HHHHHsssssXXXX...",
-    ".....sssHHsssssXXsX...", ".....sssHHSSsssssllX..", ".....sssHHSSsssssssX..",
-    "...XXsssssXssssssXX...", ".XbbbtLsssssssXXX.....", ".XbbXtLXXXXXXXXXt.....",
-    ".XbXtTLvvvvvvttTTX....", ".BBXtTLttttttttTTX....", "XBBttTLttttttttTTX....",
-    "XLbttSLttttttttTStX...", "XLbXtStttttttttTSX....", ".XLLLXtTTTggTTTtX.....",
-    "..XLLLXttttttttX......", "....X..XXXXXXXX.......", "......................",
+    "............................", "............................", "............................", "............aaaaaa..........",
+    "..........aaceeeeea.........", "..........ccggggeeca........", ".........aeeeeeeeeea........", ".........aceeeeeeeeb........",
+    ".........acchbbaaabbba......", ".........acchbbbbbbeca......", "..........cccbbbebbca.......", ".........aacccbbbbca........",
+    ".........aaaaaaaaaa.........", "........aabbbggeeea.........", "........aaeebeeggeca........", "........abbbeaeeeea.........",
+    "........abbebeeeeca.........", "........abbeaccccca.........", ".......afabbbbhhcccc........", ".......afaaaaccccacc........",
+    "......aiabccea.bccec........", "......aaabccea.bccec........", "......afabbbba.bbbbc........", "......adabggga.beeee........",
+    "......aaabbbbbabbbbba.......", "............................", "............................", "............................",
   ],
   [
-    ".......XXXXXXXX.......", ".......kkkkkkkkX......", "......XkkkkkkkkhX.....",
-    ".....HHhhhhhhhhhhX....", ".....HHhhhhhhhhhhX....", ".....HHHHhhhhhhhhhX...",
-    ".....hhhhhhhhhhhhhX...", ".....hhhhhhhhhhhhhX...", ".....hhhhhhhhhhhhX....",
-    ".....hhhHHHHHHHhhX....", ".....XXhhhSShhhhX.....", "....XXbXXXXXXXXXt.....",
-    "...XtbBBBBBBBBBbXX....", "...XtbBBBBBBBBBbXX....", "...ttbBLBBBBBLLbXX....",
-    "...ttbbgbbbbbggbXtX...", "...XtbbLbbbbbLLbXX....", ".....bbLbbbbbLLbX.....",
-    ".....bbLbbbbbLLbX.....", ".....Xbbbbbbbbb.......", "......XXXXXXXXX.......",
+    "............................", "............................", "............................", "............aaaaa...........",
+    "..........aaceeeca..........", ".........accebeeec..........", ".........aegebeeeeca........", ".........aeeebeeeeca........",
+    "........aceeebeeeecc........", "........aceeebeeeecc........", ".........aceeebeecca........", "........acacchhcccaaaa......",
+    "......aaggaaahhaaaeecc......", "......accccaffffffcccca.....", "......ccccafffffffcccca.....", "......aacaifffffffaaaa......",
+    "........adiffffffffda.......", ".......adfiffffffffdda......", ".......adfifffffffidda......", ".......adfifffffffifda......",
+    "......adfffffffdffifda......", "......adfifffffdffifdd......", "......adfffddaaddddddda.....", ".......addaaa.aaadddaaa.....",
+    "........aabbbaabbaaa........", "............................", "............................", "............................",
   ],
 ];
+
+const ENEMY_COLORS = {
+  a: "#162029", b: "#171522", c: "#233a46", d: "#2e2941", e: "#356166", f: "#51405e",
+  g: "#5b8c86", h: "#7d608c", i: "#9eb67f", j: "#a7794e", k: "#ad8db1", l: "#efa95f",
+  m: "#f5c9ff", n: "#fff6bb",
+};
+const ENEMY_FALLBACK = {
+  wolf: [
+    "..................................", "..................................", "..................................", "...................b..............",
+    "...................bbb............", "...................bhfb...........", "....................bhhfb.bb......", "..b.................bhhffbffb.....",
+    "..fb...............bbhhhfffhb.....", "..dfb......bbbb...bfbffffhhhb.....", "..ddfb....bffhfbbbffbffhhhhhhb....", "..dddfdbbhhkhhhkkhhhbffhhhhhmhfb..",
+    "..bdddffbhhhhhhhhhhhhbfhhhhhhfff..", "...bddddbfhhhhhhhhhffbhffffffffbb.", "...bddddbfhhhhhhhhfffbhfdffffbbfb.", ".....bbdbffffffbbfffbfdfffffffk...",
+    ".......bbbbfffffbbbfbfbffffffmfb..", "........bddbfbbfb.bbbbffffffffbb..", "........bdddbfffb.bbbffffbbbbb....", ".........bddbbffb..ddbbfbb........",
+    "..........bddbbffb.bddbfffb.......", "...........ddbbffbb.bddbffbb......", "...........ddddffff.bddbffff......", "...........bbbbbbbb..bbbbbbb......",
+    "..................................", "..................................",
+  ],
+  snake: [
+    "..................................", "..................................", "..................................", "........................a.........",
+    "........................aa........", ".......................aea..a.....", ".......................eegggggga..", "......................aegggggggga.",
+    ".....................aegggglnlggea", ".....................aeggggggggeea", ".....................aegggeeeeeaa.", "............a.........aeeeeeeeaa..",
+    "............caaaaa.....aaaaeea....", "..........aeeccccc.....acceaaa....", ".........aaeeeeeee.a....aceica....", "...ca..aaeegiccceeea....aceeca....",
+    "...ecaaaeegeccccieeaa...aceeca....", "..eeeccgggeeeeeeccecaaaacceica....", "..eeeegeeieeeeeeeeecccccceeeca....", ".aceeeeeeececccjjeeeeeeieejj......",
+    "...accaaaaeeeeeeecccccjjccca......", ".........aaeeeeecaaaaaaccaa.......", "..........accccca......aa.........", "...........aaaa...................",
+    "..................................", "..................................",
+  ],
+};
 
 function rect(color, x, y, width, height, context = ctx) {
   context.fillStyle = color;
@@ -150,14 +175,29 @@ function drawDragon(x, y, facing, time) {
   const width = 25;
   const height = 20;
   if (drawPng("dragon", x, y - 2, column, 0, facing, width, height)) return;
+  drawPixelMap(DRAGON_FALLBACK[column], DRAGON_COLORS, x, y - 2, facing);
+}
+
+function drawPixelMap(pixels, colors, x, y, facing = 1, context = ctx) {
+  const width = pixels[0].length;
   const left = Math.round(x - width / 2);
-  const top = Math.round(y - 2 - height / 2);
-  DRAGON_FALLBACK[column].forEach((row, j) => {
+  const top = Math.round(y - pixels.length / 2);
+  pixels.forEach((row, j) => {
     [...row].forEach((pixel, i) => {
       if (pixel === ".") return;
-      rect(DRAGON_COLORS[pixel], left + (facing < 0 ? width - 1 - i : i), top + j, 1, 1);
+      rect(colors[pixel], left + (facing < 0 ? width - 1 - i : i), top + j, 1, 1, context);
     });
   });
+}
+
+function drawEnemy({ kind, x, y, walkTime, facing, flash }) {
+  const frame = Math.floor(walkTime * 8) % PNG_SPRITES[kind].columns;
+  ctx.save();
+  if (flash > 0) ctx.filter = "brightness(1.8) saturate(0.5)";
+  if (!drawPng(kind, x, y - 4, frame, 0, facing, 34, 26)) {
+    drawPixelMap(ENEMY_FALLBACK[kind], ENEMY_COLORS, x, y - 4, facing);
+  }
+  ctx.restore();
 }
 
 function drawRoom(time) {
@@ -442,17 +482,8 @@ function knightFootPositions(x, y, row, column) {
 
 function drawKnight(x, y, row, column, context = ctx) {
   if (!drawPng("knight", x, y - 4, column, row, 1, 28, 28, context)) {
-    for (const foot of knightFootPositions(x, y, row, column)) {
-      rect("#505168", foot.x + 1, foot.y - 5, 4, 6, context);
-      rect("#4c2d2e", foot.x, foot.y, 5, 2, context);
-    }
     const bob = [2, 3, 5].includes(column) ? 1 : 0;
-    KNIGHT_FALLBACK[row].forEach((line, j) => {
-      [...line].forEach((pixel, i) => {
-        if (pixel !== ".") rect(CLOTH_COLORS[pixel], Math.round(x - 14) + 3 + i,
-          Math.round(y - 18) + 3 + j + bob, 1, 1, context);
-      });
-    });
+    drawPixelMap(KNIGHT_FALLBACK[row], KNIGHT_COLORS, x, y - 4 + bob, 1, context);
   }
   drawArmor(x, y, row, column, context);
 }
@@ -565,7 +596,7 @@ function draw(time) {
   for (const drop of groundLoot) {
     sprite(drop.item, drop.x, drop.y + Math.round(Math.sin(time * 4) * 2));
   }
-  const actors = [player, dragon, ...slimes].sort((a, b) => a.y - b.y);
+  const actors = [player, dragon, ...enemies].sort((a, b) => a.y - b.y);
   for (const actor of actors) {
     rect("#1d1926aa", Math.round(actor.x - 9), Math.round(actor.y + 4), 18, 4);
     if (actor === player) {
@@ -575,7 +606,7 @@ function draw(time) {
     } else if (actor === dragon) {
       drawDragon(actor.x, actor.y, actor.facing, time);
     } else {
-      sprite(actor.name, actor.x, actor.y, actor.facing, actor.flash > 0);
+      drawEnemy(actor);
     }
   }
   if (swing) drawSwing();

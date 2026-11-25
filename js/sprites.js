@@ -3,6 +3,8 @@
 const PNG_SPRITES = {
   knight: { path: "./images/characters/knight-walk.png", width: 40, height: 40, columns: 6, rows: 4 },
   dragon: { path: "./images/pets/vonkje-fly.png", width: 80, height: 64, columns: 4, rows: 1 },
+  wolf: { path: "./images/enemies/shadow-wolf.png", width: 42, height: 32, columns: 4, rows: 1 },
+  snake: { path: "./images/enemies/cave-serpent.png", width: 42, height: 32, columns: 4, rows: 1 },
   workbench: { path: "./images/objects/workbench.png", width: 32, height: 32, columns: 1, rows: 1 },
   chest: { path: "./images/objects/chest.png", width: 32, height: 32, columns: 1, rows: 1 },
   bed: { path: "./images/objects/bed.png", width: 32, height: 32, columns: 1, rows: 1 },

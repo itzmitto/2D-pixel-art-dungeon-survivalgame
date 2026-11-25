@@ -5,7 +5,7 @@ const ITEMS = {
   stone: { label: "Stone" },
   copper: { label: "Copper ore" },
   potion: { label: "Potion" },
-  gel: { label: "Slime gel" },
+  gel: { label: "Monster essence" },
   axe: { label: "Axe", weapon: true },
   sword: { label: "Wooden sword", weapon: true },
   stoneSword: { label: "Stone sword", weapon: true },

@@ -71,7 +71,7 @@ function update(dt) {
   if (updateArea(updatePlayer(dt))) return;
   followDragon(dt);
   updateHarvestEffects();
-  updateSlimes(dt);
+  updateEnemies(dt);
 }
 
 bindInput();
