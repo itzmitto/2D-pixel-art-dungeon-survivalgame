@@ -66,6 +66,24 @@
 }
 canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; }
 
+#warden-hud {
+  position: absolute;
+  top: min(1rem, 3%);
+  left: 50%;
+  width: min(19rem, 74%);
+  transform: translateX(-50%);
+  display: grid;
+  gap: 3px;
+  padding: 4px 8px;
+  border: 1px solid var(--copper);
+  background: #261b23ee;
+  text-align: center;
+  font-size: clamp(0.65rem, 2.3cqh, 0.875rem);
+  pointer-events: none;
+}
+#warden-health { width: 100%; height: 0.7rem; accent-color: #e77555; }
+#warden-cue { min-height: 1.2em; color: #ffcf95; }
+
 #action {
   position: absolute;
   z-index: 1;

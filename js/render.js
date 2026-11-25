@@ -63,6 +63,9 @@ const SPRITES = {
   ],
   wood: ["..nnnn...", ".acccnn..", "xnnnaacx.", "xaccnncx.", ".xxxxxx.."],
   gel: ["..bb...", ".bTTb..", "bTttbb.", ".bbbb.."],
+  wolfFang: ["..xllx..", ".xlylx..", ".xllsx..", "..xls...", "..xs....", "..x....."],
+  serpentScale: ["...xx...", "..xTbx..", ".xTtbbx.", ".xtbbbx.", "..xbDx..", "...xx..."],
+  fangBlade: ["......ll.", ".....lyl.", "....lslx.", "...lslx..", ".gxslx...", "..yx.....", ".nxg.....", "xnx......"],
   sword: ["......nn.", ".....ncn.", "....ncn..", ".a.ncn...", "..ncn....", "..na.....", ".a..a...."],
   stone: ["..sss..", ".slzsx.", "xssusux", "xuusuxx", ".xxxxx."],
   copper: ["..ccc..", ".cggnx.", "xnncngx", "xanannx", ".xxxxx."],
@@ -200,6 +203,27 @@ function drawEnemy({ kind, x, y, walkTime, facing, flash, attackPose }) {
   ctx.restore();
 }
 
+function drawWarden(warden) {
+  const { x, y, facing, attack, flash, walkTime } = warden;
+  const frame = attack ? Number(attack.phase !== "recover") : Math.floor(walkTime * 4) % 2;
+  ctx.save();
+  if (flash > 0) ctx.filter = "brightness(1.65)";
+  if (!drawPng("warden", x, y - 8, frame, 0, facing, 44, 44)) {
+    const left = Math.round(x) - 16;
+    const top = Math.round(y) - 29;
+    rect("#242029", left + 1, top + 6, 30, 32);
+    rect("#527455", left + 4, top + 18, 24, 16);
+    rect("#638a58", left + 7, top + 3, 19, 18);
+    rect("#c2c486", left + 8, top + 4, 15, 3);
+    rect("#edd7a3", left + 10, top + 9, 12, 5);
+    rect("#3d2732", left + 15 + facing, top + 9, 4, 5);
+    rect("#645243", left + 6, top + 26, 21, 7);
+    rect("#434036", left + 5, top + 33, 8, 8);
+    rect("#434036", left + 21, top + 33, 8, 8);
+  }
+  ctx.restore();
+}
+
 const terrainBackdrops = new Map();
 
 function drawTerrainBackdrop(name, variantFor) {
@@ -255,12 +279,7 @@ function drawRoom(time) {
         rect(["#373541", "#3b3845", "#413c46", "#3c3942"][variant], x, y, TILE, TILE);
       }
       if (tile === "T") torches.push({ x: x + 16, y: y + 14 });
-      if (tile === "C") {
-        rect("#251d28", x + 3, y + 8, 26, 18);
-        rect("#ac6f43", x + 5, y + 9, 22, 8);
-        rect("#694035", x + 5, y + 18, 22, 6);
-        rect("#f6bc65", x + 14, y + 16, 4, 5);
-      }
+      if (tile === "C") drawDungeonChest(x, y);
       if (tile === "A" || tile === "E") drawDungeonDoor(tile, x, y);
     });
   });
@@ -273,6 +292,20 @@ function drawRoom(time) {
     rect("#ac6f43", x - 2, y, 4, 11);
     rect("#e3734d", x - 4, y - 6, 8, 8);
     rect("#ffd386", x - 2, y - 7 + flicker, 4, 7);
+  }
+}
+
+function drawDungeonChest(x, y) {
+  const unlocked = chestUnlocked(area);
+  const open = unlocked && (progress.chestId === area || !chestSlots(progress, area).some(Boolean));
+  const spriteName = area === "dungeon3" ? (open ? "rewardOpen" : "rewardClosed") :
+    (open ? "supplyOpen" : "supplyClosed");
+  const { width, height } = PNG_SPRITES[spriteName];
+  if (!drawPng(spriteName, x + 16, y + 26 - height, 0, 0, 1, width * 2, height * 2)) drawFurniture("chest", x, y);
+  if (!unlocked) {
+    rect("#33232d", x + 12, y + 15, 8, 9);
+    rect("#ffe090", x + 13, y + 18, 6, 5);
+    rect("#92654b", x + 15, y + 19, 2, 3);
   }
 }
 
@@ -478,21 +511,6 @@ function drawDeposit(tile, x, y, variant, spent) {
   }
 }
 
-function drawHarvestEffects() {
-  for (const effect of harvestEffects) {
-    const age = elapsed - effect.started;
-    const { x, y, tool } = effect;
-    sprite(tool, x - 10 + age * 40, y + 2);
-    for (let i = 0; i < 7; i++) {
-      const angle = i * 2.4;
-      const reach = 6 + age * (22 + 3 * i);
-      const color = tool === "axe" ? (i % 2 ? "#e3b477" : "#ab6941") : (i % 2 ? "#b9b6a4" : "#e4a56d");
-      rect(color, Math.round(x + Math.cos(angle) * reach),
-        Math.round(y - 4 + Math.sin(angle) * reach + age * age * 55), 2 + i % 2, 2);
-    }
-  }
-}
-
 const KNIGHT_STRIDE = [0, 1, 2, 0, -1, -2];
 
 function knightFootPositions(x, y, row, column) {
@@ -522,15 +540,18 @@ function drawArmor(x, y, row, column, context = ctx) {
   const bob = [2, 3, 5].includes(column) ? 1 : 0;
   if (chestplate) {
     const offset = [0, -3, 3, 0][row];
+    const scale = chestplate === "scaleArmor";
+    const shadow = scale ? "#28434f" : "#743e37";
+    const plate = scale ? "#498278" : "#bf744a";
+    const rim = scale ? "#a3c99a" : "#efaa65";
     if (row === 3) {
-      // Het rugzakprofiel blijft zichtbaar tussen de koperen schouderplaten.
-      rect("#ba683f", x - 8, y - 3 + bob, 3, 5, context);
-      rect("#ba683f", x + 5, y - 3 + bob, 3, 5, context);
+      rect(plate, x - 8, y - 3 + bob, 3, 5, context);
+      rect(plate, x + 5, y - 3 + bob, 3, 5, context);
     } else {
-      rect("#743e37", x - 6 + offset, y - 4 + bob, 12, 7, context);
-      rect("#bf744a", x - 5 + offset, y - 4 + bob, 10, 5, context);
-      rect("#efaa65", x - 4 + offset, y - 3 + bob, 8, 2, context);
-      rect("#975039", x - 3 + offset, y + 1 + bob, 6, 1, context);
+      rect(shadow, x - 6 + offset, y - 4 + bob, 12, 7, context);
+      rect(plate, x - 5 + offset, y - 4 + bob, 10, 5, context);
+      rect(rim, x - 4 + offset, y - 3 + bob, 8, 2, context);
+      rect(shadow, x - 3 + offset, y + 1 + bob, 6, 1, context);
     }
   }
   if (helmet) {
@@ -589,13 +610,13 @@ function drawForest() {
       if (!painted) drawGrass(i, j, variant);
       if ("=PR".includes(tile)) drawPath(i, j, variant);
       if (tile === "#" || tile === "Y") {
-        const spent = tile === "Y" && exhausted(RESOURCES.Y, i, j);
+        const spent = tile === "Y" && exhausted(LEGACY_RESOURCES.Y, i, j);
         const drawn = spent ? drawPng("stump", x + 16, y + 24, 0, 0, 1, 18, 8) :
           drawPng("trees", x + 16, y + 17, (i + j * 2) % 3, 0, 1, 24, 22);
         if (!drawn) sprite(spent ? "stump" : "tree", x + 16, y + 21);
       }
       if (tile === "Q") drawRock(x, y, variant);
-      if (tile === "M" || tile === "N") drawDeposit(tile, x, y, variant, exhausted(RESOURCES[tile], i, j));
+      if (tile === "M" || tile === "N") drawDeposit(tile, x, y, variant, exhausted(LEGACY_RESOURCES[tile], i, j));
 
       const building = progress.buildings[tileId(i, j)];
       if (building === "floor") drawPlanks(x, y, variant);
@@ -622,6 +643,8 @@ function draw(time) {
   if (area === "forest") drawForest();
   else if (area === "house") drawHouse(time);
   else drawRoom(time);
+  const warden = enemies.find(enemy => enemy.kind === "warden" && enemy.health > 0);
+  if (warden) drawWardenTelegraph(warden);
   if (key && !hasKey) sprite("key", key.x, key.y + Math.round(Math.sin(time * 5) * 2));
   if (potion) sprite("potion", potion.x, potion.y);
   for (const drop of groundLoot) {
@@ -636,19 +659,20 @@ function draw(time) {
       drawKnight(actor.x, actor.y, row, column);
     } else if (actor === dragon) {
       drawDragon(actor.x, actor.y, actor.facing, time);
+    } else if (actor.kind === "warden") {
+      drawWarden(actor);
     } else {
       drawEnemy(actor);
     }
   }
   if (swing) drawSwing();
-  drawHarvestEffects();
   for (const ball of fireballs) sprite("fireball", ball.x, ball.y - 2);
 }
 
 
 function drawSwing() {
   const angle = Math.atan2(swing.y, swing.x);
-  const phase = 1 - swing.time / SWING_TIME;
+  const phase = 1 - swing.time / swing.duration;
   const spear = swing.weapon === "copperSpear";
   const start = angle + (spear ? 0.15 : 0.8) * (swing.hand === "left" ? -1 : 1) * (1 - phase * 2);
   const weaponPosition = {
