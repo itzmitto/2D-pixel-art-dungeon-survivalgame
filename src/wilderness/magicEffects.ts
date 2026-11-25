@@ -15,7 +15,19 @@ export function createMagicEffects(group:T.Group) {
     group.add(mesh);
     return {mesh,life:0,max:1,size:1,grow:0,lift:0,dx:0,dz:0,opacity:1};
   });
-  let cursor=0;
+  const bolts=Array.from({length:12},()=>{
+    const geometry=new T.BufferGeometry();
+    const vertices=new T.BufferAttribute(new Float32Array(21),3);
+    vertices.setUsage(T.DynamicDrawUsage);
+    geometry.setAttribute('position',vertices);
+    const material=new T.LineBasicMaterial({color:0xd6eaff,transparent:true,depthWrite:false});
+    const line=new T.Line(geometry,material);
+    line.frustumCulled=false;
+    line.visible=false;
+    group.add(line);
+    return {line,vertices,life:0};
+  });
+  let cursor=0, boltCursor=0;
   function emit(point:Point,color:number,shape:'spark'|'ring'|'dome'|'arc',size:number,seconds:number,
     options:{lift?:number;grow?:number;y?:number;dx?:number;dz?:number;yaw?:number;opacity?:number}={}){
     const p=pool[cursor++%pool.length], mesh=p.mesh;
@@ -36,12 +48,15 @@ export function createMagicEffects(group:T.Group) {
   }
   function lightning(from:Point,to:Point){
     const dx=to.x-from.x,dz=to.z-from.z,length=Math.hypot(dx,dz)||1;
+    const bolt=bolts[boltCursor++%bolts.length];
+    bolt.life=.27;
+    bolt.line.visible=true;
     for(let i=0;i<7;i++){
-      const t=i/6, jitter=Math.sin(i*2.5)*.32*Math.sin(t*Math.PI);
-      const point={x:from.x+dx*t+dz/length*jitter,z:from.z+dz*t-dx/length*jitter};
-      emit(point,0xe7f4ff,'spark',Math.max(.65,length*.52),.22,{y:.46+Math.sin(t*Math.PI)*1.05,yaw:Math.atan2(dx,dz)});
-      pool[(cursor-1)%pool.length].mesh.scale.z*=2.2;
+      const t=i/6, jitter=Math.sin(i*2.5)*.45*Math.sin(t*Math.PI);
+      const x=from.x+dx*t+dz/length*jitter,z=from.z+dz*t-dx/length*jitter;
+      bolt.vertices.setXYZ(i,x,surface(x,z)+.55+Math.sin(t*Math.PI)*1.08+jitter,z);
     }
+    bolt.vertices.needsUpdate=true;
   }
   const barrier=new T.Mesh(dome,new T.MeshBasicMaterial({color:0x6196d5,transparent:true,opacity:.16,
     side:T.DoubleSide,depthWrite:false}));
@@ -53,6 +68,12 @@ export function createMagicEffects(group:T.Group) {
       if(active){barrier.position.copy(player);barrier.position.y+=1;}
     },
     update(dt:number){
+      for(const bolt of bolts){
+        if(bolt.life<=0) continue;
+        bolt.life=Math.max(0,bolt.life-dt);
+        bolt.line.visible=bolt.life>0;
+        bolt.line.material.opacity=bolt.life/.27;
+      }
       for(const p of pool){
         if(p.life<=0) continue;
         p.life=Math.max(0,p.life-dt);p.mesh.visible=p.life>0;
@@ -64,6 +85,7 @@ export function createMagicEffects(group:T.Group) {
     dispose(){
       for(const p of pool) p.mesh.material.dispose();
       barrier.material.dispose();
+      for(const {line} of bolts){line.geometry.dispose();line.material.dispose();}
       for(const geometry of [spark,ring,dome,arc]) geometry.dispose();
     },
   };
