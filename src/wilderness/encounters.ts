@@ -4,7 +4,7 @@ import { skeletonModels } from './skeletons.ts';
 import { den, inDen } from './denLayout.ts';
 import { monsters, rollDrop, type MonsterKind, type Drop } from './huntData.ts';
 import { elementalRarity, instanceWeapon } from './itemInstances.ts';
-import { chestModels, worldChests, type Chest } from './treasure.ts';
+import { chestBonus, chestModels, worldChests, type Chest } from './treasure.ts';
 import { attackSpeed, earnXP, elemental, maxHunterHealth, mitigation, physical, lootBonus } from './progression.ts';
 import * as T from 'three';
 import { inArc, swingTimer, wolfLoot } from './combatRules.ts';
@@ -278,7 +278,7 @@ export function createEncounters(
     if(!save.arsenal.includes(type)) save.arsenal.push(type);
   }
   function unopenedChest(){
-    return chests.find(chest=>!save.opened.includes(chest.id)&&(!chest.boss||save.defeatedBosses.includes(chest.boss))&&
+    return chests.find(chest=>!save.opened.includes(chest.id)&&(!chest.boss||save.defeatedBosses.includes(chest.boss))&&(!chest.guardian||oldDefeats.has(chest.guardian))&&
       Math.hypot(player.position.x-chest.x,player.position.z-chest.z)<2.9 &&
       clearLine(player.position.x,player.position.z,chest.x,chest.z));
   }
@@ -340,9 +340,12 @@ export function createEncounters(
           save.opened.push(chest.id);
           save.gold+=chest.gold;
           save.armor=Math.max(save.armor,chest.armor);
-          save.potions++;
+          const bonus=chestBonus(chest,save.seed);
+          save.potions+=bonus.potions;
+          save.materials[bonus.material]=(save.materials[bonus.material]??0)+bonus.count;
+          fx.scatter(chest,Number.parseInt(rarity[chest.rarity].color.slice(1),16),chest.rarity==='Common'?5:12,.68);
           grantWeapon('chest-'+chest.id,chest.weapon,chest.rarity);
-          notify('Opened '+chest.rarity+' Chest · '+weapons[chest.weapon].name+' · Armor '+save.armor);
+          notify('Opened '+chest.rarity+' Chest · '+weapons[chest.weapon].name+' · Armor '+save.armor+' · '+bonus.material+' × '+bonus.count);
           return;
         }
         if(atCamp()&&save.health<maxHealth()){
@@ -508,7 +511,7 @@ export function createEncounters(
       }
     },
     render(dt:number){
-      chestViews.update(dt,save.defeatedBosses,save.opened);
+      chestViews.update(dt,save.defeatedBosses,save.opened,save.defeated);
       fx.update(dt);
       fx.barrier(player.position,magic.shield.active);
       slashTime=Math.max(0,slashTime-dt);
