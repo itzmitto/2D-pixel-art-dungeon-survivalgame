@@ -114,3 +114,80 @@ test('typed animation loop starts once and cancels its scheduled frame on dispos
   assert.deepEqual(cancelled, [3]);
   assert.equal(loop.isRunning(), false);
 });
+
+test('typed tower graph preserves both tower doors, stairs, and saved chest loot', async () => {
+  const { TOWER_CONNECTIONS, TOWER_CHESTS, TOWER_FLOORS, towerFloorAt } = await import('../src/game/world/towers.ts');
+  assert.equal(TOWER_FLOORS.length, 3);
+  assert.equal(TOWER_CONNECTIONS.length, 6);
+  assert.equal(towerFloorAt(TOWER_CONNECTIONS[0][1])?.id, 'watch');
+  assert.equal(towerFloorAt(TOWER_CONNECTIONS[2][1])?.id, 'watchTop');
+  assert.equal(towerFloorAt(TOWER_CONNECTIONS[4][1])?.id, 'fen');
+  assert.deepEqual(TOWER_CHESTS.watchTop.loot, []);
+  assert.equal(TOWER_CHESTS.watch.loot[0][0], 'wolfFang');
+});
+
+test('typed sprite manifest points only to local PNGs with the declared sheet dimensions', async () => {
+  const fs = await import('node:fs');
+  const { SPRITE_SHEETS, SPRITE_IDS } = await import('../src/game/rendering/sprites.ts');
+  for (const id of SPRITE_IDS) {
+    const definition = SPRITE_SHEETS[id];
+    const path = new URL(`../public${definition.path}`, import.meta.url);
+    assert.equal(fs.existsSync(path), true, `Missing sprite sheet for ${id}`);
+    const bytes = fs.readFileSync(path);
+    assert.equal(bytes.readUInt32BE(16), definition.frameWidth * definition.columns, `${id} width mismatch`);
+    assert.equal(bytes.readUInt32BE(20), definition.frameHeight * definition.rows, `${id} height mismatch`);
+  }
+});
+
+test('typed party placement and companion trail keep Vonkje behind the player', async () => {
+  const { createParty, updateCompanionFollow } = await import('../src/game/entities/party.ts');
+  const openWorld = {
+    tileSize: 10, mapRows: Array.from({ length: 40 }, () => '.'.repeat(40)), solidTiles: new Set(), fallbackSpawn: { x: 205, y: 205 },
+    tileAt: (x, y) => (x < 0 || y < 0 || x >= 40 || y >= 40 ? undefined : '.'),
+    floorAt: () => undefined, regionAt: () => 'woods', gateUnlocked: () => true, fenceAt: () => false,
+    worldCenter: (x, y) => ({ x: (x + 0.5) * 10, y: (y + 0.5) * 10 }),
+    distance: (left, right) => Math.hypot(left.x - right.x, left.y - right.y),
+  };
+  const party = createParty({ x: 205, y: 205 }, 3, 0, {}, openWorld);
+  const prior = { ...party.companion };
+  updateCompanionFollow({ x: 280, y: 280 }, party.companion, party.trail, 1, 0.2, false);
+  assert.notDeepEqual(party.companion, prior);
+  assert.equal(party.player.hearts, 3);
+  assert.ok(party.trail.some((node) => node.time === 1));
+});
+
+test('typed inventory preserves splitting, isolated chest transfers, and take-only crafting costs', async () => {
+  const { clickSlot, shiftTransfer, takeCraftOutput } = await import('../src/game/items/inventoryModel.ts');
+  const { recipeFor } = await import('../src/game/items/recipes.ts');
+  const state = {
+    bag: Array(27).fill(null), hotbar: Array(9).fill(null), chest: Array(27).fill(null),
+    dungeonChests: { supply: Array(27).fill(null) }, bagCraft: Array(4).fill(null), benchCraft: Array(9).fill(null),
+    hands: { left: null, right: null }, armor: { helmet: null, chestplate: null, boots: null }, pet: { pet: null },
+    held: null, panelMode: 'bag', chestId: null,
+  };
+  state.bag[0] = { item: 'wood', count: 5 };
+  clickSlot(state, { area: 'bag', index: 0 }, true);
+  assert.equal(state.held.count, 3);
+  assert.equal(state.bag[0].count, 2);
+  state.held = null;
+  state.bag[1] = { item: 'wolfFang', count: 2 };
+  state.panelMode = 'chest';
+  state.chestId = 'supply';
+  assert.equal(shiftTransfer(state, { area: 'bag', index: 1 }), 2);
+  assert.equal(state.dungeonChests.supply[0].item, 'wolfFang');
+  assert.equal(state.chest[0], null);
+
+  const recipe = recipeFor('benchCraft', 'scaleArmor');
+  assert.ok(recipe);
+  for (const [index, cell] of recipe.pattern.entries()) {
+    if (cell) state.benchCraft[index] = { item: cell.item, count: cell.count };
+  }
+  state.held = { item: 'scaleArmor', count: 1, source: null };
+  const before = JSON.stringify(state.benchCraft);
+  assert.equal(takeCraftOutput(state, 'benchCraft', recipe), false);
+  assert.equal(JSON.stringify(state.benchCraft), before);
+  state.held = null;
+  assert.equal(takeCraftOutput(state, 'benchCraft', recipe), true);
+  assert.equal(state.held.item, 'scaleArmor');
+  assert.ok(state.benchCraft.every((stack) => stack === null));
+});

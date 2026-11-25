@@ -5,7 +5,7 @@ import type { EnemyKind } from '../types/world';
 const STACKABLE = 64;
 const SINGLE = 1;
 
-export const ITEMS = {
+export const ITEMS: Record<ItemId, ItemDefinition> = {
   wood: { label: 'Wood', maxStack: STACKABLE },
   stone: { label: 'Stone', maxStack: STACKABLE },
   copper: { label: 'Copper ore', maxStack: STACKABLE },
@@ -30,7 +30,7 @@ export const ITEMS = {
   fence: { label: 'Fence', maxStack: STACKABLE },
   floor: { label: 'Floor tile', maxStack: STACKABLE },
   torch: { label: 'Wooden torch', maxStack: STACKABLE },
-} satisfies Record<ItemId, ItemDefinition>;
+};
 
 export const WEAPONS = {
   axe: { damage: 2, range: 26, cooldown: 0.38, sprite: 'axe' },

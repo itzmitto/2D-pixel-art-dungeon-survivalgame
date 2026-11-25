@@ -61,13 +61,16 @@ export const SPRITE_SHEETS: Readonly<Record<SpriteId, SpriteSheetDefinition>> = 
 
 export class SpriteRegistry {
   readonly #images = new Map<SpriteId, HTMLImageElement>();
+  readonly #imageFactory: () => HTMLImageElement;
 
-  constructor(private readonly imageFactory: () => HTMLImageElement = () => new Image()) {}
+  constructor(imageFactory: () => HTMLImageElement = () => new Image()) {
+    this.#imageFactory = imageFactory;
+  }
 
   async loadAll(): Promise<void> {
     await Promise.all(SPRITE_IDS.map(async (id) => {
       const definition = SPRITE_SHEETS[id];
-      const image = this.imageFactory();
+      const image = this.#imageFactory();
       await new Promise<void>((resolve) => {
         image.onload = () => {
           const validSize = image.naturalWidth === definition.frameWidth * definition.columns &&
