@@ -650,6 +650,36 @@ function draw(time) {
     if (pointInView(ball.x, ball.y, TILE)) sprite("fireball", ball.x, ball.y - 2);
   }
   ctx.restore();
+  drawAtmosphere(time);
+}
+
+function drawAtmosphere(time) {
+  const shade = ctx.createRadialGradient(VIEW_WIDTH * 0.5, VIEW_HEIGHT * 0.58, 54,
+    VIEW_WIDTH * 0.5, VIEW_HEIGHT * 0.58, VIEW_WIDTH * 0.72);
+  shade.addColorStop(0, "#07100b08");
+  shade.addColorStop(1, "#060a09a8");
+  rect(shade, 0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+
+  const haze = ctx.createLinearGradient(0, VIEW_HEIGHT * 0.12, 0, VIEW_HEIGHT * 0.8);
+  haze.addColorStop(0, "#8a96830a");
+  haze.addColorStop(0.62, "#bac3a018");
+  haze.addColorStop(1, "#b6b28b00");
+  rect(haze, 0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+
+  const { left, right, top, bottom } = visibleTileBounds();
+  for (let row = top; row < bottom; row += 2) {
+    for (let col = left; col < right; col += 2) {
+      const seed = (col * 73 + row * 151 + col * row * 11) % 97;
+      if (seed > 5 || !".=+".includes(worldTile(col, row))) continue;
+      const worldX = col * TILE + 7 + seed * 2;
+      const worldY = row * TILE + 10 + seed % 13;
+      const pulse = Math.sin(time * 2.4 + seed) * 0.35 + 0.65;
+      const x = worldX - camera.x;
+      const y = worldY - camera.y;
+      rect(`rgba(231, 197, 121, ${0.25 * pulse})`, x, y, 2, 2);
+      if (seed % 2 === 0) rect(`rgba(255, 224, 151, ${0.45 * pulse})`, x, y, 1, 1);
+    }
+  }
 }
 
 function drawSwing() {
