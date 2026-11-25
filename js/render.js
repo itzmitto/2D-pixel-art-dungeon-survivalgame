@@ -302,6 +302,48 @@ function drawBuildingExterior({ left, top, right, bottom }, cottage = false) {
   if (cottage) drawHouseDoor(COTTAGE.door.x, COTTAGE.door.y + 2, 0);
 }
 
+function drawTowerLandmark(tower, time) {
+  const x = tower.left * TILE;
+  const y = tower.top * TILE;
+  const width = (tower.right - tower.left + 1) * TILE;
+  const height = (tower.bottom - tower.top + 1) * TILE;
+  rect("#101815b0", x + 8, y + height - 8, width + 6, 15);
+  rect("#202827", x + 11, y + 14, width - 22, height - 16);
+  rect("#303737", x + 18, y + 4, width - 36, height - 7);
+  rect("#46504b", x + 24, y + 5, width - 48, 3);
+  for (let level = 0; level < 4; level++) {
+    const levelY = y + 18 + level * 25;
+    rect("#343c38", x + 13, levelY, width - 26, 19);
+    rect("#545c50", x + 13, levelY, width - 26, 3);
+    for (let stone = 0; stone < 5; stone++) {
+      const sx = x + 18 + ((stone * 31 + level * 9) % Math.max(8, width - 42));
+      rect(stone % 2 ? "#27322d" : "#5c6253", sx, levelY + 7 + (stone % 2) * 4, 8, 2);
+    }
+  }
+  const doorX = tower.door.x;
+  const doorY = tower.door.y;
+  rect("#121817", doorX - 10, doorY - 23, 20, 28);
+  rect("#786149", doorX - 12, doorY - 24, 3, 26);
+  rect("#786149", doorX + 9, doorY - 24, 3, 26);
+  rect("#756f5c", doorX - 12, doorY - 25, 24, 3);
+  drawLight(doorX, doorY - 16, 32 + Math.sin(time * 5) * 2, "#e1a66536");
+  for (const side of [-1, 1]) {
+    const lx = doorX + side * 26;
+    rect("#272c29", lx - 2, doorY - 9, 4, 12);
+    rect("#9c7048", lx - 3, doorY - 15, 6, 7);
+    rect("#ffd28b", lx - 1, doorY - 14, 3, 4);
+  }
+}
+
+function drawFieldFire(x, y, time) {
+  drawLight(x, y - 2, 34 + Math.sin(time * 7) * 2, "#db78413d");
+  rect("#1b1c18", x - 10, y + 3, 20, 4);
+  rect("#50453a", x - 9, y + 2, 18, 2);
+  rect("#853f2d", x - 3, y - 5, 6, 8);
+  rect("#e77d42", x - 2, y - 7, 4, 7);
+  rect("#ffd38a", x - 1, y - 6, 2, 4);
+}
+
 function drawCottageCutaway(time) {
   const { left, top, right, bottom, door } = COTTAGE;
   const floorTop = (top + 1) * TILE;

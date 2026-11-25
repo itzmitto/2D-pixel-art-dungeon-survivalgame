@@ -236,7 +236,6 @@ function makeWorldMap() {
   // Keep the field-kit clearing and encounter centers open inside the wilderness.
   for (let y = 13; y <= 21; y++) for (let x = 10; x <= 18; x++) map[y][x] = ".";
   place("W", [[13, 15]]);
-  place("B", [[14, 15]]);
   place("O", [[15, 15]]);
   place("F", [[13, 18]]);
   for (const { x, y, zone } of WORLD_ENEMY_SPAWNS) {
