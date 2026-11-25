@@ -5,6 +5,7 @@ import { meadow } from './grass';
 import { spawn, surface, walkable } from './layout';
 import { scenery } from './scenery';
 import { terrain } from './terrain';
+import { createEncounters } from './encounters';
 import { obstacleGrid } from './spatial';
 import type { Exploration, Position } from './exploration';
 
@@ -15,7 +16,10 @@ export function startWilderness(
   save: Exploration,
   onPosition:(position:Position)=>void,
   onMapKey:(closeOnly:boolean)=>void,
-  mapOpen:()=>boolean,
+  uiOpen:()=>boolean,
+  onInventory:()=>void,
+  onCombat:(notification:string,prompt:string)=>void,
+  onSaveChange:()=>void,
 ) {
   const context=canvas.getContext('webgl2',{antialias:true});
   if(!context) throw new Error('WebGL2 is required for the wilderness.');
@@ -40,6 +44,8 @@ export function startWilderness(
   onPosition(start);
   const animateGrass=meadow(scene,body.position,rocks,save.seed);
   const animateNight=atmosphere(scene,fireY);
+  const encounters=createEncounters(scene,camera,body,save,canWalk,onSaveChange);
+  let blocking=false, frameDelta=0, prompt='', notification='';
   const destination=body.position.clone();
   const focus=destination.clone();
   const offset=new T.Vector3(0,Math.sin(58*Math.PI/180),Math.cos(58*Math.PI/180));
@@ -57,34 +63,49 @@ export function startWilderness(
   resize();
   window.addEventListener('keydown',e=>{
     if(e.ctrlKey||e.altKey||e.metaKey) return;
-    if(e.code==='KeyM'||(e.code==='Escape'&&mapOpen())){
+    if(e.code==='KeyM'||e.code==='Tab'||(e.code==='Escape'&&uiOpen())){
       e.preventDefault();
       keys.clear();
-      if(!e.repeat) onMapKey(e.code==='Escape');
+      blocking=false;
+      if(!e.repeat){
+        if(e.code==='Tab') onInventory();
+        else onMapKey(e.code==='Escape');
+      }
       return;
     }
-    if(!mapOpen()&&['KeyW','KeyA','KeyS','KeyD','ShiftLeft','ShiftRight'].includes(e.code)){
+    if(e.code==='KeyE'&&!uiOpen()&&!e.repeat){
+      e.preventDefault();
+      encounters.interact();
+      onPosition({x:body.position.x,z:body.position.z,yaw:body.rotation.y});
+    }
+    if(!uiOpen()&&['KeyW','KeyA','KeyS','KeyD','ShiftLeft','ShiftRight'].includes(e.code)){
       e.preventDefault(); keys.add(e.code);
     }
   },{signal});
   window.addEventListener('keyup',e=>keys.delete(e.code),{signal});
-  window.addEventListener('blur',()=>keys.clear(),{signal});
+  window.addEventListener('blur',()=>{keys.clear();blocking=false;},{signal});
+  window.addEventListener('pointerup',e=>{if(e.button===2) blocking=false;},{signal});
+  window.addEventListener('pointercancel',()=>{blocking=false;},{signal});
+  canvas.addEventListener('contextmenu',e=>e.preventDefault(),{signal});
   canvas.addEventListener('pointerdown',e=>{
-    if(e.isPrimary && e.button===0 && !mapOpen()) knight.playAttack();
+    if(!e.isPrimary||uiOpen()) return;
+    if(e.button===2) blocking=true;
+    if(e.button===0&&!blocking) encounters.attack(knight.playAttack);
   },{signal});
   canvas.addEventListener('wheel',e=>{
     e.preventDefault();
-    if(!mapOpen()) zoom=T.MathUtils.clamp(zoom+Math.sign(e.deltaY)*3,24,57);
+    if(!uiOpen()) zoom=T.MathUtils.clamp(zoom+Math.sign(e.deltaY)*3,24,57);
   },{passive:false,signal});
   const loop=createGameLoop({
     scheduler:browserFrameScheduler,
     update(dt){
-      if(mapOpen()) keys.clear();
+      frameDelta=uiOpen()?0:dt;
+      if(uiOpen()||!save.health) {keys.clear(); blocking=false;}
       const x=Number(keys.has('KeyD'))-Number(keys.has('KeyA'));
       const z=Number(keys.has('KeyS'))-Number(keys.has('KeyW'));
       const length=Math.hypot(x,z);
       const sprinting=keys.has('ShiftLeft')||keys.has('ShiftRight');
-      const speed=sprinting?12:6;
+      const speed=blocking?3:sprinting?12:6;
       const p=body.position;
       const beforeX=p.x,beforeZ=p.z;
       if(length){
@@ -93,12 +114,20 @@ export function startWilderness(
         if(canWalk(p.x,p.z+dz)) p.z+=dz;
       }
       const travelled=Math.hypot(p.x-beforeX,p.z-beforeZ);
-      knight.update(dt,{
+      knight.update(frameDelta,{
         speed:dt>0?travelled/dt:0,
         sprinting,
         facing:length?Math.atan2(x,z):undefined,
       });
       p.y=T.MathUtils.lerp(p.y,surface(p.x,p.z),1-Math.exp(-22*dt));
+      if(!uiOpen()) {
+        encounters.update(dt,blocking);
+        const view=encounters.ui();
+        if(view.prompt!==prompt||view.notification!==notification){
+          prompt=view.prompt; notification=view.notification;
+          onCombat(notification,prompt);
+        }
+      }
       destination.set(p.x,p.y+.75,p.z);
       focus.lerp(destination,1-Math.exp(-7*dt));
       distance=T.MathUtils.lerp(distance,zoom,1-Math.exp(-9*dt));
@@ -113,6 +142,7 @@ export function startWilderness(
       water.value=time;
       animateGrass(time);
       animateNight(time,body.position);
+      encounters.render(frameDelta);
       renderer.render(scene,camera);
     },
   });
@@ -120,7 +150,7 @@ export function startWilderness(
   canvas.addEventListener('webglcontextrestored',()=>loop.start(),{signal});
   loop.start();
   return ()=>{
-    loop.stop(); controller.abort(); observer.disconnect();
+    loop.stop(); controller.abort(); observer.disconnect(); encounters.dispose();
     const geometries=new Set<T.BufferGeometry>(),materials=new Set<T.Material>();
     scene.traverse(object=>{
       if(object instanceof T.InstancedMesh) object.dispose();
