@@ -15,7 +15,7 @@ const trails=[
   ...branchTrails.map(trail=>trail.map(point=>point.join(',')).join(' ')),
 ];
 const bound=(value:number,half:number)=>Math.max(-extent+half,Math.min(extent-half,value));
-const cartography=contours([2,4,6,8,10,13,16,19]);
+let cartography:string[]|undefined;
 const symbols={
   ruin:'M-4 5v-9h2v3h4v-5h2V5z M-1 5v-3h2v3',
   bridge:'M-5 -3H5M-5 3H5M-3 -3v6m3-6v6m3-6v6',
@@ -32,10 +32,11 @@ const descriptions:Record<keyof typeof symbols,string>={
 };
 const AtlasTerrain=memo(function AtlasTerrain(){
   const texture=useMemo(terrainTexture,[]);
+  const lines=cartography??=contours([2,4,6,8,10,13,16,19]);
   return <>
     {texture?<image href={texture} x={-extent} y={-extent} width={span} height={span}/>:
       <rect x={-extent} y={-extent} width={span} height={span} fill="#4f5440"/>}
-    {cartography.map((d,i)=><path key={i} d={d} fill="none" stroke={i%2?'#d3b889':'#bbac83'} strokeWidth={i%2?.66:.46} opacity={.37+i*.026}/>)}
+    {lines.map((d,i)=><path key={i} d={d} fill="none" stroke={i%2?'#d3b889':'#bbac83'} strokeWidth={i%2?.66:.46} opacity={.37+i*.026}/>)}
     <g fill="#b8ab7b" fillOpacity=".29" stroke="#162a27" strokeWidth=".4">
       {cartographicTrees.map(({x,z,s},i)=><path key={i} d={`M${x} ${z-s}l${-s*.7} ${s*1.7}h${s*1.4}z`}/>)}
     </g>
@@ -103,7 +104,7 @@ export function WorldMap({position,discovered,cleared,bossDefeated,close}:{
     ? 'Rank '+den.rank+' · Level '+den.level+' · '+(cleared?'Cleared':'Uncleared')+(bossDefeated?' · Fang Guardian defeated':'')
     : descriptions[kind];
   const activate=(event:KeyboardEvent<SVGGElement>,name:string)=>{
-    if(event.key==='Enter'||event.key===' '){event.preventDefault();select(name);}
+    if(event.key==='Enter'||event.key===' '){event.preventDefault();setRegion('velren');select(name);}
   };
   return <SystemPanel title="World Atlas" section="Cartographer’s archive / surveyed lands" close={close} style="atlas-panel">
     <div className="atlas-layout">
@@ -125,12 +126,14 @@ export function WorldMap({position,discovered,cleared,bossDefeated,close}:{
             onPointerUp={()=>{drag.current=null;}} onPointerCancel={()=>{drag.current=null;}}>
             <Discovery id={mask} cells={discovered}/>
             <rect x={-extent} y={-extent} width={span} height={span} fill="#172326"/>
-            <g clipPath={`url(#${mask})`}><AtlasTerrain/></g>
+            <defs><g id={mask+'-terrain'}><AtlasTerrain/></g></defs>
+            <use href={`#${mask}-terrain`} opacity=".22" pointerEvents="none"/>
+            <g clipPath={`url(#${mask})`}><use href={`#${mask}-terrain`} pointerEvents="none"/></g>
             <rect x={-extent+1.3} y={-extent+1.3} width={span-2.6} height={span-2.6}
               fill="none" stroke="#d6ae73" strokeWidth="2" strokeDasharray="5 3" pointerEvents="none"/>
             {landmarks.filter(item=>seen.has(cellAt(item.x,item.z))).map(item=><g
               key={item.name} className={'atlas-pin '+(item.name===selection?'selected':'')} role="button" tabIndex={0}
-              aria-label={item.name+' · '+caption(item.kind)} onClick={()=>select(item.name)} onKeyDown={event=>activate(event,item.name)}
+              aria-label={item.name+' · '+caption(item.kind)} onClick={()=>{setRegion('velren');select(item.name);}} onKeyDown={event=>activate(event,item.name)}
               transform={`translate(${item.x} ${item.z})`}>
               <title>{item.name} · {caption(item.kind)}</title><circle r={item.kind==='gate'?7:5.6} />
               <path d={symbols[item.kind]} />

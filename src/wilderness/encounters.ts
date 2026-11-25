@@ -77,11 +77,12 @@ export function createEncounters(
   const red=new T.MeshBasicMaterial({color:'#ba5447',depthWrite:false});
   const alert=new T.MeshBasicMaterial({color:'#de9c55',depthWrite:false});
   const lootGeometry=new T.OctahedronGeometry(.29);
+  const lootBeamGeometry=new T.CylinderGeometry(.028,.10,1.25,6,1,true);
   const lootMaterial=new T.MeshStandardMaterial({color:'#bd9868',emissive:'#916024',emissiveIntensity:.7,roughness:.36});
   type Enemy = {
     root:T.Group; legs:T.Object3D[]; brush:T.Object3D;
     id:string; kind:MonsterKind; spec:typeof monsters[MonsterKind]; home:T.Vector3; hp:number; hpBar:T.Group; fill:T.Mesh;
-    statuses:ReturnType<typeof statuses>; cooldown:number; windup:number; heading:number; phase:number; hitFlash:number; charge:number; chargeWindup:boolean; chargeHit:boolean; loot:T.Mesh<T.BufferGeometry,T.MeshStandardMaterial>;
+    statuses:ReturnType<typeof statuses>; cooldown:number; windup:number; heading:number; phase:number; hitFlash:number; charge:number; chargeWindup:boolean; chargeHit:boolean; beam:T.Mesh<T.BufferGeometry,T.MeshBasicMaterial>; loot:T.Mesh<T.BufferGeometry,T.MeshStandardMaterial>;
   };
   const enemies:Enemy[]=[];
   const spawns=[
@@ -118,9 +119,12 @@ export function createEncounters(
     }
     loot.visible=oldDefeats.has(id)&&!collected.has(id);
     group.add(loot);
+    const beam=new T.Mesh(lootBeamGeometry,new T.MeshBasicMaterial({transparent:true,
+      opacity:.36,depthWrite:false,side:T.DoubleSide}));
+    beam.visible=false;group.add(beam);
     if(save.drops[id]) loot.material.color.set(rarity[save.drops[id].rarity].color);
     enemies.push({...actor,id,kind,spec,home,hp:(oldDefeats.has(id)||save.defeatedBosses.includes(id))?0:spec.health,hpBar,fill,
-      statuses:statuses(spec.resistance),cooldown:0,windup:0,heading:rand()*6.28,phase:rand()*10,hitFlash:0,charge:0,chargeWindup:false,chargeHit:false,loot});
+      statuses:statuses(spec.resistance),cooldown:0,windup:0,heading:rand()*6.28,phase:rand()*10,hitFlash:0,charge:0,chargeWindup:false,chargeHit:false,loot,beam});
   }
 
   const sparkGeometry=new T.BufferGeometry();
@@ -459,9 +463,16 @@ export function createEncounters(
         enemy.fill.material=enemy.windup>0?alert:red;
         enemy.fill.scale.x=enemy.hp/enemy.spec.health;
         enemy.fill.position.x=(enemy.fill.scale.x-1)*.6;
+        enemy.beam.visible=enemy.loot.visible&&
+          Math.hypot(player.position.x-enemy.loot.position.x,player.position.z-enemy.loot.position.z)<45;
         if(enemy.loot.visible){
           enemy.loot.position.y=surface(enemy.loot.position.x,enemy.loot.position.z)+.32+Math.sin(time*4+enemy.phase)*.12;
           enemy.loot.rotation.y=time*1.8;
+          if(enemy.beam.visible){
+            enemy.beam.material.color.copy(enemy.loot.material.color);
+            enemy.beam.position.copy(enemy.loot.position);
+            enemy.beam.position.y+=.76;
+          }
         }
       }
       let cursor=0;
@@ -483,10 +494,10 @@ export function createEncounters(
     dispose(){
       scene.remove(group);
       models.dispose();skeletons.dispose();
-      for(const resource of [barGeometry,backing,red,alert,lootGeometry,lootMaterial,sparkGeometry,sparks.material,slashGeometry,slashMaterial]) resource.dispose();
+      for(const resource of [barGeometry,backing,red,alert,lootGeometry,lootBeamGeometry,lootMaterial,sparkGeometry,sparks.material,slashGeometry,slashMaterial]) resource.dispose();
       fx.dispose();
       chestViews.dispose();
-      for(const enemy of enemies) enemy.loot.material.dispose();
+      for(const enemy of enemies){enemy.loot.material.dispose();enemy.beam.material.dispose();}
       for(const material of numberMaterials.values()){material.map?.dispose();material.dispose();}
       emptyMaterial.dispose();
     },

@@ -75,5 +75,7 @@ test('old saves gain only the starter and equipment is validated against owned w
   assert.deepEqual(readExploration(JSON.stringify(legacy)).arsenal,['longsword']);
   const restored=readExploration(JSON.stringify({...legacy,arsenal:['staff'],equipped:'axe',hotbar:['axe','staff']}));
   assert.equal(restored.equipped,'longsword');
-  assert.deepEqual(restored.hotbar,[null,'staff',null,null,null]);
+  assert.deepEqual(restored.hotbar,[null,'staff',null,null,null,null,null,null,null]);
+  restored.hotbar[8]='staff'; restored.slotItems[8]='staff';
+  assert.equal(readExploration(JSON.stringify(restored)).slotItems[8],'staff');
 });

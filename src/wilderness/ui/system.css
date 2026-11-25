@@ -88,3 +88,5 @@
 .system-toast.rank { --rarity:#afedf6; }.system-toast.boss { --rarity:#ecab90; }.system-toast.dungeon { --rarity:#dfc07f; }
 @keyframes sweep { to {transform:translateX(100%)} }
 @media(max-width:580px) { .hunter-status .attribute-list{grid-template-columns:1fr;}.system-nav button{font-size:.7rem!important;} }
+[data-overlay-closing=true] .system-panel { animation:system-exit .14s ease-in both; pointer-events:none; }
+@keyframes system-exit { to { opacity:0;transform:translateY(5px) scale(.992); } }

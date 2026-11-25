@@ -1,7 +1,7 @@
 export const rarity = {
   Common:{color:'#b6b8bc', multiplier:1}, Uncommon:{color:'#91b979', multiplier:1.2},
   Rare:{color:'#89b5e7', multiplier:1.5}, Epic:{color:'#c19bdc', multiplier:1.9},
-  Legendary:{color:'#e9bd6f', multiplier:2.5}, Mythic:{color:'#ea9184', multiplier:3.2},
+  Legendary:{color:'#e9bd6f', multiplier:2.5}, Mythic:{color:'#ee718d', multiplier:3.2},
 } as const;
 export type Rarity = keyof typeof rarity;
 export type WeaponId = 'longsword'|'greatsword'|'axe'|'staff'|'shield'|'katana';

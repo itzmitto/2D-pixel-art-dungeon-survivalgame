@@ -1,25 +1,26 @@
+import { memo } from 'react';
 import type { Exploration } from '../exploration';
 import { instanceWeapon, legacyItem } from '../itemInstances';
 import { maxHunterHealth, rank, xpNeeded } from '../progression';
-import { regionLabel } from '../regions';
+import type { regionLabel } from '../regions';
 import { weapons, type WeaponId } from '../weapons';
 import { Glyph } from './Glyph';
 import { healthNotation, tint } from './HunterInventory';
 
-export function HunterHUD({hero,z}:{hero:Exploration;z:number}){
+export const HunterHUD=memo(function HunterHUD({hero,region}:{hero:Exploration;region:ReturnType<typeof regionLabel>}){
   const health=maxHunterHealth(hero), xp=xpNeeded(hero.level);
   return <aside className="hunter-hud" aria-label="Hunter vitals">
     <div className="hud-rank"><small>Rank</small><strong>{rank(hero.level)}</strong></div>
     <div className="hud-vitals">
-      <div><strong>Level {hero.level}</strong><span>{regionLabel(z)}</span></div>
+      <div><strong>Level {hero.level}</strong><span>{region}</span></div>
       <label>HP {healthNotation(hero.health)}/{health}<progress className="system-meter health" value={hero.health} max={health}/></label>
       <label>XP {hero.xp}/{xp}<progress className="system-meter" value={hero.xp} max={xp}/></label>
       <div><span>Armor {hero.armor}</span><span title="R · Health Potion">Potion × {hero.potions}</span></div>
     </div>
   </aside>;
-}
+});
 
-export function HunterHotbar({hero,locked,cooldown,equip}:{hero:Exploration;locked:boolean;cooldown:number;equip:(type:WeaponId,id:string)=>void}){
+export const HunterHotbar=memo(function HunterHotbar({hero,locked,cooldown,equip}:{hero:Exploration;locked:boolean;cooldown:number;equip:(type:WeaponId,id:string)=>void}){
   const weapon=instanceWeapon(hero.items.find(item=>item.id===hero.selectedItem)??legacyItem(hero.equipped));
   return <>
     <div className="system-ability" style={tint(weapon.rarity)}>
@@ -37,4 +38,4 @@ export function HunterHotbar({hero,locked,cooldown,equip}:{hero:Exploration;lock
       })}
     </div>
   </>;
-}
+});
