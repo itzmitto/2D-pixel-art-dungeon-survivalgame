@@ -11,12 +11,12 @@ const poses = [
   { time: .73, channels: [0,0,0,0,0,0,0,0] },
 ];
 const swingDuration = poses[poses.length-1].time;
-type Motion = { speed: number; sprinting: boolean; facing?: number };
+type Motion = { speed: number; sprinting: boolean; blocking?: boolean; facing?: number };
 
 export function createDarkKnight() {
   const model = createKnightModel();
   const {root,hips,torso,head,arms,legs,cape} = model;
-  let time=0, phase=0, stride=0, run=0, turn=0, attack=swingDuration;
+  let time=0, phase=0, stride=0, run=0, guard=0, turn=0, attack=swingDuration;
   const swing = new Float32Array(8);
 
   function playAttack() {
@@ -38,6 +38,7 @@ export function createDarkKnight() {
     phase=(phase+dt*stride*(8.7+3.7*run))%(Math.PI*2);
 
     attack=Math.min(swingDuration,attack+dt);
+    guard=T.MathUtils.lerp(guard,motion.blocking && attack===swingDuration ? 1 : 0,weight);
     const next = poses.findIndex((pose,i)=>i>0 && attack<=pose.time);
     const from=poses[next-1], to=poses[next];
     const blend=T.MathUtils.smoothstep(attack,from.time,to.time);
@@ -73,7 +74,12 @@ export function createDarkKnight() {
       arm.fore.rotation.x=-.2-.40*run+(i===1?swing[4]:0);
       arm.hand.rotation.y=i===1?swing[5]:0;
     }
-    arms[1].socket.rotation.set(-.38+swing[6],0,-1.93+swing[7]);
+    arms[1].upper.rotation.x-=.72*guard;
+    arms[1].upper.rotation.z+=.3*guard;
+    arms[1].fore.rotation.x-=.63*guard;
+    arms[0].upper.rotation.x-=.49*guard;
+    arms[0].fore.rotation.x-=.35*guard;
+    arms[1].socket.rotation.set(-.38+swing[6]+1.08*guard,0,-1.93+swing[7]+2.57*guard);
 
     const cloth=cape.geometry.attributes.position;
     for(let row=0;row<=12;row++){

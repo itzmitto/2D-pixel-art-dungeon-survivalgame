@@ -74,6 +74,10 @@ export function createEncounters(
     group.add(hpBar);
     const loot=new T.Mesh(lootGeometry,lootMaterial);
     loot.position.copy(home);
+    const previousDrop=save.pending[id];
+    if(previousDrop&&canWalk(previousDrop.x,previousDrop.z)){
+      loot.position.set(previousDrop.x,surface(previousDrop.x,previousDrop.z),previousDrop.z);
+    }
     loot.visible=oldDefeats.has(id)&&!collected.has(id);
     group.add(loot);
     enemies.push({...actor,id,home,hp:oldDefeats.has(id)?0:wolf.health,hpBar,fill,
@@ -136,6 +140,7 @@ export function createEncounters(
     if(enemy.hp) return;
     enemy.loot.position.copy(enemy.root.position);
     enemy.loot.visible=true;
+    save.pending[enemy.id]={x:enemy.loot.position.x,z:enemy.loot.position.z};
     oldDefeats.add(enemy.id);
     save.defeated=[...oldDefeats];
     save.xp+=wolf.xp;
@@ -186,6 +191,7 @@ export function createEncounters(
         loot.loot.visible=false;
         collected.add(loot.id);
         save.collected=[...collected];
+        delete save.pending[loot.id];
         save.gold+=wolfLoot.gold;
         save.fangs+=wolfLoot.count;
         notify('Collected '+wolfLoot.item+' and '+wolfLoot.gold+' gold.');

@@ -116,7 +116,8 @@ export function startWilderness(
       const travelled=Math.hypot(p.x-beforeX,p.z-beforeZ);
       knight.update(frameDelta,{
         speed:dt>0?travelled/dt:0,
-        sprinting,
+        sprinting:sprinting&&!blocking,
+        blocking,
         facing:length?Math.atan2(x,z):undefined,
       });
       p.y=T.MathUtils.lerp(p.y,surface(p.x,p.z),1-Math.exp(-22*dt));
