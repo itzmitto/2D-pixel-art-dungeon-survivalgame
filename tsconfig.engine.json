@@ -32,6 +32,8 @@
     "src/game/core/loop.ts",
     "src/game/rendering/sprites.ts",
     "src/game/entities/party.ts",
-    "src/game/items/inventoryModel.ts"
+    "src/game/items/inventoryModel.ts",
+    "src/game/core/bridge.ts",
+    "src/window.d.ts"
   ]
 }

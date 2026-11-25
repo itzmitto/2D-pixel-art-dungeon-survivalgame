@@ -26,6 +26,7 @@
   "include": [
     "src/main.tsx",
     "src/vite-env.d.ts",
-    "vite.config.ts"
+    "vite.config.ts",
+    "src/window.d.ts"
   ]
 }
