@@ -568,6 +568,13 @@ function collectWorldScenery(time, add) {
         }
       });
       if (tile === "Q") add(y + 28, () => drawRock(x, y, variant));
+      if (tile === "." && (col * 29 + row * 13) % 43 === 0) {
+        const glowX = x + 7 + (col * 5) % 17;
+        const glowY = y + 11 + (row * 3) % 15;
+        drawLight(glowX, glowY, 11, "#bdd47726");
+        rect("#81975d", glowX - 1, glowY, 2, 5);
+        rect("#d9d8a1", glowX - 1, glowY - 2, 2, 2);
+      }
       if (tile === "G" || tile === "X") add(y + 16, () => drawRuinGate(tile, x, y));
       if (tile === "F") add(y + 27, () => drawFieldFire(x + 16, y + 22, time));
       if (tile === "L" || tile === "T") {

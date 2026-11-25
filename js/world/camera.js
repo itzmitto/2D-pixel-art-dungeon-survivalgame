@@ -1,14 +1,18 @@
 "use strict";
 
-const VIEW_WIDTH = 480;
-const VIEW_HEIGHT = 320;
+const VIEW_WIDTH = 240;
+const VIEW_HEIGHT = 160;
 const camera = { x: 0, y: 0 };
 let cameraFollowX = 0;
 let cameraFollowY = 0;
 
 function cameraTarget(position) {
   const floor = towerFloorAt(position);
-  if (floor) return { x: 0, y: floor.top * TILE };
+  if (floor) return {
+    x: Math.max(0, Math.min(floor.rows[0].length * TILE - VIEW_WIDTH, position.x - VIEW_WIDTH / 2)),
+    y: Math.max(floor.top * TILE, Math.min((floor.top + floor.rows.length) * TILE - VIEW_HEIGHT,
+      position.y - VIEW_HEIGHT * 0.69)),
+  };
   return {
     x: Math.max(0, Math.min(WORLD_WIDTH - VIEW_WIDTH, position.x - VIEW_WIDTH / 2)),
     // Keep the knight in the lower third so the view follows from behind and exposes the trail ahead.
@@ -36,7 +40,12 @@ function updateCamera(dt) {
 
 function visibleTileBounds(padding = 0) {
   const floor = towerFloorAt(player);
-  if (floor) return { left: 0, right: floor.rows[0].length, top: floor.top, bottom: floor.top + floor.rows.length };
+  if (floor) return {
+    left: Math.max(0, Math.floor((camera.x - padding) / TILE)),
+    right: Math.min(floor.rows[0].length, Math.ceil((camera.x + VIEW_WIDTH + padding) / TILE)),
+    top: Math.max(floor.top, Math.floor((camera.y - padding) / TILE)),
+    bottom: Math.min(floor.top + floor.rows.length, Math.ceil((camera.y + VIEW_HEIGHT + padding) / TILE)),
+  };
   return {
     left: Math.max(0, Math.floor((camera.x - padding) / TILE)),
     right: Math.min(WORLD_MAP[0].length, Math.ceil((camera.x + VIEW_WIDTH + padding) / TILE)),

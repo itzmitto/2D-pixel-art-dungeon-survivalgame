@@ -210,7 +210,8 @@ function loadDungeonProgress(saved, loaded) {
     const width = legacy ? 15 * TILE : WORLD_WIDTH;
     const height = legacy ? 10 * TILE : (TOWER_FLOORS.at(-1).top + 10) * TILE;
     const validPosition = state.x >= 8 && state.x <= width - 8 && state.y >= 8 && state.y <= height - 8;
-    const destination = validPosition ? (legacy ? legacyWorldPoint(id.split(":")[0], state) : state) : spawn;
+    const destination = validPosition ? (legacy ? legacyWorldPoint(id.split(":")[0], state) :
+      saved.version === 7 ? migrateVersion7Point(state) : state) : spawn;
     const position = safeWorldPoint(destination, loaded, zone);
     const drop = validStack(state.drop) ? { item: state.drop.item, count: state.drop.count } :
       !(saved.version >= DUNGEON_LOOT_VERSION) ? { item: "gel", count: 1 } : MOB_LOOT[kind];
@@ -223,15 +224,31 @@ function loadPosition(saved, loaded) {
   const point = saved.position ?? saved.playerPosition ?? saved.player ?? saved.location;
   if (saved.version >= SAVE_VERSION) return safeWorldPoint(point, loaded);
   if (saved.version >= 7 && Number.isFinite(point?.x) && Number.isFinite(point?.y)) {
-    if (towerFloorAt(point)) return safeWorldPoint(point, loaded);
-    if (point.x < 24 * TILE && point.y < 38 * TILE) return { ...COTTAGE.spawn };
-    return safeWorldPoint(point, loaded);
+    const translated = migrateVersion7Point(point);
+    if (towerFloorAt(translated)) return safeWorldPoint(translated, loaded);
+    const col = Math.floor(point.x / TILE);
+    const row = Math.floor(point.y / TILE);
+    if (col < 24 && row < 38) return { ...COTTAGE.spawn };
+    if (col >= 34 && col <= 40 && row >= 2 && row <= 8) return worldCenter(82, 10);
+    if (col >= 25 && col <= 32 && row >= 33 && row <= 38) return worldCenter(9, 58);
+    return safeWorldPoint(translated, loaded);
   }
   const oldArea = point?.area ?? point?.region ?? saved.area ?? saved.currentArea ?? "forest";
+  if (oldArea === "house") return { ...COTTAGE.spawn };
   const arrival = LEGACY_ARRIVALS[oldArea];
   if (!arrival) return { ...COTTAGE.spawn };
   const translated = Number.isFinite(point?.x) && Number.isFinite(point?.y) ? legacyWorldPoint(oldArea, point) : arrival;
   return safeWorldPoint(translated, loaded, regionAt(arrival));
+}
+
+function migrateVersion7Point(point) {
+  const oldTops = [42, 56, 70];
+  const row = Math.floor(point.y / TILE);
+  const floorIndex = oldTops.findIndex(top => row >= top && row < top + 10);
+  if (floorIndex < 0) return point;
+  const oldTop = oldTops[floorIndex];
+  const newFloor = TOWER_FLOORS[floorIndex];
+  return { ...point, y: point.y + (newFloor.top - oldTop) * TILE };
 }
 
 function loadProgress() {

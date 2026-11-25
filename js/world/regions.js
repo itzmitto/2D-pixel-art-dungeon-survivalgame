@@ -23,9 +23,9 @@ const ZONES = {
 const COTTAGE = {
   left: 11, top: 14, right: 16, bottom: 20,
   door: worldCenter(13, 18),
-  workbench: worldCenter(13, 15),
-  bed: worldCenter(14, 15),
-  chest: worldCenter(15, 15),
+  workbench: worldCenter(13, 17),
+  bed: worldCenter(14, 17),
+  chest: worldCenter(15, 17),
   spawn: worldCenter(13, 19),
   workbenchArrival: worldCenter(12, 16),
   chestArrival: worldCenter(16, 16),
@@ -235,8 +235,8 @@ function makeWorldMap() {
 
   // Keep the field-kit clearing and encounter centers open inside the wilderness.
   for (let y = 13; y <= 21; y++) for (let x = 10; x <= 18; x++) map[y][x] = ".";
-  place("W", [[13, 15]]);
-  place("O", [[15, 15]]);
+  place("W", [[13, 17]]);
+  place("O", [[15, 17]]);
   place("F", [[13, 18]]);
   for (const { x, y, zone } of WORLD_ENEMY_SPAWNS) {
     const col = Math.floor(x / TILE);
@@ -254,8 +254,6 @@ function regionAt({ x, y }) {
   const col = Math.floor(x / TILE);
   const row = Math.floor(y / TILE);
   if (inTileBounds(col, row, COTTAGE)) return "cottage";
-  if (col <= 23 && row <= 22) return "village";
-  if (col <= 23) return "river";
   if (col >= 48 && col <= 62 && row >= 27 && row <= 36) return "arena";
   if ((col >= 43 && col <= 59 && row >= 4 && row <= 13) || (col === 59 && row < 27) ||
       (col >= 41 && col <= 52 && row >= 12 && row <= 15) || (col >= 50 && col <= 52 && row <= 26 && row >= 15)) {
