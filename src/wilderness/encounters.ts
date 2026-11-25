@@ -196,6 +196,7 @@ export function createEncounters(
   const atCamp=()=> Math.hypot(player.position.x+45,player.position.z)<4 ||
     Math.hypot(player.position.x-154,player.position.z-103)<4;
   return {
+    get weaponLocked(){return rangeTimer.busy || Boolean(queued) || magic.dashing;},
     get dashing(){return magic.dashing;},
     get abilityRemaining(){return Math.max(0,(cooldowns.get(save.equipped)??0)-time);},
     attack(startAnimation:(weapon:Weapon)=>boolean){

@@ -11,6 +11,7 @@ export function statuses(resistance:Resistance=ordinaryResistance) {
       burn=Math.max(burn,statusTuning.burn);
     },
     stun(){stun=Math.max(stun,statusTuning.stun*resistance.control);},
+    slow(){slow=Math.max(slow,statusTuning.slow*resistance.control);},
     freeze(){
       frozen=Math.max(frozen,statusTuning.freeze*resistance.control);
       slow=Math.max(slow,statusTuning.slow*resistance.control);

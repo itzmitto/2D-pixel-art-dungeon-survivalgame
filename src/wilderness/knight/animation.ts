@@ -10,7 +10,7 @@ export function createDarkKnight() {
   const model = createKnightModel();
   const {root,hips,torso,head,arms,legs,cape} = model;
   let time=0, phase=0, stride=0, run=0, guard=0, turn=0, attack=1;
-  let weapon=weapons.longsword, poseWeapon=weapon, duration=weapon.attackDuration;
+  let weapon=weapons.longsword, poseWeapon=weapon, duration=weapon.attackDuration, casting=false;
   const starter=arms[1].socket.children.slice();
   const models=new Map(elementalIds.map(id=>{
     const model=weaponModel(id);
@@ -31,7 +31,8 @@ export function createDarkKnight() {
   function playAttack(config:Weapon=weapon, ability=false) {
     if (attack < duration) return false;
     poseWeapon=config;
-    duration=ability?.69:config.attackDuration;
+    casting=ability;
+    duration=ability ? .69 : config.attackDuration;
     attack=0;
     return true;
   }
@@ -53,8 +54,11 @@ export function createDarkKnight() {
     const fraction=attack/duration;
     const impact=poseWeapon.impactTime/poseWeapon.attackDuration;
     const windupEnd=impact*.78, followEnd=impact+.14;
+    const groundStrike=casting&&poseWeapon.ability==='lightning';
+    const castStrike=groundStrike ? [.26,.28,-.75,.04,-.32,.12,.31,-.46] : poseWeapon.animation.strike;
     for(let i=0;i<swing.length;i++){
-      const {windup,strike}=poseWeapon.animation;
+      const {windup}=poseWeapon.animation;
+      const strike=castStrike;
       swing[i]=fraction<windupEnd
         ? windup[i]*T.MathUtils.smoothstep(fraction,0,windupEnd)
         : fraction<followEnd
@@ -64,7 +68,7 @@ export function createDarkKnight() {
 
     hips.position.y=1.02-.055*stride-.036*run+.026*Math.cos(phase*2)*stride;
     hips.rotation.y=.086*Math.sin(phase)*stride;
-    torso.rotation.x=.045*stride+.19*run;
+    torso.rotation.x=.045*stride+.19*run+(groundStrike?Math.max(0,Math.sin(fraction*Math.PI))*.31:0);
     torso.rotation.y=-.15*Math.sin(phase)*stride+swing[0];
     torso.rotation.z=.029*Math.sin(phase)*stride-turn*.021;
     torso.position.y=.09+.009*Math.sin(time*2.4)*(1-stride*.7);
@@ -128,5 +132,5 @@ export function createDarkKnight() {
   }
 
   update(0,{speed:0,sprinting:false});
-  return {root,update,playAttack,equip};
+  return {root,update,playAttack,equip,get animating(){return attack<duration;}};
 }

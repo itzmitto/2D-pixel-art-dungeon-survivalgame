@@ -49,9 +49,15 @@ export function startWilderness(
   const encounters=createEncounters(scene,camera,body,save,canWalk,onSaveChange);
   let blocking=false, frameDelta=0, prompt='', notification='', abilitySeconds=0;
   function equip(id:WeaponId){
-    if(!save.arsenal.includes(id)) return;
+    if(!save.arsenal.includes(id)||save.equipped===id) return;
+    if(encounters.weaponLocked||knight.animating){
+      onCombat('Finish the current attack before switching weapons.',prompt,abilitySeconds);
+      return;
+    }
     save.equipped=id;
     knight.equip(id);
+    abilitySeconds=Math.ceil(encounters.abilityRemaining);
+    onCombat(notification,prompt,abilitySeconds);
     onSaveChange();
   }
   const destination=body.position.clone();
@@ -175,7 +181,7 @@ export function startWilderness(
     },
     redeem(id:WeaponId){
       if(id==='longsword'||save.arsenal.includes(id)||save.fangs<1||
-        Math.hypot(body.position.x+45,body.position.z)>10 || !weapons[id].ability) return;
+        Math.hypot((body.position.x+45)*.85,body.position.z)>=9.5 || !weapons[id].ability) return;
       save.fangs--;
       save.arsenal.push(id);
       onSaveChange();

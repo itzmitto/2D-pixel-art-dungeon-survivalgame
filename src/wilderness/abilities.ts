@@ -14,7 +14,7 @@ export const abilityTuning={
 type Target={point:Point; alive:()=>boolean; effects:ReturnType<typeof statuses>; hit:(amount:number)=>void};
 type Travel={kind:'bolt'|'fire'|'wind'; point:Point; x:number; z:number; remaining:number; speed:number;
   radius:number; damage:number; color:number; hit:Set<Target>; trail:number};
-type Field={point:Point;remaining:number;tick:number;damage:number;first:boolean};
+type Field={point:Point;remaining:number;tick:number;damage:number;seen:Set<Target>};
 export function abilityCombat(
   player:Point, targets:readonly Target[], walkable:(x:number,z:number)=>boolean,
   clear:(x:number,z:number,tx:number,tz:number)=>boolean, fx:ReturnType<typeof createMagicEffects>,
@@ -64,7 +64,7 @@ export function abilityCombat(
         }
         case 'ice': {
           const a=abilityTuning.ice;
-          field={point,remaining:a.duration,tick:0,damage:damage*a.damage,first:true};
+          field={point,remaining:a.duration,tick:0,damage:damage*a.damage,seen:new Set()};
           fx.emit(point,weapon.color,'ring',a.radius,a.duration,{opacity:.35});
           for(let i=0;i<12;i++){
             const angle=i*Math.PI/6;
@@ -99,10 +99,13 @@ export function abilityCombat(
         field.remaining-=active;field.tick-=active;
         while(field.tick<=0){
           for(const target of nearby(field.point,abilityTuning.ice.radius)){
-            if(field.first) target.effects.freeze();
+            if(!field.seen.has(target)){
+              target.effects.freeze();
+              field.seen.add(target);
+            } else target.effects.slow();
             target.hit(field.damage);
           }
-          field.first=false;field.tick+=abilityTuning.ice.interval;
+          field.tick+=abilityTuning.ice.interval;
         }
         if(field.remaining<=0) field=undefined;
       }
