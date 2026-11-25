@@ -15,23 +15,38 @@ function paintGrass(col, row, x, y, zone) {
       rect("#334e39", x + dx - 1, y + dy + 2, 4, 1);
     }
   }
-  const shade = zone === "village" || zone === "cottage" ? "#38433558" :
-    zone === "forest" ? "#142b33a3" : "#24313082";
+  const shade = zone === "cottage" ? "#0c1712a0" :
+    zone === "forest" ? "#0a1712b8" : "#14201b9a";
   rect(shade, x, y, TILE, TILE);
+  const plant = (col * 13 + row * 7) % 19;
+  if (plant < 8) {
+    const px = x + 4 + (variant * 5 + col) % 23;
+    const py = y + 7 + (row * 11 + variant * 3) % 20;
+    rect("#293e2d", px, py + 2, 2, 4);
+    rect("#40553a", px - 2, py + 3, 3, 1);
+    rect("#364a32", px + 1, py + 1, 3, 1);
+  }
+  if (plant === 13) {
+    const fx = x + 7 + (col * 5) % 19;
+    const fy = y + 8 + (row * 3) % 18;
+    rect("#8d9174", fx, fy, 2, 3);
+    rect("#d5cda5", fx, fy, 2, 1);
+    rect("#5c7860", fx, fy + 3, 1, 2);
+  }
 }
 
 function paintDirtPath(col, row, x, y, variant) {
   const joins = (dx, dy) => "=:U+%GX".includes(worldTile(col + dx, row + dy) || " ");
-  const earth = "#75654f";
-  rect("#4a473a", x + 3, y + 3, 26, 26);
+  const earth = "#655b45";
+  rect("#373a31", x + 3, y + 3, 26, 26);
   rect(earth, x + 5, y + 5, 22, 22);
   if (joins(-1, 0)) rect(earth, x, y + 5, 6, 22);
   if (joins(1, 0)) rect(earth, x + 26, y + 5, 6, 22);
   if (joins(0, -1)) rect(earth, x + 5, y, 22, 6);
   if (joins(0, 1)) rect(earth, x + 5, y + 26, 22, 6);
-  rect("#96826a", x + 6 + variant * 4, y + 10, 5, 1);
-  rect("#625442", x + 11, y + 21 - variant, 6, 2);
-  rect("#a19576", x + 19, y + 14, 2, 2);
+  rect("#80715b", x + 6 + variant * 4, y + 10, 5, 1);
+  rect("#4f4b3b", x + 11, y + 21 - variant, 6, 2);
+  rect("#94866a", x + 19, y + 14, 2, 2);
 }
 
 function paintCobble(x, y, variant, bridge = false) {
