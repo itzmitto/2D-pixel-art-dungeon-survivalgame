@@ -62,6 +62,13 @@ function enemyMaxHealth(enemy) {
   return ENEMIES[enemy.kind].health + (enemy.veteran ? 2 : 0);
 }
 
+function exhausted(resource, x, y, state = progress) {
+  const localX = x - LEGACY_OFFSETS.forest.x;
+  const localY = y - LEGACY_OFFSETS.forest.y;
+  return LEGACY_RESOURCES[LEGACY_FOREST[localY]?.[localX]] === resource &&
+    state[resource.state][tileId(localX, localY)] === resource.hits;
+}
+
 function oldForestDrops() {
   const drops = progress.legacyTrailLoot ? [...FOREST_LOOT] : [];
   LEGACY_FOREST.forEach((row, y) => {
