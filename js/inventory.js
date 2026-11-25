@@ -53,7 +53,6 @@ const RECIPES = {
   },
 };
 
-const stage = document.querySelector(".stage");
 const backpack = document.querySelector("#backpack");
 const backpackToggle = document.querySelector("#backpack-toggle");
 const closeBackpack = document.querySelector("#close-backpack");
@@ -279,8 +278,8 @@ function openInventory(mode = "bag") {
   }
   document.querySelector("#recipe-guide").open = false;
   panelMessage("");
+  clearMouseRoute();
   backpack.hidden = false;
-  stage.dataset.panel = mode;
   backpackToggle.setAttribute("aria-expanded", "true");
   swing = undefined;
   updateInventory();
@@ -298,7 +297,6 @@ function closeInventory(focus = true) {
     return false;
   }
   backpack.hidden = true;
-  delete stage.dataset.panel;
   backpackToggle.setAttribute("aria-expanded", "false");
   inventoryChanged();
   if (focus) backpackToggle.focus();
@@ -314,7 +312,6 @@ function resumeInventory() {
   } else {
     progress.panelMode = null;
     backpack.hidden = true;
-    delete stage.dataset.panel;
     backpackToggle.setAttribute("aria-expanded", "false");
     updateInventory();
   }

@@ -60,10 +60,6 @@
 }
 .game[data-area="house"] .stage { background: radial-gradient(ellipse, #594133, #382822); }
 .game[data-area^="dungeon"] .stage { background: radial-gradient(ellipse, #383440, #26242e); }
-.stage[data-panel="bag"] {
-  grid-template-columns: minmax(0, 1fr) clamp(20rem, 36%, 31rem);
-  grid-template-rows: minmax(0, 1fr);
-}
 .room {
   position: relative;
   width: min(100%, 150cqh);
@@ -138,11 +134,6 @@ canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; 
   pointer-events: none;
 }
 @media (max-width: 43rem) {
-  .stage[data-panel="bag"] {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 2fr) minmax(0, 3fr);
-  }
-  .stage[data-panel="bag"] .room { max-width: 60cqh; }
   .controls {
     grid-template-columns: 1fr auto;
   }

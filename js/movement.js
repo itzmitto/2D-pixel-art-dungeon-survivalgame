@@ -6,7 +6,7 @@ const ROUTE_NEIGHBORS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 let mouseRoute = [];
 
 function clearMouseRoute() {
-  mouseRoute = [];
+  mouseRoute.length = 0;
 }
 
 function tileAt({ x, y }) {
@@ -19,11 +19,13 @@ function roomTile({ x, y }) {
 
 function routeSegmentClear(from, to, walkable) {
   const steps = Math.ceil(distance(from, to) / (MAX_MOVE_STEP / 2));
+  let previousX = from.x;
   let previousY = from.y;
   for (let i = 1; i <= steps; i++) {
     const x = from.x + (to.x - from.x) * i / steps;
     const y = from.y + (to.y - from.y) * i / steps;
-    if (!walkable(x, previousY) || !walkable(x, y)) return false;
+    if (!walkable(x, previousY) || !walkable(previousX, y) || !walkable(x, y)) return false;
+    previousX = x;
     previousY = y;
   }
   return true;

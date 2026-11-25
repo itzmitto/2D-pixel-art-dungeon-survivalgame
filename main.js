@@ -50,6 +50,7 @@ function updateHud() {
 }
 
 function finish(outcome, message) {
+  clearMouseRoute();
   phase = outcome;
   result.textContent = message;
   ending.hidden = false;

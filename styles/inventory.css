@@ -19,15 +19,8 @@
   box-shadow: 0 10px 30px #100c09b3;
   pointer-events: auto;
 }
-.stage[data-panel="bag"] .inventory {
-  position: static;
-  place-self: stretch;
-  place-items: stretch;
-  min-width: 0;
-  min-height: 0;
-}
-.stage[data-panel="bag"] .panel-body { grid-template-columns: minmax(0, 1fr); }
 .panel-heading, .panel-footer {
+  flex-shrink: 0;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -54,6 +47,7 @@
 }
 #panel-feedback { color: #ffce9a; }
 .panel-body {
+  flex: 1 1 auto;
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
   align-items: start;
