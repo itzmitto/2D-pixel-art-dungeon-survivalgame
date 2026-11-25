@@ -1,4 +1,6 @@
-import { isWeaponId, type WeaponId } from './weapons.ts';
+import { legacyItem, type WeaponItem } from './itemInstances.ts';
+import type { Drop } from './huntData.ts';
+import { isWeaponId, rarity, type Rarity, type WeaponId } from './weapons.ts';
 import { freshStats, maxHunterHealth, progression, statNames, type Hunter } from './progression.ts';
 import { extent, spawn } from './layout.ts';
 
@@ -9,6 +11,7 @@ export const saveKey = 'vonkje-wilderness-v1';
 export type Position = { x: number; z: number; yaw: number };
 export type Exploration = Hunter & { version: 1; seed: number; position: Position; discovered: number[];
   gold: number; fangs: number; armor: number;
+  items: WeaponItem[]; selectedItem: string; materials: Record<string,number>; potions:number; drops:Record<string,Drop>; returns:Record<string,number>; opened:string[];
   arsenal: WeaponId[]; equipped: WeaponId; hotbar: (WeaponId|null)[];
   defeated: string[]; collected: string[]; pending: Record<string,{x:number;z:number}>;
 };
@@ -52,12 +55,12 @@ export function readExploration(raw: string | null): Exploration | null {
     const ids=(key:string)=>{
       const list:unknown=Object.getOwnPropertyDescriptor(value,key)?.value;
       return Array.isArray(list) ? [...new Set(list.filter((id:unknown): id is string =>
-        typeof id==='string' && /^wolf-[0-9]+$/.test(id)))] : [];
+        typeof id==='string' && /^(wolf|dire|den)-[a-z0-9-]+$/.test(id)))] : [];
     };
     const pending: Exploration['pending']={};
-    const drops:unknown=Object.getOwnPropertyDescriptor(value,'pending')?.value;
-    if(drops&&typeof drops==='object') for(const [id,point] of Object.entries(drops)){
-      if(/^wolf-[0-9]+$/.test(id) && point && typeof point.x==='number' && Math.abs(point.x)<extent &&
+    const savedPending:unknown=Object.getOwnPropertyDescriptor(value,'pending')?.value;
+    if(savedPending&&typeof savedPending==='object') for(const [id,point] of Object.entries(savedPending)){
+      if(/^(wolf|dire|den)-[a-z0-9-]+$/.test(id) && point && typeof point.x==='number' && Math.abs(point.x)<extent &&
         typeof point.z==='number' && Math.abs(point.z)<extent) pending[id]={x:point.x,z:point.z};
     }
     const storedArsenal:unknown=Object.getOwnPropertyDescriptor(value,'arsenal')?.value;
@@ -85,7 +88,37 @@ export function readExploration(raw: string | null): Exploration | null {
       return Array.isArray(list)?[...new Set(list.filter((id:unknown):id is string=>
         typeof id==='string'&&/^[a-z0-9-]{1,48}$/.test(id)))]:[];
     };
-    return {version:1,seed,arsenal,equipped,hotbar,position:{x:position.x,z:position.z,yaw:position.yaw},discovered:[...new Set(known)],
+    const items:WeaponItem[]=[];
+    const storedItems:unknown=Object.getOwnPropertyDescriptor(value,'items')?.value;
+    if(Array.isArray(storedItems)) for(const item of storedItems.slice(0,250)){
+      if(item&&typeof item.id==='string'&&/^[a-z0-9-]{1,70}$/.test(item.id)&&isWeaponId(item.type)&&
+        typeof item.rarity==='string'&&Object.hasOwn(rarity,item.rarity)&&!items.some(existing=>existing.id===item.id)){
+        items.push({id:item.id,type:item.type,rarity:item.rarity as Rarity});
+        if(!arsenal.includes(item.type)) arsenal.push(item.type);
+      }
+    }
+    for(const type of arsenal) if(!items.some(item=>item.type===type)) items.push(legacyItem(type));
+    const storedSelection:unknown=Object.getOwnPropertyDescriptor(value,'selectedItem')?.value;
+    const selectedItem=(items.find(item=>item.id===storedSelection&&item.type===equipped)??items.find(item=>item.type===equipped))?.id??'longsword';
+    const drops:Record<string,Drop>={};
+    const storedDrops:unknown=Object.getOwnPropertyDescriptor(value,'drops')?.value;
+    if(storedDrops&&typeof storedDrops==='object') for(const [id,drop] of Object.entries(storedDrops)){
+      if(!Object.hasOwn(pending,id)||!drop||typeof drop.material!=='string'||!Object.hasOwn(rarity,drop.rarity)||
+        !Number.isSafeInteger(drop.gold)||drop.gold<0||drop.gold>1000) continue;
+      drops[id]={gold:drop.gold,material:drop.material.slice(0,40),rarity:drop.rarity,weapon:isWeaponId(drop.weapon)?drop.weapon:undefined,
+        potion:drop.potion===1?1:0};
+    }
+    const counts=(key:string)=>{
+      const record:Record<string,number>={};
+      const raw:unknown=Object.getOwnPropertyDescriptor(value,key)?.value;
+      if(raw&&typeof raw==='object') for(const [id,amount] of Object.entries(raw)){
+        if(/^[a-zA-Z0-9 -]{1,48}$/.test(id)&&typeof amount==='number'&&Number.isSafeInteger(amount)&&amount>=0)
+          record[id]=amount;
+      }
+      return record;
+    };
+    return {version:1,seed,arsenal,equipped,hotbar,items,selectedItem,drops,opened:namedIds('opened'),
+      returns:counts('returns'),materials:counts('materials'),potions:integer('potions',0,0,100000),position:{x:position.x,z:position.z,yaw:position.yaw},discovered:[...new Set(known)],
       health:integer('health',maxHunterHealth({level,stats}),0,maxHunterHealth({level,stats})),level,stats,
       armor:integer('armor',0,0,25),statPoints:integer('statPoints',budget,0,budget),
       kills:integer('kills',ids('defeated').length,0,1e9),
@@ -96,5 +129,5 @@ export function readExploration(raw: string | null): Exploration | null {
 }
 
 export function newExploration(): Exploration {
-  return {version:1,seed:defaultSeed,arsenal:['longsword'],equipped:'longsword',hotbar:['longsword',null,null,null,null],position:{...spawn,yaw:0},discovered:[],health:progression.baseHealth,level:1,stats:freshStats(),statPoints:0,kills:0,armor:0,completedDungeons:[],defeatedBosses:[],xp:0,gold:0,fangs:0,defeated:[],collected:[],pending:{}};
+  return {version:1,seed:defaultSeed,arsenal:['longsword'],items:[legacyItem('longsword')],selectedItem:'longsword',materials:{},potions:0,drops:{},returns:{},opened:[],equipped:'longsword',hotbar:['longsword',null,null,null,null],position:{...spawn,yaw:0},discovered:[],health:progression.baseHealth,level:1,stats:freshStats(),statPoints:0,kills:0,armor:0,completedDungeons:[],defeatedBosses:[],xp:0,gold:0,fangs:0,defeated:[],collected:[],pending:{}};
 }
