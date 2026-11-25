@@ -1,8 +1,12 @@
 import * as T from 'three';
-import { inArc, longsword, maxHealth, swingTimer, wolf, wolfLoot, xpNeeded } from './combatRules.ts';
+import { inArc, maxHealth, swingTimer, wolf, wolfLoot, xpNeeded } from './combatRules.ts';
 import type { Exploration } from './exploration.ts';
 import { randomSequence, spawn, surface } from './layout.ts';
 import { wolfModels } from './wolves.ts';
+import { elementalIds, weaponDamage, weapons, type Weapon, type WeaponId } from './weapons.ts';
+import { createMagicEffects } from './magicEffects.ts';
+import { abilityCombat } from './abilities.ts';
+import { statuses } from './statusEffects.ts';
 
 const territories = [
   { x:-66,z:-20 }, { x:-97,z:-68 }, { x:-162,z:67 }, { x:-170,z:-111 },
@@ -40,6 +44,9 @@ export function createEncounters(
   const rangeTimer=swingTimer();
   const oldDefeats=new Set(save.defeated), collected=new Set(save.collected);
   const rand=randomSequence(save.seed ^ 0xa3615);
+  const fx=createMagicEffects(group);
+  const cooldowns=new Map<WeaponId,number>();
+  let attackWeapon=weapons.longsword, queued:{weapon:Weapon;delay:number;yaw:number}|undefined;
   let time=0, notification='', noticeUntil=0;
   const notify=(message:string)=>{
     notification=message; noticeUntil=time+notificationsSeconds; changed();
@@ -52,7 +59,7 @@ export function createEncounters(
   const lootMaterial=new T.MeshStandardMaterial({color:'#bd9868',emissive:'#916024',emissiveIntensity:.7,roughness:.36});
   type Enemy = ReturnType<typeof models.make> & {
     id:string; home:T.Vector3; hp:number; hpBar:T.Group; fill:T.Mesh;
-    cooldown:number; windup:number; heading:number; phase:number; hitFlash:number; loot:T.Mesh;
+    statuses:ReturnType<typeof statuses>; cooldown:number; windup:number; heading:number; phase:number; hitFlash:number; loot:T.Mesh;
   };
   const enemies:Enemy[]=[];
   for(const [index,center] of territories.entries()){
@@ -81,7 +88,7 @@ export function createEncounters(
     loot.visible=oldDefeats.has(id)&&!collected.has(id);
     group.add(loot);
     enemies.push({...actor,id,home,hp:oldDefeats.has(id)?0:wolf.health,hpBar,fill,
-      cooldown:0,windup:0,heading:rand()*6.28,phase:rand()*10,hitFlash:0,loot});
+      statuses:statuses(),cooldown:0,windup:0,heading:rand()*6.28,phase:rand()*10,hitFlash:0,loot});
   }
 
   const sparkGeometry=new T.BufferGeometry();
@@ -93,16 +100,19 @@ export function createEncounters(
   group.add(sparks);
   const bursts=Array.from({length:36},()=>({p:new T.Vector3(),v:new T.Vector3(),life:0}));
   let sparkCursor=0;
-  const numberMaterial=numberSprite(longsword.damage);
-  const numbers=numberMaterial?Array.from({length:6},()=>{
-    const sprite=new T.Sprite(numberMaterial);
+  const numberMaterials=new Map<number,T.SpriteMaterial>();
+  const emptyMaterial=new T.SpriteMaterial();
+  const numbers=Array.from({length:6},()=>{
+    const sprite=new T.Sprite(emptyMaterial);
     sprite.scale.set(1.6,1.2,1);
     sprite.visible=false;
     group.add(sprite);
     return {sprite,age:1,base:0};
-  }):[];
+  });
   let numberCursor=0;
-
+  const magic=abilityCombat(player.position,enemies.map(enemy=>({
+    point:enemy.root.position,alive:()=>enemy.hp>0,effects:enemy.statuses,hit:damage=>hitEnemy(enemy,damage),
+  })),canWalk,clearLine,fx);
   const slashGeometry=new T.RingGeometry(1.53,2.71,18,1,Math.PI/2-1,2).rotateX(Math.PI/2);
   const slashMaterial=new T.MeshBasicMaterial({color:'#e3cda6',transparent:true,opacity:0,
     side:T.DoubleSide,depthWrite:false});
@@ -110,15 +120,22 @@ export function createEncounters(
   slash.visible=false;
   group.add(slash);
   let slashTime=0;
-  function impact(point:T.Vector3, showDamage=false){
+  function impact(point:T.Vector3, damage=0){
     for(let i=0;i<8;i++){
       const spark=bursts[sparkCursor++%bursts.length];
       spark.p.copy(point); spark.p.y+=.85;
       spark.v.set((rand()-.5)*6,1.5+rand()*3,(rand()-.5)*6);
       spark.life=.32+rand()*.16;
     }
-    if(showDamage&&numbers.length){
+    if(damage>0){
+      let material=numberMaterials.get(damage);
+      if(!material){
+        material=numberSprite(damage)??undefined;
+        if(material) numberMaterials.set(damage,material);
+      }
+      if(!material) return;
       const number=numbers[numberCursor++%numbers.length];
+      number.sprite.material=material;
       number.sprite.position.copy(point);
       number.base=point.y+2.2;
       number.age=0;
@@ -133,10 +150,12 @@ export function createEncounters(
     return true;
   }
 
-  function hitEnemy(enemy:Enemy){
-    enemy.hp=Math.max(0,enemy.hp-longsword.damage);
+  function hitEnemy(enemy:Enemy, amount:number){
+    if(enemy.hp<=0) return;
+    const damage=Math.round(amount*10)/10;
+    enemy.hp=Math.max(0,enemy.hp-damage);
     enemy.hitFlash=.22;
-    impact(enemy.root.position,true);
+    impact(enemy.root.position,damage);
     if(enemy.hp) return;
     enemy.loot.position.copy(enemy.root.position);
     enemy.loot.visible=true;
@@ -155,14 +174,17 @@ export function createEncounters(
 
   function hitPlayer(enemy:Enemy, blocking:boolean){
     const guard=blocking&&inArc(player.position,enemy.root.position,player.rotation.y,3,1.25);
-    if(guard){
+    const shieldBlock=guard&&weapons[save.equipped].model.shield;
+    if(shieldBlock || (guard&&save.equipped==='longsword')){
       impact(player.position);
       notify('Blocked');
       return;
     }
-    save.health=Math.max(0,save.health-wolf.damage);
+    const damage=magic.shield.absorb(guard ? Math.ceil(wolf.damage*.46) : wolf.damage);
+    if(damage===0){notify('Water barrier absorbed the bite.');return;}
+    save.health=Math.max(0,save.health-damage);
     impact(player.position);
-    if(!save.health) rangeTimer.cancel();
+    if(!save.health){rangeTimer.cancel();queued=undefined;magic.reset();}
     notify(save.health?'The wolf hit you.':'You fell in the Blackwater Wilds.');
   }
 
@@ -174,9 +196,21 @@ export function createEncounters(
   const atCamp=()=> Math.hypot(player.position.x+45,player.position.z)<4 ||
     Math.hypot(player.position.x-154,player.position.z-103)<4;
   return {
-    attack(startAnimation:()=>boolean){
-      if(!save.health||!rangeTimer.start()) return;
-      if(!startAnimation()) rangeTimer.cancel();
+    get dashing(){return magic.dashing;},
+    get abilityRemaining(){return Math.max(0,(cooldowns.get(save.equipped)??0)-time);},
+    attack(startAnimation:(weapon:Weapon)=>boolean){
+      if(!save.health||queued||magic.dashing) return;
+      const weapon=weapons[save.equipped];
+      if(!rangeTimer.start(weapon)) return;
+      if(!startAnimation(weapon)){rangeTimer.cancel();return;}
+      attackWeapon=weapon;
+    },
+    cast(startAnimation:(weapon:Weapon,ability:boolean)=>boolean){
+      const weapon=weapons[save.equipped];
+      if(!save.health||!weapon.ability||queued||magic.dashing||rangeTimer.busy||
+        (cooldowns.get(weapon.id)??0)>time||!startAnimation(weapon,true)) return;
+      cooldowns.set(weapon.id,time+weapon.abilityCooldown);
+      queued={weapon,delay:.69*weapon.impactTime/weapon.attackDuration,yaw:player.rotation.y};
     },
     interact(){
       if(!save.health){
@@ -194,7 +228,11 @@ export function createEncounters(
         delete save.pending[loot.id];
         save.gold+=wolfLoot.gold;
         save.fangs+=wolfLoot.count;
-        notify('Collected '+wolfLoot.item+' and '+wolfLoot.gold+' gold.');
+        const reward=elementalIds[Number(loot.id.split('-')[1])];
+        if(reward&&!save.arsenal.includes(reward)){
+          save.arsenal.push(reward);
+          notify('Looted '+weapons[reward].name+', Wolf Fang and gold.');
+        } else notify('Collected '+wolfLoot.item+' and '+wolfLoot.gold+' gold.');
       } else if(atCamp()&&save.health<maxHealth){
         save.health=maxHealth;
         notify('Rested at the campfire.');
@@ -207,21 +245,40 @@ export function createEncounters(
     update(dt:number,blocking:boolean){
       time+=dt;
       if(notification&&time>=noticeUntil){notification='';changed();}
-      if(rangeTimer.advance(dt)&&save.health){
-        slashTime=.23;
-        slash.position.copy(player.position);
-        slash.position.y+=1.15;
-        slash.rotation.y=player.rotation.y;
-        for(const enemy of enemies){
-          const p=enemy.root.position;
-          if(enemy.hp && Math.abs(player.position.y-p.y)<2 &&
-            inArc(player.position,p,player.rotation.y,longsword.range,longsword.reachAngle) &&
-            clearLine(player.position.x,player.position.z,p.x,p.z)) hitEnemy(enemy);
+      if(queued){
+        queued.delay-=dt;
+        if(queued.delay<=0){
+          magic.cast(queued.weapon,queued.yaw);
+          queued=undefined;
         }
       }
+      if(rangeTimer.advance(dt)&&save.health){
+        const weapon=attackWeapon;
+        if(weapon.id==='staff') magic.bolt(weapon,player.rotation.y);
+        else {
+          slashTime=.23;
+          slashMaterial.color.setHex(weapon.color);
+          slash.scale.setScalar(weapon.range/2.9);
+          slash.position.copy(player.position);
+          slash.position.y+=1.15;
+          slash.rotation.y=player.rotation.y;
+          for(const enemy of enemies){
+            const p=enemy.root.position;
+            if(enemy.hp && Math.abs(player.position.y-p.y)<2 &&
+              inArc(player.position,p,player.rotation.y,weapon.range,weapon.reachAngle) &&
+              clearLine(player.position.x,player.position.z,p.x,p.z)) hitEnemy(enemy,weaponDamage(weapon));
+          }
+        }
+      }
+      magic.update(dt);
+
 
       for(const enemy of enemies){
         const root=enemy.root, p=root.position;
+        if(enemy.hp>0) enemy.statuses.update(dt,amount=>hitEnemy(enemy,amount),(dx,dz)=>{
+          if(canWalk(p.x+dx,p.z)) p.x+=dx;
+          if(canWalk(p.x,p.z+dz)) p.z+=dz;
+        });
         const gap=Math.hypot(player.position.x-p.x,player.position.z-p.z);
         const active=gap<nearDistance&&enemy.hp>0;
         root.visible=active;
@@ -233,7 +290,9 @@ export function createEncounters(
         enemy.cooldown=Math.max(0,enemy.cooldown-dt);
         enemy.hitFlash=Math.max(0,enemy.hitFlash-dt);
         let gait=0;
-        if(enemy.windup>0){
+        if(enemy.statuses.halted){
+          enemy.windup=0;
+        } else if(enemy.windup>0){
           enemy.windup=Math.max(0,enemy.windup-dt);
           if(!enemy.windup){
             enemy.cooldown=wolf.recovery;
@@ -249,7 +308,7 @@ export function createEncounters(
           };
           const dx=goal.x-p.x,dz=goal.z-p.z,remaining=Math.hypot(dx,dz);
           if(remaining>.35){
-            const step=Math.min(remaining,(aggro?wolf.speed:1.65)*dt);
+            const step=Math.min(remaining,(aggro?wolf.speed:1.65)*dt*enemy.statuses.speed);
             const tryStep=(factor:number)=>{
               const angle=Math.atan2(dx,dz)+factor;
               const x=p.x+Math.sin(angle)*step,z=p.z+Math.cos(angle)*step;
@@ -271,6 +330,8 @@ export function createEncounters(
       }
     },
     render(dt:number){
+      fx.update(dt);
+      fx.barrier(player.position,magic.shield.active);
       slashTime=Math.max(0,slashTime-dt);
       slash.visible=slashTime>0;
       slashMaterial.opacity=slashTime*1.7;
@@ -306,8 +367,9 @@ export function createEncounters(
       scene.remove(group);
       models.dispose();
       for(const resource of [barGeometry,backing,red,alert,lootGeometry,lootMaterial,sparkGeometry,sparks.material,slashGeometry,slashMaterial]) resource.dispose();
-      numberMaterial?.map?.dispose();
-      numberMaterial?.dispose();
+      fx.dispose();
+      for(const material of numberMaterials.values()){material.map?.dispose();material.dispose();}
+      emptyMaterial.dispose();
     },
   };
 }

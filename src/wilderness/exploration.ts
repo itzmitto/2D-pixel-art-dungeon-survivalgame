@@ -1,3 +1,4 @@
+import { isWeaponId, type WeaponId } from './weapons.ts';
 import { maxHealth } from './combatRules.ts';
 import { extent, spawn } from './layout.ts';
 
@@ -8,6 +9,7 @@ export const saveKey = 'vonkje-wilderness-v1';
 export type Position = { x: number; z: number; yaw: number };
 export type Exploration = { version: 1; seed: number; position: Position; discovered: number[];
   health: number; level: number; xp: number; gold: number; fangs: number;
+  arsenal: WeaponId[]; equipped: WeaponId; hotbar: (WeaponId|null)[];
   defeated: string[]; collected: string[]; pending: Record<string,{x:number;z:number}>;
 };
 
@@ -58,7 +60,16 @@ export function readExploration(raw: string | null): Exploration | null {
       if(/^wolf-[0-9]+$/.test(id) && point && typeof point.x==='number' && Math.abs(point.x)<extent &&
         typeof point.z==='number' && Math.abs(point.z)<extent) pending[id]={x:point.x,z:point.z};
     }
-    return {version:1,seed,position:{x:position.x,z:position.z,yaw:position.yaw},discovered:[...new Set(known)],
+    const storedArsenal:unknown=Object.getOwnPropertyDescriptor(value,'arsenal')?.value;
+    const arsenal:WeaponId[]=[...new Set<WeaponId>(['longsword',...(Array.isArray(storedArsenal)?storedArsenal.filter(isWeaponId):[])])];
+    const storedEquipped:unknown=Object.getOwnPropertyDescriptor(value,'equipped')?.value;
+    const storedHotbar:unknown=Object.getOwnPropertyDescriptor(value,'hotbar')?.value;
+    const hotbar=Array.from({length:5},(_,i)=>{
+      const id:unknown=Array.isArray(storedHotbar)?storedHotbar[i]:i===0?'longsword':null;
+      return isWeaponId(id)&&arsenal.includes(id)?id:null;
+    });
+    const equipped=isWeaponId(storedEquipped)&&arsenal.includes(storedEquipped)?storedEquipped:'longsword';
+    return {version:1,seed,arsenal,equipped,hotbar,position:{x:position.x,z:position.z,yaw:position.yaw},discovered:[...new Set(known)],
       health:integer('health',maxHealth,0,maxHealth),level:integer('level',1,1,1e5),
       xp:integer('xp',0,0,6e6),gold:integer('gold',0,0,1e9),fangs:integer('fangs',0,0,1e9),
       defeated:ids('defeated'),collected:ids('collected'),pending};
@@ -66,5 +77,5 @@ export function readExploration(raw: string | null): Exploration | null {
 }
 
 export function newExploration(): Exploration {
-  return {version:1,seed:defaultSeed,position:{...spawn,yaw:0},discovered:[],health:maxHealth,level:1,xp:0,gold:0,fangs:0,defeated:[],collected:[],pending:{}};
+  return {version:1,seed:defaultSeed,arsenal:['longsword'],equipped:'longsword',hotbar:['longsword',null,null,null,null],position:{...spawn,yaw:0},discovered:[],health:maxHealth,level:1,xp:0,gold:0,fangs:0,defeated:[],collected:[],pending:{}};
 }

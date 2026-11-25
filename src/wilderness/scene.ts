@@ -9,6 +9,7 @@ import { createEncounters } from './encounters';
 import { obstacleGrid } from './spatial';
 import type { Exploration, Position } from './exploration';
 
+import { weapons, type WeaponId } from './weapons';
 import { createDarkKnight } from './knight/animation';
 
 export function startWilderness(
@@ -18,7 +19,7 @@ export function startWilderness(
   onMapKey:(closeOnly:boolean)=>void,
   uiOpen:()=>boolean,
   onInventory:()=>void,
-  onCombat:(notification:string,prompt:string)=>void,
+  onCombat:(notification:string,prompt:string,cooldown:number)=>void,
   onSaveChange:()=>void,
 ) {
   const context=canvas.getContext('webgl2',{antialias:true});
@@ -32,6 +33,7 @@ export function startWilderness(
   const camera=new T.PerspectiveCamera(43,1,.3,400);
   const knight=createDarkKnight();
   const body=knight.root;
+  knight.equip(save.equipped);
 
   scene.add(body);
   const water=terrain(scene);
@@ -45,7 +47,13 @@ export function startWilderness(
   const animateGrass=meadow(scene,body.position,rocks,save.seed);
   const animateNight=atmosphere(scene,fireY);
   const encounters=createEncounters(scene,camera,body,save,canWalk,onSaveChange);
-  let blocking=false, frameDelta=0, prompt='', notification='';
+  let blocking=false, frameDelta=0, prompt='', notification='', abilitySeconds=0;
+  function equip(id:WeaponId){
+    if(!save.arsenal.includes(id)) return;
+    save.equipped=id;
+    knight.equip(id);
+    onSaveChange();
+  }
   const destination=body.position.clone();
   const focus=destination.clone();
   const offset=new T.Vector3(0,Math.sin(58*Math.PI/180),Math.cos(58*Math.PI/180));
@@ -72,6 +80,13 @@ export function startWilderness(
         else onMapKey(e.code==='Escape');
       }
       return;
+    }
+    if(!uiOpen()&&!e.repeat){
+      if(e.code==='KeyQ'&&!blocking){e.preventDefault();encounters.cast(knight.playAttack);}
+      if(/^Digit[1-5]$/.test(e.code)){
+        const id=save.hotbar[Number(e.code.slice(-1))-1];
+        if(id) equip(id);
+      }
     }
     if(e.code==='KeyE'&&!uiOpen()&&!e.repeat){
       e.preventDefault();
@@ -103,7 +118,7 @@ export function startWilderness(
       if(uiOpen()||!save.health) {keys.clear(); blocking=false;}
       const x=Number(keys.has('KeyD'))-Number(keys.has('KeyA'));
       const z=Number(keys.has('KeyS'))-Number(keys.has('KeyW'));
-      const length=Math.hypot(x,z);
+      const length=encounters.dashing?0:Math.hypot(x,z);
       const sprinting=keys.has('ShiftLeft')||keys.has('ShiftRight');
       const speed=blocking?3:sprinting?12:6;
       const p=body.position;
@@ -124,9 +139,10 @@ export function startWilderness(
       if(!uiOpen()) {
         encounters.update(dt,blocking);
         const view=encounters.ui();
-        if(view.prompt!==prompt||view.notification!==notification){
-          prompt=view.prompt; notification=view.notification;
-          onCombat(notification,prompt);
+        const seconds=Math.ceil(encounters.abilityRemaining);
+        if(view.prompt!==prompt||view.notification!==notification||seconds!==abilitySeconds){
+          prompt=view.prompt; notification=view.notification; abilitySeconds=seconds;
+          onCombat(notification,prompt,abilitySeconds);
         }
       }
       destination.set(p.x,p.y+.75,p.z);
@@ -150,7 +166,21 @@ export function startWilderness(
   canvas.addEventListener('webglcontextlost',e=>{ e.preventDefault(); loop.stop(); },{signal});
   canvas.addEventListener('webglcontextrestored',()=>loop.start(),{signal});
   loop.start();
-  return ()=>{
+  return {
+    equip,
+    assign(slot:number,id:WeaponId|null){
+      if(!Number.isInteger(slot)||slot<0||slot>=save.hotbar.length||(id&&!save.arsenal.includes(id))) return;
+      save.hotbar=save.hotbar.map((item,i)=>i===slot?id:id&&item===id?null:item);
+      onSaveChange();
+    },
+    redeem(id:WeaponId){
+      if(id==='longsword'||save.arsenal.includes(id)||save.fangs<1||
+        Math.hypot(body.position.x+45,body.position.z)>10 || !weapons[id].ability) return;
+      save.fangs--;
+      save.arsenal.push(id);
+      onSaveChange();
+    },
+    dispose(){
     loop.stop(); controller.abort(); observer.disconnect(); encounters.dispose();
     const geometries=new Set<T.BufferGeometry>(),materials=new Set<T.Material>();
     scene.traverse(object=>{
@@ -163,5 +193,6 @@ export function startWilderness(
     });
     geometries.forEach(g=>g.dispose()); materials.forEach(m=>m.dispose());
     renderer.dispose();
+    },
   };
 }

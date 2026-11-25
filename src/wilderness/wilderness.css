@@ -23,3 +23,10 @@
   .wild-health { align-items: flex-start; flex-direction: column; gap: .15rem; font-size: .78rem; }
   .wild nav { flex-direction: column; align-items: flex-end; gap: .3rem; }
 }
+.weaponHud { justify-self: center; display: grid; gap: .1rem; padding: .25rem .6rem; background: #191b1ae6; border: 1px solid #615844; font-size: .83rem; }
+.weaponHud kbd { color: #f6d195; }
+.wild .wild-hotbar button { width: auto; flex: 1; min-width: 0; padding: .26rem; aspect-ratio: auto; font-size: .69rem; }
+.wild .wild-hotbar { width: 100%; }
+.weapon-list { display:flex; flex-wrap:wrap; list-style:none; padding:0; gap:.3rem; }
+.weapon-detail { display:grid; gap:.4rem; justify-items:start; padding:.55rem; background:#171b19; }
+.weapon-detail select { color:#f2e4ca; background:#262621; }

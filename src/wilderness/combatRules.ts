@@ -1,7 +1,5 @@
-export const longsword = {
-  name: 'Longsword', damage: 3, range: 2.9, reachAngle: 1.05,
-  impactTime: .32, cooldown: .78, rarity: 'Common',
-} as const;
+import { weapons, type Weapon } from './weapons.ts';
+export const longsword=weapons.longsword;
 
 export const wolf = {
   name: 'Blackwater Wolf', level: 1, health: 6, damage: 2, speed: 4.25,
@@ -19,18 +17,20 @@ export function inArc(origin: Point, target: Point, facing: number, range: numbe
 }
 
 export function swingTimer() {
-  let elapsed=longsword.cooldown as number;
+  let elapsed=longsword.cooldown, attack=longsword;
   return {
-    start() {
-      if(elapsed<longsword.cooldown) return false;
+    get busy(){return elapsed<attack.cooldown;},
+    start(weapon:Weapon=longsword) {
+      if(elapsed<attack.cooldown) return false;
+      attack=weapon;
       elapsed=0;
       return true;
     },
     advance(dt:number) {
       const previous=elapsed;
-      elapsed=Math.min(longsword.cooldown,elapsed+dt);
-      return previous<longsword.impactTime && elapsed>=longsword.impactTime;
+      elapsed=Math.min(attack.cooldown,elapsed+dt);
+      return previous<attack.impactTime && elapsed>=attack.impactTime;
     },
-    cancel() { elapsed=longsword.cooldown; },
+    cancel() { elapsed=attack.cooldown; },
   };
 }
