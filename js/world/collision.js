@@ -18,7 +18,7 @@ function blocked(x, y, radius, canUseGates = true, state = progress) {
       const col = Math.floor(edgeX / TILE);
       const row = Math.floor(edgeY / TILE);
       const tile = worldTile(col, row);
-      if (!tile || SOLID_TILES.has(tile) || state?.buildings[tileId(col, row)] === "fence") return true;
+      if (!tile || SOLID_TILES.has(tile) || state?.buildings?.[tileId(col, row)] === "fence") return true;
       if ((tile === "G" || tile === "X") && (!canUseGates || !gateOpen(tile, state))) return true;
     }
   }

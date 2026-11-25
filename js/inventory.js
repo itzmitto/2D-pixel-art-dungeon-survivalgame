@@ -329,7 +329,7 @@ function resumeInventory() {
       if (distance(player, station.position) >= 38) placeParty(station.arrival);
       openInventory(mode, chestId);
     } else {
-      if (mode === "workbench" && (!insideCottage(player) || distance(player, COTTAGE.workbench) >= 35)) {
+      if (mode === "workbench" && (!insideCottage(player) || distance(player, COTTAGE.workbench) >= 38)) {
         placeParty(COTTAGE.workbenchArrival);
       }
       openInventory(mode === "chest" ? "bag" : mode);

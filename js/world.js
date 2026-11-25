@@ -175,10 +175,10 @@ function getAction() {
     return { kind: "chest", id, hint: "E — Open " + chest.name.toLowerCase() };
   }
   if (insideCottage(player)) {
-    if (distance(player, COTTAGE.workbench) < 31) return { kind: "bench", hint: "E — Open workbench" };
+    if (distance(player, COTTAGE.workbench) < 38) return { kind: "bench", hint: "E — Open workbench" };
     if (distance(player, COTTAGE.bed) < 36 && player.hearts < 3) return { kind: "rest", hint: "E — Rest" };
   }
-  if (!hasKey && distance(player, KEY_GATE_POSITION) < 48) return { kind: "locked", hint: "Gate locked · Find the keep key" };
+  if (!hasKey && distance(player, WORLD_GATES.G) < 48) return { kind: "locked", hint: "Gate locked · Find the keep key" };
   return null;
 }
 

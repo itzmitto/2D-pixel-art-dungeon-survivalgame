@@ -15,8 +15,10 @@ function cameraTarget(position) {
 
 function snapCamera() {
   const target = cameraTarget(player);
-  camera.x = cameraFollowX = target.x;
-  camera.y = cameraFollowY = target.y;
+  cameraFollowX = target.x;
+  cameraFollowY = target.y;
+  camera.x = Math.round(cameraFollowX);
+  camera.y = Math.round(cameraFollowY);
 }
 
 function updateCamera(dt) {

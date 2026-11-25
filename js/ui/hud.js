@@ -32,6 +32,8 @@ function updateHud() {
 function finish(outcome, message) {
   clearMouseRoute();
   phase = outcome;
+  progress.position = { ...COTTAGE.spawn };
+  storeProgress();
   result.textContent = message;
   ending.hidden = false;
   respawnButton.hidden = false;

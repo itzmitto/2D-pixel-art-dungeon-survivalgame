@@ -285,7 +285,13 @@ function drawBuildingExterior({ left, top, right, bottom }, cottage = false) {
   if (!cottage) {
     ctx.filter = (left + top) % 3 === 0 ? "saturate(0.6) brightness(0.79)" : "saturate(0.72) brightness(0.88)";
   }
-  if (!drawPng("cottage", x + width / 2, y + height / 2, 0, 0, 1, width, height)) {
+  const image = PNG_SPRITES.cottage.image;
+  if (cottage && image) {
+    // Align the source facade's off-center awning with the doorway tile.
+    const half = width / 2;
+    ctx.drawImage(image, 0, 0, 80, 96, x, y, half, height);
+    ctx.drawImage(image, 80, 0, 48, 96, x + half, y, half, height);
+  } else if (!drawPng("cottage", x + width / 2, y + height / 2, 0, 0, 1, width, height)) {
     rect("#523b34", x + 3, y + 40, width - 6, height - 42);
     rect("#422e37", x, y + 19, width, 34);
     rect("#6f493d", x + 12, y + 9, width - 24, 15);
@@ -376,22 +382,6 @@ function drawBuiltTorch(x, y) {
   rect("#ac6f43", x - 2, y, 4, 11);
   rect("#e3734d", x - 4, y - 6, 8, 8);
   rect("#ffd386", x - 2, y - 8, 4, 7);
-}
-
-function drawDeposit(tile, x, y, variant, spent) {
-  if (drawTerrainTile("rocks", x, y, spent ? 4 : tile === "N" ? 3 : 2)) return;
-  if (spent) {
-    rect("#3d4c42", x + 6, y + 17, 21, 9);
-    rect("#6a6b58", x + 8, y + 18, 5, 3);
-    rect("#7d7963", x + 19, y + 22, 6, 3);
-    return;
-  }
-  drawRock(x, y, variant);
-  if (tile === "N") {
-    rect("#8b4a37", x + 7, y + 12, 16, 6);
-    rect("#db9259", x + 9, y + 12, 9, 3);
-    rect("#edb477", x + 17, y + 16, 6, 2);
-  }
 }
 
 const KNIGHT_STRIDE = [0, 1, 2, 0, -1, -2];
@@ -508,7 +498,7 @@ function drawWorldTree(col, row, x, y, zone) {
   const frame = terrainVariant(col, row, 3);
   const size = zone === "forest" ? 1.17 : 1;
   ctx.save();
-  if (!spent && zone === "forest") ctx.filter = "saturate(0.72) brightness(0.77)";
+  if (!spent && zone === "forest") ctx.globalAlpha = 0.83;
   const drawn = spent ? drawPng("stump", x + 16, y + 24, 0, 0, 1, 18, 8) :
     drawPng("trees", x + 16, y + 12, frame, 0, frame === 2 ? -1 : 1, 38 * size, 34 * size);
   if (!drawn) sprite(spent ? "stump" : "tree", x + 16, y + 21);
@@ -525,15 +515,12 @@ function collectWorldScenery(time, add) {
       const y = row * TILE;
       const variant = terrainVariant(col, row, 4);
       const building = progress.buildings[tileId(col, row)];
-      if (building === "floor") drawPlanks(x, y, variant);
+      if (building === "floor" && pointInView(x + 16, y + 16, 16)) drawPlanks(x, y, variant);
       if (tile === "Y") {
         const zone = regionAt({ x: x + 16, y: y + 16 });
         add(y + 27, () => drawWorldTree(col, row, x, y, zone));
       }
       if (tile === "Q") add(y + 28, () => drawRock(x, y, variant));
-      if (tile === "M" || tile === "N") {
-        add(y + 28, () => drawDeposit(tile, x, y, variant, exhausted(LEGACY_RESOURCES[tile], col, row)));
-      }
       if (tile === "G" || tile === "X") add(y + 16, () => drawRuinGate(tile, x, y));
       if (tile === "L" || tile === "T") {
         drawLight(x + 16, y + 8, 39 + Math.sin(time * 6 + col) * 2, "#e9a96645");
@@ -549,7 +536,7 @@ function collectWorldScenery(time, add) {
   }
   if (buildingInView(COTTAGE)) {
     const { door, workbench, chest, bed } = COTTAGE;
-    drawPng("porch", door.x, door.y + 25);
+    drawPng("porch", door.x - 15, door.y + 25);
     if (cutaway) {
       drawCottageCutaway(time);
       for (const [point, name] of [[workbench, "workbench"], [chest, "chest"], [bed, "bed"]]) {
