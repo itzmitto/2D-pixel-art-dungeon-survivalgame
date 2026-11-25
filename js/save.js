@@ -1,7 +1,7 @@
 "use strict";
 
 const SAVE_KEY = "vonkje-survival-v1";
-const SAVE_VERSION = 7;
+const SAVE_VERSION = 8;
 const SLOT_SAVE_VERSION = 5;
 const DUNGEON_LOOT_VERSION = 6;
 const SAVED_SLOT_COUNTS = { bag: BAG_SLOTS, hotbar: HOTBAR_SLOTS, chest: CHEST_SLOTS, bagCraft: 4, benchCraft: 9 };
@@ -61,7 +61,7 @@ function loadBuildings(saved, loaded) {
     if (!["fence", "floor", "torch"].includes(building) || !/^\d+,\d+$/.test(id)) continue;
     let [x, y] = id.split(",").map(Number);
     if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y)) continue;
-    if (!(saved.version >= SAVE_VERSION)) ({ x, y } = tileAt(legacyWorldPoint("forest", worldCenter(x, y))));
+    if (!(saved.version >= 7)) ({ x, y } = tileAt(legacyWorldPoint("forest", worldCenter(x, y))));
     const slot = tileId(x, y);
     if (canBuildTile(x, y) && !loaded.buildings[slot]) loaded.buildings[slot] = building;
     else displaced.push({ x, y, building });
@@ -206,7 +206,7 @@ function loadDungeonProgress(saved, loaded) {
       loaded.dungeonEnemies[id] = { health: 0 };
       continue;
     }
-    const legacy = !(saved.version >= SAVE_VERSION);
+    const legacy = !(saved.version >= 7);
     const width = legacy ? 15 * TILE : WORLD_WIDTH;
     const height = legacy ? 10 * TILE : (TOWER_FLOORS.at(-1).top + 10) * TILE;
     const validPosition = state.x >= 8 && state.x <= width - 8 && state.y >= 8 && state.y <= height - 8;
@@ -222,6 +222,11 @@ function loadDungeonProgress(saved, loaded) {
 function loadPosition(saved, loaded) {
   const point = saved.position ?? saved.playerPosition ?? saved.player ?? saved.location;
   if (saved.version >= SAVE_VERSION) return safeWorldPoint(point, loaded);
+  if (saved.version >= 7 && Number.isFinite(point?.x) && Number.isFinite(point?.y)) {
+    if (towerFloorAt(point)) return safeWorldPoint(point, loaded);
+    if (point.x < 24 * TILE && point.y < 38 * TILE) return { ...COTTAGE.spawn };
+    return safeWorldPoint(point, loaded);
+  }
   const oldArea = point?.area ?? point?.region ?? saved.area ?? saved.currentArea ?? "forest";
   const arrival = LEGACY_ARRIVALS[oldArea];
   if (!arrival) return { ...COTTAGE.spawn };

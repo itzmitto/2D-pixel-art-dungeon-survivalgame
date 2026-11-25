@@ -22,7 +22,7 @@ function updateHud() {
   }));
   hearts.setAttribute("aria-label", formatNumber(player.hearts) + " of 3 hearts");
   game.dataset.area = region;
-  roomNumber.textContent = ZONES[region];
+  roomNumber.textContent = "";
   keyLabel.hidden = !["ruins", "undercroft", "arena"].includes(region);
   keyLabel.textContent = hasKey ? "Keep key found" : "Keep key missing";
   updateInventory();

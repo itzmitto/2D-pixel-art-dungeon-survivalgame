@@ -21,7 +21,7 @@ const ZONES = {
 };
 
 const COTTAGE = {
-  left: 11, top: 14, right: 16, bottom: 18,
+  left: 11, top: 14, right: 16, bottom: 20,
   door: worldCenter(13, 18),
   workbench: worldCenter(13, 15),
   bed: worldCenter(14, 15),

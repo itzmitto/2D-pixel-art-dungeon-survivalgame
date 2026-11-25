@@ -49,7 +49,7 @@
   background-clip: text;
   color: transparent;
 }
-#key, #fireball-status, #feedback { color: #ffd18a; }
+#key, #fireball-status, #feedback { color: #d9bd85; }
 
 .stage {
   position: relative;
@@ -178,10 +178,10 @@ canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; 
 .hud-status {
   top: 1rem; left: 1rem; display: grid;
   grid-template-columns: auto auto; gap: .2rem .8rem;
-  padding: .55rem .75rem; border: 1px solid #766747;
-  background: #191a19ef; box-shadow: 0 4px 12px #130f0fbb;
+  padding: .4rem .55rem; border: 1px solid #615b48;
+  background: #101411d9; box-shadow: 0 3px 10px #090d0bee;
 }
-#room-number { grid-column: 1 / -1; color: #e2cc9a; font-family: Georgia, serif; }
+#room-number { display: none; }
 #fireball-status, #key { grid-column: 1 / -1; font-size: .75rem; }
 #wood, .hud-hands { display: none; }
 .hud-actions { top: 1rem; right: 1rem; }

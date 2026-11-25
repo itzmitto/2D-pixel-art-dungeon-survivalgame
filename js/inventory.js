@@ -287,7 +287,7 @@ function openInventory(mode = "bag", chestId = "house") {
   progress.panelMode = mode;
   progress.chestId = openingChest;
   const area = craftingArea();
-  const title = openingChest ? CHEST_STATIONS[chestId].name : mode === "workbench" ? "Workbench" : "Inventory";
+  const title = openingChest ? CHEST_STATIONS[chestId].name : mode === "workbench" ? "Field Kit" : "Inventory";
   document.querySelector("#panel-title").textContent = title;
   document.querySelector("#chest-section").hidden = mode !== "chest";
   document.querySelector("#craft-section").hidden = !area;
