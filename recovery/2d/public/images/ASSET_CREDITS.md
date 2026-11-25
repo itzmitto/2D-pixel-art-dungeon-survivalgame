@@ -15,3 +15,7 @@ The Blackwater Wolf, bridge, camps, cave facade and tower exterior are original 
 ## Elemental weapons
 
 The greatsword, battle axe, magic staff, sword and shield, katana, and their effects were built from original Three.js geometry. They do not use imported artwork.
+
+## Hunter progression
+
+Hollow Fang Den, its magic gate, Fang Guardian, Dire Wolf, Skeleton Warrior and treasure chests use original procedural Three.js geometry. No imported asset pack is required.

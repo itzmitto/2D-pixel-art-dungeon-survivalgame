@@ -12,7 +12,9 @@ Install Node.js 22.18 or newer, run `npm install` and then `npm run dev`. Open t
 | Q | Use the equipped weapon's elemental ability |
 | 1–5 | Equip a weapon assigned to a hotbar slot |
 | Hold right mouse button | Guard from the front. The starter sword and the shield fully block wolf bites. |
-| E | Collect nearby loot, rest at a campfire, or respawn |
+| E | Collect loot, open chests, enter or leave the Den, rest, or respawn |
+| P | Open or close Character Status |
+| R | Drink a Health Potion if wounded |
 | Tab | Open or close the inventory |
 | Mouse wheel | Zoom the world camera or open map |
 | M | Open or close the map |
@@ -21,19 +23,27 @@ Install Node.js 22.18 or newer, run `npm install` and then `npm run dev`. Open t
 
 ## Blackwater Wilds
 
-The Dark Knight starts near Ember Clearing. Follow paths to two river crossings, Moonwatch Ruin and the Standing Stones. Explore farther to find Raven Camp, Hollowmouth Cave, Greyfen Tower and the Lantern Rest campfire. The cave and tower are outdoor landmarks for now.
+The Dark Knight starts near Ember Clearing. Follow paths to two river crossings, Moonwatch Ruin and the Standing Stones. Explore farther to find Raven Camp, Hollowmouth Cave, Greyfen Tower and the Lantern Rest campfire. The Hollow Fang Den gate is by Hollowmouth Cave. Greyfen Tower remains an outdoor landmark with a cache near its entrance.
 
-The map shows the knight's direction, water, terrain, paths and discovered landmarks. Unexplored cells are covered. Use the wheel or the map's zoom buttons, then drag to pan. Movement and combat pause while the map or inventory is open.
+The map shows the knight's direction, water, terrain, paths and discovered landmarks. Unexplored cells are covered. Use the wheel or the map's zoom buttons, then drag to pan. Movement and combat pause in the map, inventory and Character Status.
 
 Terrain and landmarks have a fixed layout. Forest, boulder and grass placement use the saved world seed. Terrain, vegetation and rock batches are partitioned spatially, and movement tests only nearby obstacles. The world uses the existing original Three.js knight, procedural meshes and nighttime lighting.
 
-## Fighting wolves
+## Hunter progression
 
-Blackwater Wolves patrol territories near the forest, Raven Camp, the crossing approaches and the northern landmarks. Face a wolf before swinging. The strike lands at the impact frame of the animation. Back away during the wolf's windup or hold right mouse to guard while facing it. Wolf kills award experience and leave a pickup for gold and Wolf Fangs. If defeated, press **E** to return to Ember Clearing. Campfires restore health with **E**.
+Open **P** to see your level, hunter rank, XP, health, armor, weapon and kill totals. Every level gives three stat points and adds five base maximum health. Buy upgrades in Strength, Vitality, Agility, Intelligence, Defense or Luck. Agility, Defense and Luck bonuses have caps. Rank follows level: E 1–9, D 10–24, C 25–49, B 50–74, A 75–99, S 100–149, SS 150–199 and SSS from 200.
+
+Wild Wolves hunt alone and in packs. Dire Wolves patrol farther from camp and move faster and hit harder. Skeleton Warriors near the ruins and tower wind up before swinging their swords. Give them space or face them when blocking. Eligible outdoor encounters return after a delay once their loot is collected and you move away. Dungeon encounters stay cleared.
+
+Pick up glowing monster loot with **E**. Wolves drop fangs or hides, dire wolves drop Dire Fangs, and skeletons drop Bones or Iron. XP is awarded on kills. Drops may include health potions and graded weapons, with a bounded Luck bonus on rare drops. Open nearby color-coded chests with **E**. Their lids animate and the contents can be claimed once. Chests can improve your armor automatically. Press **R** to use a health potion. If defeated, press **E** to return to Ember Clearing.
+
+## Hollow Fang Den
+
+Find the blue gate near Hollowmouth Cave in the northwest. Press **E** to enter the E-rank dungeon. Level 5 is recommended. Follow the corridors through Wild Wolves and a Dire Wolf, and look for a side chamber with a chest. In the final arena, step sideways out of the Fang Guardian's marked charge lane, then attack during recovery. The Guardian has reduced crowd-control durations. Defeating it awards boss and clear XP and unlocks the Legendary reward chest. Use the starting portal to leave. The map shows the interior while you're inside.
 
 ## Elemental weapons
 
-The Common longsword is your starting weapon. Five wolf territories award unique weapons on loot pickup and the Ember Clearing exchange lets you spend one Wolf Fang on a missing weapon. The exchange is also available to players who already collected the original wolf rewards. Open **Tab**, inspect a weapon, select **Equip** or assign it to a hotbar slot. The world HUD displays the equipped element and Q cooldown. Cooldowns run during active play and are shared across equipment changes for each weapon. They are session state.
+The Common longsword is your starting weapon. Five wolf territories can award their associated weapon on loot pickup and the Ember Clearing exchange lets you spend one Wolf Fang on a missing weapon. The exchange is also available to players who already collected the original wolf rewards. Open **Tab**, inspect a weapon, select **Equip** or assign it to a hotbar slot. The world HUD displays the equipped element and Q cooldown. Cooldowns run during active play and are shared across equipment changes for each weapon. They are session state.
 
 | Weapon | Normal attack | Q ability |
 | --- | --- | --- |
@@ -45,18 +55,18 @@ The Common longsword is your starting weapon. Five wolf territories award unique
 
 **Developer Weapon Lab:** run `npm run dev` and open `/?weaponLab=1` on the local URL. All five are on slots 1–5, wolves start alive, and the session never reads or writes the normal save. The production build does not offer this mode.
 
-Rarity colors and damage multipliers are configured for Common, Uncommon, Rare, Epic, Legendary and Mythic in `src/wilderness/weapons.ts`. Each weapon currently has one defined rarity. Boss crowd-control resistance has a configuration profile for future encounters.
+Rarity colors and damage multipliers are configured for Common, Uncommon, Rare, Epic, Legendary and Mythic in `src/wilderness/weapons.ts`. Generated weapons are independent saved instances with actual rarity-based attack damage and elemental bonuses. All instances of one weapon type reuse its model and animation.
 
 ## Saves and recovery
 
-The 3D exploration save uses `vonkje-wilderness-v1`. It stores the seed, position, facing, health, level, experience, gold, Wolf Fangs, defeated wolves, unclaimed drop positions, collected rewards, owned weapons, equipped weapon, hotbar assignments and discovered cells. It leaves the old 2D save key untouched. An unreadable or incompatible 3D save is retained and the session starts from the clearing without writing to that key.
+The 3D exploration save uses `vonkje-wilderness-v1`. It stores the seed, position, facing, health, level, experience, gold, Wolf Fangs, defeated wolves, unclaimed drop positions, collected rewards, owned weapons, equipped weapon, hotbar assignments discovered cells, allocated stats, pending drops, opened chests, defeated bosses and dungeon clears. It leaves the old 2D save key untouched. An unreadable or incompatible 3D save is retained and the session starts from the clearing without writing to that key.
 
 The original 2D game remains available for offline recovery in `legacy-index.html` with its original files. The former Vite 2D runtime and assets are archived under `recovery/2d/public/`, outside production assets. Keep using the same browser, origin or original file path when recovering an origin-specific save.
 
 ## Next milestones
 
-- Open the cave and tower interiors with encounters, bosses and chests.
-- Add chest and boss loot, variant rarity drops, armor and consumable hotbar slots.
-- Add the horse and mount controls.
+- Add goblins, orcs and dark wizards and their distinct combat styles.
+- Expand Greyfen Tower into playable floors and add higher-ranked dungeons.
+- Add separate armor items and equipment slots. Chest armor currently applies as a defense rating.
 
 No asset download is required. See the [original asset credits](recovery/2d/public/images/ASSET_CREDITS.md).
