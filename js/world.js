@@ -78,7 +78,7 @@ const houseApproach = arrivalAt(4, 5, 0, 1);
 const caveApproach = arrivalAt(12, 3, 0, 1);
 const PORTALS = {
   forest: {
-    U: { to: "house", arrival: arrivalAt(7, 7, 0, -1), back: "U", dy: -1, ready: () => progress.repaired },
+    U: { to: "house", arrival: arrivalAt(7, 7, 0, -1), back: "U", dy: -1 },
     G: { to: "dungeon1", arrival: arrivalAt(1, 8, 1, 0), back: "A", dy: -1 },
   },
   house: {
@@ -136,6 +136,7 @@ const FOREST_LOOT = [
 ];
 
 function enterArea(nextArea, health, arrival = houseApproach, back = "") {
+  clearMouseRoute();
   area = nextArea;
   room = AREAS[area];
   areaPortals = Object.entries(PORTALS[area]).map(([tile, portal]) => ({
@@ -225,26 +226,6 @@ function move(actor, dx, dy, canUsePortals = true) {
   if (!blocked(actor.x, actor.y + dy, actor.radius, canUsePortals)) actor.y += dy;
 }
 
-function updatePlayer(dt) {
-  const arrowsMove = !inventoryOpen();
-  const down = (letter, arrow) => Number(pressed.has(letter) || (arrowsMove && pressed.has(arrow)));
-  const dx = down("d", "arrowright") - down("a", "arrowleft");
-  const dy = down("s", "arrowdown") - down("w", "arrowup");
-  if (dx || dy) {
-    if (dx && (!dy || facingTile.x)) facingTile = { x: dx, y: 0 };
-    else facingTile = { x: 0, y: dy };
-  }
-  if (dx) player.facing = Math.sign(dx);
-  const step = 104 * dt / (Math.hypot(dx, dy) || 1);
-  const { x, y } = player;
-  move(player, dx * step, dy * step);
-  const traveled = Math.hypot(player.x - x, player.y - y);
-  player.walking = traveled > 0;
-  player.walkTime = player.walking ? player.walkTime + dt : 0;
-  if (player.walking) aim = { x: (player.x - x) / traveled, y: (player.y - y) / traveled };
-  return { dx, dy };
-}
-
 function tileId(x, y) {
   return x + "," + y;
 }
@@ -323,9 +304,6 @@ function getAction() {
   if (phase !== "playing" || inventoryOpen()) return "";
   if (nearbyLoot()) return "pickup";
   if (area === "forest") {
-    if (nearby("U") && !progress.repaired) {
-      return itemCount("wood") >= 6 ? "repair" : "inspect";
-    }
     const { x, y } = targetTile();
     const resource = RESOURCES[room[y]?.[x]];
     if (resource && !exhausted(resource, x, y) && distance(player, centerOf({ x, y })) < 42 &&
@@ -353,16 +331,6 @@ function interact() {
       harvest(x, y);
       break;
     }
-    case "inspect":
-      showFeedback("Broken door · needs 6 wood.");
-      break;
-    case "repair":
-      removeItem("wood", 6);
-      progress.repaired = true;
-      storeProgress();
-      updateInventory();
-      showFeedback("Door repaired.");
-      break;
     case "workbench":
     case "chest":
       openHousePanel(action);
@@ -396,7 +364,6 @@ function updateAction() {
   const action = getAction();
   const hint = {
     chop: "E — Chop tree",
-    inspect: "E — Inspect broken door", repair: "E — Repair door (6 wood)",
     rest: "E — Rest",
     workbench: "E — Open workbench", chest: "E — Open house chest",
   }[action];
@@ -421,7 +388,7 @@ function followDragon(dt) {
   if (distance(player, trail[trail.length - 1]) > 0) {
     trail.push({ x: player.x, y: player.y, time: elapsed });
   }
-  let remaining = 125 * dt;
+  let remaining = (sprinting() ? 250 : 125) * dt;
   while (remaining > 0 && trail[0].time <= elapsed - FOLLOW_DELAY) {
     const target = trail[0];
     const gap = distance(dragon, target);

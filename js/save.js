@@ -18,7 +18,7 @@ function newProgress() {
     armor: { helmet: null, chestplate: null, boots: null },
     pet: { pet: null },
     held: null, panelMode: null, selectedHotbar: 0, overflow: { bag: {}, chest: {} },
-    trees: {}, mines: {}, buildings: {}, collected: {}, repaired: false, dungeonCompleted: false,
+    trees: {}, mines: {}, buildings: {}, collected: {}, dungeonCompleted: false,
     dungeonEnemies: {},
   };
 }
@@ -193,7 +193,6 @@ function loadProgress() {
     }
     loadBuildings(saved, loaded);
     loadDungeonProgress(saved, loaded);
-    loaded.repaired = saved.repaired === true;
     if (!(saved.version >= SAVE_VERSION)) storeProgress(loaded);
   } catch {
     // Local storage may be blocked when opening index.html directly.
