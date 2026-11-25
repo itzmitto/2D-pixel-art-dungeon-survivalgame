@@ -5,19 +5,8 @@ const WARDEN_ATTACKS = {
   slam: { range: 64, windup: 0.85, strike: 0.19, radius: 54, damage: 1.5, cue: "Ground slam · Back away" },
 };
 const WARDEN_RECOVERY = 0.85;
-const wardenHud = document.querySelector("#warden-hud");
-const wardenHealth = document.querySelector("#warden-health");
-const wardenCue = document.querySelector("#warden-cue");
-
 function updateWardenHud() {
-  const warden = enemies.find(enemy => enemy.kind === "warden" && enemy.zone === region && enemy.health > 0);
-  document.querySelector("#boss-name").textContent = region === "watchTop" ? "The Bellkeeper" : "Cyclops Warden";
-  wardenHud.hidden = !warden;
-  if (!warden) return;
-  wardenHealth.max = ENEMIES.warden.health;
-  wardenHealth.value = warden.health;
-  const attack = warden.attack;
-  wardenCue.textContent = !attack ? "" : attack.phase === "recover" ? "Recovering" : WARDEN_ATTACKS[attack.kind].cue;
+  publishUi();
 }
 
 function chargeEnd(warden, origin, direction, length) {
