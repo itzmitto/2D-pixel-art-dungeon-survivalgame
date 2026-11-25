@@ -29,6 +29,7 @@
     "src/game/items/catalog.ts",
     "src/game/entities/encounters.ts",
     "src/game/items/recipes.ts",
-    "src/game/core/loop.ts"
+    "src/game/core/loop.ts",
+    "src/game/rendering/sprites.ts"
   ]
 }
