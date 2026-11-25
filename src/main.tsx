@@ -4,16 +4,17 @@ import legacyUi from './legacy-ui.html?raw';
 import './styles/tokens.css';
 import './styles/base.css';
 import styles from './styles/App.module.css';
+import { exportSaveText, parseSaveFile } from './storage/saveTransfer';
 import './styles/game.css';
 import './styles/inventory.css';
 
 const scripts = [
-  '/js/world/regions.js', '/js/world/towers.js', '/js/entities/encounters.js',
-  '/js/world/camera.js', '/js/world/collision.js', '/js/world.js',
-  '/js/entities/party.js', '/js/movement.js', '/js/sprites.js',
-  '/js/world/terrain.js', '/js/render.js', '/js/inventory.js',
-  '/js/combat.js', '/js/entities/wolf.js', '/js/boss.js', '/js/save.js',
-  '/js/ui/hud.js', '/js/input.js', '/main.js',
+  '/legacy-runtime/js/world/regions.js', '/legacy-runtime/js/world/towers.js', '/legacy-runtime/js/entities/encounters.js',
+  '/legacy-runtime/js/world/camera.js', '/legacy-runtime/js/world/collision.js', '/legacy-runtime/js/world.js',
+  '/legacy-runtime/js/entities/party.js', '/legacy-runtime/js/movement.js', '/legacy-runtime/js/sprites.js',
+  '/legacy-runtime/js/world/terrain.js', '/legacy-runtime/js/render.js', '/legacy-runtime/js/inventory.js',
+  '/legacy-runtime/js/combat.js', '/legacy-runtime/js/entities/wolf.js', '/legacy-runtime/js/boss.js', '/legacy-runtime/js/save.js',
+  '/legacy-runtime/js/ui/hud.js', '/legacy-runtime/js/input.js', '/legacy-runtime/main.js',
 ];
 
 function GameCanvas() {
@@ -32,7 +33,7 @@ function GameCanvas() {
     loadAt(0);
     return () => {
       disposed = true;
-      // The legacy loop has no teardown hook yet. Reloading the view is the only current reset.
+      window.vonkjeStop?.();
     };
   }, []);
   return <div ref={host} className="legacy-game-root" dangerouslySetInnerHTML={{ __html: legacyUi }} />;
@@ -42,8 +43,7 @@ function SaveTools() {
   const importRef = useRef<HTMLInputElement>(null);
   const exportSave = () => {
     try {
-      const save = localStorage.getItem('vonkje-survival-v1');
-      if (!save) { window.alert('No browser save was found.'); return; }
+      const save = exportSaveText(localStorage, 'vonkje-survival-v1');
       const url = URL.createObjectURL(new Blob([save], { type: 'application/json' }));
       const anchor = document.createElement('a');
       anchor.href = url; anchor.download = 'vonkje-save.json'; anchor.click(); URL.revokeObjectURL(url);
@@ -52,8 +52,7 @@ function SaveTools() {
   const importSave = async (file?: File) => {
     if (!file) return;
     try {
-      const parsed: unknown = JSON.parse(await file.text());
-      if (!parsed || typeof parsed !== 'object' || !('version' in parsed)) throw new Error('Invalid save');
+      const parsed = parseSaveFile(await file.text());
       localStorage.setItem('vonkje-survival-v1', JSON.stringify(parsed));
       window.alert('Save imported. Reload the game to apply it.');
     } catch { window.alert('That save file is invalid. Your current save was not changed.'); }
