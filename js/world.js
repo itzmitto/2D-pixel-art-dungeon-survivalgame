@@ -370,6 +370,7 @@ function nearbyLoot() {
 }
 
 function pickUp(drop) {
+  if (!groundLoot.includes(drop)) return;
   if (!addItem(drop.item, drop.count)) {
     showFeedback("Backpack and hotbar are full.");
     return;

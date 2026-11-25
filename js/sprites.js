@@ -5,7 +5,7 @@ const PNG_SPRITES = {
   dragon: { path: "./images/pets/vonkje-flight.png", width: 256, height: 204, columns: 4, rows: 1 },
   wolf: { path: "./images/enemies/shadow-wolf.png", width: 134, height: 102, columns: 5, rows: 1 },
   snake: { path: "./images/enemies/cave-serpent.png", width: 134, height: 102, columns: 5, rows: 1 },
-  warden: { path: "./images/third-party/superpowers-medieval-fantasy/cyclop.png", width: 16, height: 16, columns: 2, rows: 1 },
+  warden: { path: "./images/third-party/superpowers-medieval-fantasy/cyclop.png", width: 32, height: 16, columns: 1, rows: 1 },
   supplyClosed: { path: "./images/third-party/superpowers-medieval-fantasy/wood-chest-close.png", width: 10, height: 8, columns: 1, rows: 1 },
   supplyOpen: { path: "./images/third-party/superpowers-medieval-fantasy/wood-chest-open.png", width: 10, height: 13, columns: 1, rows: 1 },
   rewardClosed: { path: "./images/third-party/superpowers-medieval-fantasy/gold-chest-close.png", width: 12, height: 9, columns: 1, rows: 1 },

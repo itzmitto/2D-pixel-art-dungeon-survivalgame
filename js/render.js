@@ -205,10 +205,10 @@ function drawEnemy({ kind, x, y, walkTime, facing, flash, attackPose }) {
 
 function drawWarden(warden) {
   const { x, y, facing, attack, flash, walkTime } = warden;
-  const frame = attack ? Number(attack.phase !== "recover") : Math.floor(walkTime * 4) % 2;
+  const lift = attack ? Number(attack.phase === "windup") * 2 : Math.floor(walkTime * 6) % 2;
   ctx.save();
   if (flash > 0) ctx.filter = "brightness(1.65)";
-  if (!drawPng("warden", x, y - 8, frame, 0, facing, 44, 44)) {
+  if (!drawPng("warden", x, y - 8 - lift, 0, 0, -facing, 64, 32)) {
     const left = Math.round(x) - 16;
     const top = Math.round(y) - 29;
     rect("#242029", left + 1, top + 6, 30, 32);

@@ -57,7 +57,7 @@ const RECIPES = {
     copperBoots: [[null, null, null], [null, null, null], [null, ["copper", 1], null]],
     copperPendant: [[null, ["wood", 1], null], [null, ["copper", 1], null], [null, null, null]],
     fangBlade: [[null, ["wolfFang", 2], null], [null, ["copper", 1], null], [null, ["wood", 1], null]],
-    scaleArmor: [[['serpentScale', 1], ['copper', 1], ['serpentScale', 1]], [null, ['serpentScale', 1], null], [null, null, null]],
+    scaleArmor: [[["serpentScale", 1], ["copper", 1], ["serpentScale", 1]], [null, ["serpentScale", 1], null], [null, null, null]],
     emberCharm: [[null, ["emberCore", 1], null], [["wolfFang", 1], ["copper", 1], ["serpentScale", 1]], [null, null, null]],
   },
 };
