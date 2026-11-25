@@ -418,7 +418,7 @@ function releaseArrivalKey(key) {
   arrivalGuard?.keys.delete(key);
 }
 
-function updateArea({ dx, dy }) {
+function updateArea({ dx, dy, routePortal }) {
   if (key && !hasKey && distance(player, key) < 16) {
     hasKey = true;
     progress.collected[DUNGEON_KEY] = true;
@@ -437,7 +437,7 @@ function updateArea({ dx, dy }) {
 
   if (arrivalGuard && arrivalGuard.keys.size === 0) arrivalGuard = null;
   const portal = areaPortals.find(portal => portal.tile !== arrivalGuard?.tile &&
-    dx * (portal.dx || 0) + dy * (portal.dy || 0) > 0 &&
+    (portal.tile === routePortal || dx * (portal.dx || 0) + dy * (portal.dy || 0) > 0) &&
     distance(player, portal.position) < 13 && portalOpen(portal));
   if (!portal) return false;
   enterArea(portal.to, player.hearts, portal.arrival, portal.back);

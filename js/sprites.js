@@ -2,7 +2,7 @@
 
 const PNG_SPRITES = {
   knight: { path: "./images/characters/knight-walk.png", width: 40, height: 40, columns: 6, rows: 4 },
-  dragon: { path: "./images/pets/vonkje-fly.png", width: 256, height: 204, columns: 4, rows: 1 },
+  dragon: { path: "./images/pets/vonkje-flight.png", width: 256, height: 204, columns: 4, rows: 1 },
   wolf: { path: "./images/enemies/shadow-wolf.png", width: 134, height: 102, columns: 5, rows: 1 },
   snake: { path: "./images/enemies/cave-serpent.png", width: 134, height: 102, columns: 5, rows: 1 },
   grass: { path: "./images/terrain/grass.png", width: 102, height: 102, columns: 8, rows: 1 },

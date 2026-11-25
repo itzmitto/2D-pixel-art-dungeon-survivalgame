@@ -53,7 +53,7 @@ Use transparent PNGs and keep frame registration consistent when replacing sprit
 | File | Layout |
 | --- | --- |
 | `images/characters/knight-walk.png` | 240×160 dark-steel knight sheet. Six 40×40 frames per row, ordered down, left, right, up. The first frame in each row doubles as the idle pose. |
-| `images/pets/vonkje-fly.png` | 1024×204 sheet. Four 256×204 frames in one row facing right. The renderer mirrors the pose when Vonkje turns left. |
+| `images/pets/vonkje-flight.png` | 1024×204 game sheet. Four 256×204 frames in one row facing right. The renderer mirrors the pose when Vonkje turns left. The source art is `vonkje-fly.png`. |
 | `images/enemies/` | Shadow wolf and cave serpent. Each 670×102 sheet has four 134×102 movement frames and one attack frame facing right. |
 | `images/terrain/` | Grass, rock, and dungeon stone sheets use 102×102 tiles. Tree frames are 40×36 and the stump is 29×13. |
 | `images/house/` | Cottage exterior, porch, two open doorway views, interior floor and wall with hearth and shelves, and rug. |

@@ -131,12 +131,15 @@ function updatePlayer(dt) {
   const multiplier = sprinting() ? 2 : 1;
   const budget = WALK_SPEED * multiplier * dt;
   const { x, y } = player;
+  let routePortal;
 
   if (drive) {
     clearMouseRoute();
     const steps = Math.ceil(budget / MAX_MOVE_STEP);
     for (let i = 0; i < steps; i++) move(player, dx * budget / drive / steps, dy * budget / drive / steps);
   } else {
+    const destination = mouseRoute.at(-1);
+    if (destination) routePortal = roomTile(tileAt(destination));
     ({ dx, dy } = moveAlongRoute(budget));
   }
 
@@ -152,5 +155,5 @@ function updatePlayer(dt) {
   player.walking = traveled > 0;
   player.walkTime = player.walking ? player.walkTime + dt * multiplier : 0;
   if (player.walking) aim = { x: (player.x - x) / traveled, y: (player.y - y) / traveled };
-  return { dx, dy };
+  return { dx, dy, routePortal };
 }
