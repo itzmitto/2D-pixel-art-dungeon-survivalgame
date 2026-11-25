@@ -3,6 +3,7 @@
 const canvas = document.querySelector("#dungeon");
 const ctx = canvas.getContext("2d");
 ctx.scale(canvas.width / WORLD_WIDTH, canvas.height / WORLD_HEIGHT);
+ctx.imageSmoothingEnabled = false;
 const roomNumber = document.querySelector("#room-number");
 const hearts = document.querySelector("#hearts");
 const fireballStatus = document.querySelector("#fireball-status");

@@ -132,10 +132,12 @@ function updateEnemies(dt) {
     const gap = distance(enemy, player);
     if (gap > spec.sight) {
       enemy.walkTime = 0;
+      enemy.attackPose = false;
       continue;
     }
     const { x, y } = enemy;
-    const speed = gap < 42 ? spec.rushSpeed : spec.speed;
+    enemy.attackPose = gap < 42;
+    const speed = enemy.attackPose ? spec.rushSpeed : spec.speed;
     const chase = Math.min(gap, speed * dt) / (gap || 1);
     move(enemy, (player.x - x) * chase, (player.y - y) * chase, false);
     if (enemy.x !== x) enemy.facing = Math.sign(enemy.x - x);

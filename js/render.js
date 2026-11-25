@@ -13,38 +13,37 @@ const PALETTE = {
 };
 
 const DRAGON_COLORS = {
-  X: "#392527", A: "#804329", a: "#ad602e", H: "#d78e36", h: "#f1b749",
-  G: "#ffd778", C: "#fff0bd", R: "#773c49", r: "#b46466", M: "#d38976",
-  m: "#ebaa8b", W: "#ffe6af", E: "#1e1821",
+  X: "#392730", D: "#784225", A: "#b8692f", G: "#e59c37", H: "#ffd46c", P: "#fff0b5",
+  R: "#a95363", S: "#be6e73", M: "#efab90", L: "#f9c3a5", Q: "#d48a82", C: "#f3b955",
 };
 const DRAGON_FALLBACK = [
   [
-    ".........................", ".........................", ".....RX..................", ".....RaX.R...X.....XX....",
-    ".....RmaRXXX..CX....CX...", ".....XmmmMMaX.XHCX.XCX...", "......XmamMaX.XChhGhXX...", ".......mmaMMMaHXGAAAhX...",
-    ".......XmmaMMraXhGWEAh...", "..XaX...XRmHaaHhhGEEGGXX.", "..Ha.....XRmaahmhhAAGGGhX", "..HX.....XHXaaXHHHhhhHHH.",
-    "..HX.....XhhhRhHhHHGGGGX.", "..XaX...XhHhhhhaXHX.XXX..", "...XHXXaHahhHhaGHX.......", "....XaaaXXaHaaaHHX.......",
-    "..........aaXXXaX........", ".........................", ".........................", ".........................",
+    ".........................", "...XX....................", "....XRRGX.........P......", "....XXRRRRGX....XPXCP....",
+    "....XRSRRRRGRX...CPXCX...", ".....XQSRRRRRRX..XCXXX...", "......XQSRRRRRRX.XHPPHX..", ".......XSSRRRRGXDXHHDHHX.",
+    "........XSSRRRRXXXGGGGHG.", ".X.......XSSRRRXXGXXXXXX.", ".XX.......XRRRRGGHCCX....", ".XA.......GGXXGXHCCX.....",
+    "..X.....XXXGGGGGCCX......", "...XXXXXXXXXAAAAAAX......", "....XXX....XDDXXXAX......", "............DD...........",
+    ".........................", ".........................", ".........................", ".........................",
   ],
   [
-    ".........................", ".........................", ".........................", ".............X.....X.....",
-    ".............XXX....X....", "..XX....X.....XGX..XCX...", "..XmRRRRRX.....CXhhXCH...", "...XRmHRRaaRXXXXGGGGGX...",
-    ".....mmmHRMaMXaahAEGhh...", "..XaXRRmmaRMMrhhhGEEhhX..", "..HaX.XXmmmaaMHmhAEAGGXh.", "..HX...XRRmmarhHHhhhhGGHX",
-    "..HX.....XhXRHhXHHGGGGGX.", "..XX....XhhhhXhaGXXXXXX..", "..XHXXXXHhhHXhHGHX.......", "...XXHHaXaaHaaGaHX.......",
-    "..........CaXXXCHX.......", ".........................", ".........................", ".........................",
+    ".........................", ".........................", "..................PX.....", "................XPXCP....",
+    ".................CPXCX...", ".........GXX.....XCXXX...", "..XXXRRRRRRRRX.XXXHPPHX..", "..XXRRRRRRRRGRRXDXHHDHHX.",
+    "...XRRRRRRRRRRRX.XGGHGHX.", ".X.XRXRRLSRRRRRXXGHXXXXX.", ".X...XRXXRSRRRRGGHCCX....", ".XA......XXRRXGXHCCX.....",
+    "..A......XXGGGGGCCX......", "..XGXXXGXXXXAAAAAAX......", "...XGXXX...XDDXXXAX......", "............DD...........",
+    ".........................", ".........................", ".........................", ".........................",
   ],
   [
-    ".........................", ".........................", ".........................", ".............X.....X.....",
-    ".............XXX....X....", "..............XGX..XCX...", "...............CXhhXCH...", ".............XXXGGGGGX...",
-    ".............XaahAEGhh...", "..Xa..........hhhGEEhhX..", "..HaX........XHmhAEAGGXh.", "..HX......XHhhhHHhhhhGGHX",
-    "..HX.....XhRRHXXHHGGGGGX.", "..XX....XRRaaaRaGXXXXXX..", "..XHXXXRmaMHXaXGHX.......", "...XXmmmHRMHaaGaHX.......",
-    ".....mamXXCaXXXCHX.......", "....XRRXX................", "....XX...................", ".........................",
+    ".........................", ".........................", "..................X......", "................XXXPX....",
+    ".................CPXCX...", ".................XCXXX...", "...............X.XXPPXX..", "...............XDXHHPHHX.",
+    "................XXGGGGHGX", ".X.........XXXXXXGXXHXXX.", ".X.......XRGHGGGGHCCX....", ".XA.....XRRRRXGXHCCX.....",
+    "..A....XRRRRGGGGCCX......", "..XGXGRRRRXXAAAAAAX......", "....GRRRSRXXDDXXXAX......", "...GRRQSXRX.DD...........",
+    "...GRXRX.XX..............", "...XX.X..................", "...X.....................", ".........................",
   ],
   [
-    ".........................", ".........................", ".........................", ".............X.....XX....",
-    "..............CX....CX...", "..............XHCX.XCX...", "...............ChhGhXX...", ".....XXXXaRXXXHXGAAAhX...",
-    "....XmmmRMMaMRaXhGWEAh...", "..XRaaaHHamMaMHhhGEEGGXX.", "..HmRRRmmmmaaMhmhhAAGGGhX", "..HX....XXHXHaXHHHhhhHHH.",
-    "..HX.....XhhhhhHhHHGGGGX.", "..XaX...XhHhhhhaXHX.XXX..", "...XHXXaHahhHhaGHX.......", "....XaaaXXaHaaaHHX.......",
-    "..........aaXXXaX........", ".........................", ".........................", ".........................",
+    ".........................", ".........................", "..................X......", "................PXXPX....",
+    ".................CPCCX...", ".................XCXCP...", "...............X.XXPPXX..", "........XXRRRXXXDXHHDHHX.",
+    "......GRRRRRRRRXXXHGGHHGX", ".X..XRRRRRRRRRRXXGXGHDXX.", ".XAXRRRRRRRRRRGGGHCCX....", "..ARRXQSSSSSSXGXHCCX.....",
+    "..XX..XRRRXGGGGGCCX......", "...XXXXXXXXXAAAAAAX......", ".....XX....XDDXXXAX......", "............DD...........",
+    ".........................", ".........................", ".........................", ".........................",
   ],
 ];
 
@@ -190,8 +189,9 @@ function drawPixelMap(pixels, colors, x, y, facing = 1, context = ctx) {
   });
 }
 
-function drawEnemy({ kind, x, y, walkTime, facing, flash }) {
-  const frame = Math.floor(walkTime * 8) % PNG_SPRITES[kind].columns;
+function drawEnemy({ kind, x, y, walkTime, facing, flash, attackPose }) {
+  const actionFrame = PNG_SPRITES[kind].columns - 1;
+  const frame = attackPose ? actionFrame : Math.floor(walkTime * 8) % actionFrame;
   ctx.save();
   if (flash > 0) ctx.filter = "brightness(1.8) saturate(0.5)";
   if (!drawPng(kind, x, y - 4, frame, 0, facing, 34, 26)) {
@@ -206,16 +206,9 @@ function drawRoom(time) {
     [...row].forEach((tile, i) => {
       const x = i * TILE;
       const y = j * TILE;
-      const variant = (i * 17 + j * 31) % 5;
-      rect("#24232d", x, y, TILE, TILE);
-      rect(["#373541", "#3b3845", "#413c46", "#3c3942", "#373643"][variant],
-        x + 1, y + 1, 30, 30);
-      rect("#4a434d", x + 2, y + 2, 28, 1);
-      if (variant === 1) {
-        rect("#2b2935", x + 8, y + 12, 8, 2);
-        rect("#2b2935", x + 14, y + 14, 3, 5);
-      }
-      if (tile === "#" || tile === "T") {
+      const isWall = tile === "#" || tile === "T";
+      const variant = (i * 17 + j * 31) % 4;
+      if (!drawTerrainTile("dungeonStone", x, y, variant + (isWall ? 4 : 0)) && isWall) {
         rect("#23212c", x, y, 32, 32);
         rect("#656071", x + 1, y + 1, 30, 5);
         rect("#494452", x + 1, y + 6, 30, 20);
@@ -223,6 +216,9 @@ function drawRoom(time) {
         rect("#322d3c", x + 12, y + 6, 2, 9);
         rect("#322d3c", x + 23, y + 17, 2, 9);
         rect("#302a36", x + 1, y + 26, 30, 5);
+      }
+      if (!PNG_SPRITES.dungeonStone.image && !isWall) {
+        rect(["#373541", "#3b3845", "#413c46", "#3c3942"][variant], x, y, TILE, TILE);
       }
       if (tile === "T") torches.push({ x: x + 16, y: y + 14 });
       if (tile === "C") {
@@ -278,7 +274,7 @@ function drawCabin() {
     rect("#ae774e", door.x - 48, door.y + 16, 64, 20);
     rect("#c48a58", door.x - 12, door.y + 36, 24, 8);
   }
-  drawHouseDoor(door.x, door.y, progress.repaired ? 1 : 0);
+  drawHouseDoor(door.x, door.y, 0);
 }
 
 function drawHouseDoor(x, y, frame) {
@@ -286,11 +282,6 @@ function drawHouseDoor(x, y, frame) {
   rect("#8e563b", x - 14, y - 14, 28, 30);
   rect("#30262a", x - 9, y - 9, 18, 21);
   rect("#c48a58", x - 10, y + 12, 20, 4);
-  if (frame === 0) {
-    rect("#a96b43", x - 9, y - 8, 5, 16);
-    rect("#a96b43", x + 5, y - 3, 4, 15);
-    rect("#a96b43", x - 9, y + 4, 18, 5);
-  }
 }
 
 function drawHouse(time) {
@@ -318,13 +309,14 @@ function drawHouse(time) {
     drawFurniture(name, position.x - TILE / 2, position.y - TILE / 2);
   }
   const [door] = markers("U");
-  drawHouseDoor(door.x, door.y, 2);
+  drawHouseDoor(door.x, door.y, 1);
 }
 
 // Alle grondversieringen worden door hun tegelcoördinaten bepaald.
 function drawGrass(i, j, variant) {
   const x = i * TILE;
   const y = j * TILE;
+  if (drawTerrainTile("grass", x, y, (i * 29 + j * 17 + i * j) % 8)) return;
   const seed = (i * 117 + j * 91 + i * j * 17) % 97;
   rect(["#426843", "#476e46", "#4b7448", "#406342"][variant], x, y, TILE, TILE);
   for (let n = 0; n < 5; n++) {
@@ -373,6 +365,7 @@ function drawPlanks(x, y, variant) {
 }
 
 function drawRock(x, y, variant) {
+  if (drawTerrainTile("rocks", x, y, variant % 2)) return;
   rect("#3a403c", x + 2, y + 8, 29, 24);
   rect("#555c52", x + 4, y + 5, 25, 23);
   rect("#777e6c", x + 7, y + 3, 19, 11);
@@ -437,6 +430,7 @@ function drawBuiltTorch(x, y) {
 }
 
 function drawDeposit(tile, x, y, variant, spent) {
+  if (drawTerrainTile("rocks", x, y, spent ? 4 : tile === "N" ? 3 : 2)) return;
   if (spent) {
     rect("#3d4c42", x + 6, y + 17, 21, 9);
     rect("#6a6b58", x + 8, y + 18, 5, 3);
@@ -561,7 +555,10 @@ function drawForest() {
       drawGrass(i, j, variant);
       if ("=PR".includes(tile)) drawPath(i, j, variant);
       if (tile === "#" || tile === "Y") {
-        sprite(tile === "Y" && exhausted(RESOURCES.Y, i, j) ? "stump" : "tree", x + 16, y + 21);
+        const spent = tile === "Y" && exhausted(RESOURCES.Y, i, j);
+        const drawn = spent ? drawPng("stump", x + 16, y + 24, 0, 0, 1, 18, 8) :
+          drawPng("trees", x + 16, y + 17, (i + j * 2) % 3, 0, 1, 24, 22);
+        if (!drawn) sprite(spent ? "stump" : "tree", x + 16, y + 21);
       }
       if (tile === "Q") drawRock(x, y, variant);
       if (tile === "M" || tile === "N") drawDeposit(tile, x, y, variant, exhausted(RESOURCES[tile], i, j));
