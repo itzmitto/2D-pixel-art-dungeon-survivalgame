@@ -25,13 +25,13 @@ export function SystemPanel({title,section,close,children,style=''}:{
 }){
   const id=useId();
   const hunter=!style.includes('atlas-panel');
+  const content=<>
+    <header className="system-heading"><div><span className="system-kicker">{section}</span><h2 id={id}>{title}</h2></div>
+      <button className="system-close" autoFocus onClick={close} aria-label="Close overlay">× <kbd>Esc</kbd></button>
+    </header>
+    {children}
+  </>;
   return <div className={'system-shade'+(hunter?' hunter-shade':'')}><section className={'system-panel '+style+(hunter?' hunter-window':'')} role="dialog" aria-modal="true" aria-labelledby={id}>
-    {hunter&&<SystemFrame/>}
-    <div className={hunter?'hunter-scroll':undefined}>
-      <header className="system-heading"><div><span className="system-kicker">{section}</span><h2 id={id}>{title}</h2></div>
-        <button className="system-close" autoFocus onClick={close} aria-label="Close overlay">× <kbd>Esc</kbd></button>
-      </header>
-      {children}
-    </div>
+    {hunter?<><SystemFrame/><div className="hunter-scroll">{content}</div></>:content}
   </section></div>;
 }

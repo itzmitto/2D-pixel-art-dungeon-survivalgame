@@ -120,6 +120,7 @@ export function createEncounters(
   const lootMaterial=new T.MeshStandardMaterial({color:'#bd9868',emissive:'#916024',emissiveIntensity:.7,roughness:.36});
   type Enemy = CreatureRig & {
     affinity:T.Mesh<T.BufferGeometry,T.MeshBasicMaterial>;
+    wolfRig:boolean; turn:number;
     posePhase:number; gait:number; anticipation:number; collapse:number; impactAge:number; retreat:number; strikes:number;
 
     id:string; kind:MonsterKind; spec:typeof monsters[MonsterKind]; home:T.Vector3; hp:number; hpBar:T.Group; fill:T.Mesh;
@@ -180,7 +181,7 @@ export function createEncounters(
       opacity:.36,depthWrite:false,side:T.DoubleSide}));
     beam.visible=false;group.add(beam);
     if(save.drops[id]) loot.material.color.set(rarity[save.drops[id].rarity].color);
-    enemies.push({...actor,id,kind,spec,home,affinity,posePhase:enemies.length*.92,gait:0,anticipation:0,collapse:1,
+    enemies.push({...actor,id,kind,spec,home,affinity,wolfRig:kind!=='skeleton'&&kind!=='goblin',turn:0,posePhase:enemies.length*.92,gait:0,anticipation:0,collapse:1,
       impactAge:3,retreat:0,strikes:0,hp:(oldDefeats.has(id)||save.defeatedBosses.includes(id))?0:spec.health,hpBar,fill,
       statuses:statuses(spec.resistance),visualTick:0,lastVisual:null,cooldown:0,windup:0,heading:rand()*6.28,phase:rand()*10,hitFlash:0,charge:0,chargeWindup:false,chargeHit:false,loot,beam});
   }
@@ -287,8 +288,8 @@ export function createEncounters(
       if(!save.completedDungeons.includes(den.id)) save.completedDungeons.push(den.id);
     }
     const reward=enemyXpReward(enemy.kind);
-    const levelUp=earnXP(save,reward);
-    notify((boss?den.name+' cleared':enemy.spec.name+' defeated')+' · +'+reward+' XP'+(levelUp?' · '+levelUp:''));
+    earnXP(save,reward);
+    notify((boss?den.name+' cleared':enemy.spec.name+' defeated')+' · +'+reward+' XP');
 
   }
 
@@ -497,7 +498,7 @@ export function createEncounters(
         }
         if(dying){
           enemy.collapse=Math.min(1,enemy.collapse+dt*1.15);
-          enemy.animate({time,phase:enemy.posePhase,gait:0,windup:0,recovery:0,hit:0,leap:0,dead:enemy.collapse,frozen:false});
+          enemy.animate({time,phase:enemy.posePhase,gait:0,windup:0,recovery:0,hit:0,leap:0,dead:enemy.collapse,frozen:false,distance:gap});
         }
         if(!active) continue;
         const homeGap=Math.hypot(p.x-enemy.home.x,p.z-enemy.home.z);
@@ -506,6 +507,7 @@ export function createEncounters(
         enemy.cooldown=Math.max(0,enemy.cooldown-dt);
         enemy.hitFlash=Math.max(0,enemy.hitFlash-dt);
         let gait=0;
+        const previousX=p.x, previousZ=p.z;
         if(enemy.statuses.halted){
           enemy.windup=0; enemy.charge=0; enemy.chargeWindup=false;
         } else if(enemy.charge>0){
@@ -564,10 +566,19 @@ export function createEncounters(
         }
         if(enemy.windup>0&&!enemy.chargeWindup) enemy.heading=Math.atan2(player.position.x-p.x,player.position.z-p.z);
         const angle=enemy.heading-root.rotation.y;
-        root.rotation.y+=Math.atan2(Math.sin(angle),Math.cos(angle))*(1-Math.exp(-10*dt));
+        const facing=Math.atan2(Math.sin(angle),Math.cos(angle));
+        root.rotation.y+=facing*(1-Math.exp(-10*dt));
+        enemy.turn=T.MathUtils.damp(enemy.turn,T.MathUtils.clamp(facing*1.7,-1,1),9,dt);
         p.y=surface(p.x,p.z);
-        enemy.gait=T.MathUtils.damp(enemy.gait,gait,11,dt);
-        if(!enemy.statuses.halted) enemy.posePhase+=dt*(3.1+enemy.gait*9.4);
+        const travelled=Math.hypot(p.x-previousX,p.z-previousZ);
+        const speed=travelled/Math.max(.001,dt);
+        const stride=enemy.wolfRig?Math.min(1,speed/Math.max(3.8,spec.speed)):gait;
+        enemy.gait=T.MathUtils.damp(enemy.gait,stride,11,dt);
+        if(!enemy.statuses.halted){
+          enemy.posePhase+=enemy.wolfRig
+            ? travelled*Math.PI*2/((.52+enemy.gait*1.60)*spec.scale)
+            : dt*(3.1+enemy.gait*9.4);
+        }
         const leapDuration=enemy.kind==='guardian'?.65:.43;
         const currentWindup=enemy.chargeWindup?(enemy.kind==='guardian'?1.15:.89):spec.windup;
         enemy.anticipation=T.MathUtils.damp(enemy.anticipation,
@@ -576,7 +587,7 @@ export function createEncounters(
           windup:enemy.anticipation,
           recovery:Math.max(0,1-enemy.impactAge/.33),hit:enemy.hitFlash/.22,
           leap:enemy.charge>0&&enemy.kind!=='guardian'?Math.sin(Math.PI*enemy.charge/leapDuration):0,
-          dead:0,frozen:status==='frozen'});
+          dead:0,frozen:status==='frozen',turn:enemy.turn,alert:aggro?1:0,distance:gap});
 
       }
     },

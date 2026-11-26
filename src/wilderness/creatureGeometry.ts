@@ -30,7 +30,7 @@ export function shapedPlate(points:readonly (readonly [number,number])[], depth:
   return new T.ExtrudeGeometry(path,{depth,bevelEnabled:bevel>0,bevelSegments:1,bevelThickness:bevel,bevelSize:bevel});
 }
 
-export type CreaturePose={time:number;gait:number;phase:number;windup:number;recovery:number;hit:number;leap:number;dead:number;frozen:boolean};
+export type CreaturePose={time:number;gait:number;phase:number;windup:number;recovery:number;hit:number;leap:number;dead:number;frozen:boolean;turn?:number;alert?:number;distance?:number};
 export type CreatureRig={root:T.Group; animate:(pose:CreaturePose)=>void};
 export function meshPart(parent:T.Object3D,geometry:T.BufferGeometry,material:T.Material,x=0,y=0,z=0){
   const mesh=new T.Mesh(geometry,material);
@@ -46,7 +46,7 @@ export function joint(parent:T.Object3D,x=0,y=0,z=0){
 
 // Bake meshes that move together, while leaving each anatomical joint and
 // transparent effect independent. Identical rigid parts share baked geometry.
-export function rigidBatcher(){
+export function rigidBatcher(vertexColors=false){
   const cache=new Map<string,T.BufferGeometry>();
   return {
     bake(root:T.Object3D){
@@ -67,7 +67,7 @@ export function rigidBatcher(){
           if(!merged){
             const copies=parts.map(part=>{
               const geo=part.geometry.index ? part.geometry.toNonIndexed() : part.geometry.clone();
-              for(const attr of Object.keys(geo.attributes)) if(attr!=='position'&&attr!=='normal') geo.deleteAttribute(attr);
+              for(const attr of Object.keys(geo.attributes)) if(attr!=='position'&&attr!=='normal'&&!(vertexColors&&attr==='color')) geo.deleteAttribute(attr);
               return geo.applyMatrix4(part.matrix);
             });
             const result=mergeGeometries(copies);

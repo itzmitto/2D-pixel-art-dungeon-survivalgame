@@ -136,7 +136,7 @@ export default function Wilderness() {
     <HunterHUD hero={hero} region={regionLabel(position.z)}/>
     <SystemNotifications notices={notices}/>
     {!!message.bossHealth&&<div className="guardian-health">
-      <strong>Fang Guardian</strong><progress aria-label="Fang Guardian health" value={message.bossHealth} max={monsters.guardian.health}/>
+      <strong>Fang Guardian</strong><progress className="system-meter health" aria-label="Fang Guardian health" value={message.bossHealth} max={monsters.guardian.health}/>
     </div>}
     <nav className="system-nav"><button ref={mapButton} onClick={()=>showPanel(open.current==='map'?null:'map')} aria-expanded={panel==='map'}>Map · M</button>
       <button onClick={()=>showPanel(open.current==='bag'?null:'bag')} aria-expanded={panel==='bag'}>Inventory · Tab</button>
