@@ -143,7 +143,7 @@ export function readExploration(raw: string | null): Exploration | null {
     if(savedCaves&&typeof savedCaves==='object') for(const {id} of bossCaves){
       const state=Object.getOwnPropertyDescriptor(savedCaves,id)?.value;
       if(state&&Number.isSafeInteger(state.cycle)&&state.cycle>=1&&state.cycle<=1e8&&
-        Number.isSafeInteger(state.readyAt)&&state.readyAt>=0) caveRuns[id]={cycle:state.cycle,readyAt:state.readyAt};
+        Number.isSafeInteger(state.readyAt)&&state.readyAt>=0) caveRuns[id]={cycle:state.cycle,readyAt:state.readyAt,rewardVersion:state.rewardVersion===2?2:undefined};
     }
     const savedHealth:unknown=Object.getOwnPropertyDescriptor(value,'health')?.value;
     const boundHealth=maxHunterHealth({level,stats,equippedArmor});

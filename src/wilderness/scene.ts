@@ -1,5 +1,5 @@
 import { shadowKeys } from './shadowData';
-import { bossCaves, caveAt, caveEntry, caveExit, caveRewardId, caveStatus, caveWalkable } from './bossCaves';
+import { bossCaves, caveAt, caveArrival, caveEntry, caveExit, caveLootLabel, caveRewardId, caveStatus, caveWalkable } from './bossCaves';
 import { briarWatch, floorRemaining, towerFloorAt, towerFloors, towerWalkable } from './briarWatch';
 import { armorPiece, type ArmorId, type ArmorSlot } from './armor';
 import { warhorse } from './horse';
@@ -170,7 +170,7 @@ export function startWilderness(
             'Briar Watch · Floor '+next.number+' · '+next.title});
       }
     }else if(cave){
-      doors.push({...caveExit(cave),target:{x:cave.x,z:cave.z+3.1},entering:false,label:'Leave '+cave.name,message:'Returned from '+cave.name+'.'});
+      doors.push({...caveExit(cave),target:caveArrival(cave),entering:false,label:'Leave '+cave.name,message:'Returned from '+cave.name+'.'});
     }else if(!inDen(p.z)){
       doors.push({x:briarWatch.x,z:briarWatch.z,target:towerFloors[0].entry,entering:true,label:'Enter Briar Watch',
         message:'Briar Watch · Floor 1 · '+towerFloors[0].title});
@@ -181,7 +181,7 @@ export function startWilderness(
         doors.push({x:site.x,z:site.z,target:caveEntry(site),entering:true,label:'Enter '+site.name,locked:waiting,
           detail:caveStatus(site,save.caveRuns,save.opened),
           message:openReward?'Cave reward · '+site.name:'Boss encounter · '+site.boss+' · Lv '+site.level+
-            ' · Recommended '+site.recommended+' · Rank '+site.rank+' · '+site.rarity+' reward'});
+            ' · Recommended '+site.recommended+' · Rank '+site.rank+' · '+caveLootLabel(site)+' rewards'});
       }
     }
     if(pointer){
@@ -209,7 +209,7 @@ export function startWilderness(
     encounters.transition();
     const cave=caveAt(target.z);
     if(cave) encounters.prepareCave(cave);
-    encounters.waystoneEffect(p,cave?.kind==='warlord'?0xffb169:0xa298ff);
+    encounters.waystoneEffect(p,cave?.color??0xa298ff);
     keys.clear();blocking=false;
     onPosition({x:p.x,z:p.z,yaw:body.rotation.y});
     encounters.feedback(door.message);

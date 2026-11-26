@@ -4,6 +4,8 @@ export const waystones=[
   {id:'hollowmouth',name:'Hollowmouth Waystone',x:-207,z:-104,yaw:0},
   {id:'moonwatch',name:'Moonwatch Waystone',x:128,z:-84,yaw:0},
   {id:'southwater',name:'Southwater Waystone',x:54,z:119,yaw:0},
+  {id:'crypt-road',name:'Crypt Road Waystone',x:-161,z:144,yaw:0},
+  {id:'ember-ridge',name:'Ember Ridge Waystone',x:216,z:-95,yaw:0},
   {id:'lantern',name:'Lantern Waystone',x:165,z:112,yaw:0},
 ] as const;
 export const orcCamp={name:'Thornhide Camp',x:113,z:63,kind:'orcCamp',chest:{x:113,z:54.8},

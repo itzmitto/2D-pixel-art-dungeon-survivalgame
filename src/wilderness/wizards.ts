@@ -36,7 +36,7 @@ export function wizardModels(){
   const foot=own(loft([[-.13,.056,-.068,.058],[-.040,.083,-.068,.097],[.13,.082,-.068,.055],[.20,.048,-.06,.029]],9));
   const batch=rigidBatcher();
   return {
-    make(elite:boolean):CreatureRig&{barrier:T.Mesh}{
+    make(elite:boolean,archmage=false):CreatureRig&{barrier:T.Mesh}{
       const robes=elite?eliteCloth:cloth;
       const root=new T.Group(), pelvis=joint(root,0,1.14),torso=joint(pelvis);
       meshPart(torso,tunic,robes);
@@ -62,6 +62,8 @@ export function wizardModels(){
         fold.rotation.z=-side*.37;fold.scale.set(.57,1.09,.72);
         if(elite) meshPart(head,blade,brass,side*.177,.152,.134).scale.set(.74,1.59,1);
       }
+      const relics:T.Mesh[]=[];
+      let floating:T.Group|undefined;
       const hands=[-1,1].map(side=>{
         const upper=joint(torso,side*.342,.55),fore=joint(upper,0,-.31),hand=joint(fore,0,-.22);
         meshPart(upper,sleeve,robes);meshPart(fore,sleeve,brocade).scale.set(.80,.67,.80);
@@ -69,7 +71,8 @@ export function wizardModels(){
         meshPart(hand,button,skin,0,-.033,0).scale.set(1.7,1.22,1.62);
         meshPart(upper,mantle,elite?brass:metal,side*.024,.042,.111).scale.set(.62,.61,.55);
         if(side===1){
-          const weapon=joint(hand,0,0,.071);
+          const weapon=archmage?joint(root,.72,1.08,.35):joint(hand,0,0,.071);
+          if(archmage){floating=weapon;weapon.scale.setScalar(1.23);}
           meshPart(weapon,staff,wood);
           for(const y of [-.46,.06,1.07]) meshPart(weapon,sash,metal,0,y).scale.set(.27,.87,.36);
           meshPart(weapon,crystal,light,0,1.40).scale.set(.85,1.65,.85);
@@ -77,8 +80,16 @@ export function wizardModels(){
         }
         return {upper,fore};
       });
+      if(archmage){
+        for(const side of [-1,1]){
+          const plate=meshPart(torso,mantle,brass,side*.31,.59,.14);
+          plate.scale.set(1.22,1.24,1.06);plate.rotation.z=-side*.42;
+          meshPart(head,mantle,brass,side*.183,.19,.042).scale.set(.48,1.15,.67);
+        }
+        for(let i=0;i<5;i++) relics.push(meshPart(root,crystal,light,0,1,0));
+      }
       const shoes=[-1,1].map(side=>meshPart(pelvis,foot,wood,side*.115,-1.075));
-      batch.bake(root);
+      root.remove(...relics);batch.bake(root);root.add(...relics);
       const barrier=new T.Mesh(orb,veil);barrier.position.y=1.17;barrier.scale.set(.92,1.46,.92);
       barrier.visible=false;root.add(barrier);
       return {root,barrier,animate(p){
@@ -96,6 +107,15 @@ export function wizardModels(){
         skirt.forEach((p,i)=>{
           p.rotation.x=-.14-.15*Math.sin(t*2.3+i*1.17)-walk*.29-cast*.22;
           p.rotation.z=.061*Math.sin(t*3.1+i*.43)+fall*.19;
+        });
+        if(floating){
+          floating.position.set(.74+Math.sin(t*1.8)*.17,1.04+Math.sin(t*2.5)*.17+cast*.59,.37+cast*.29);
+          floating.rotation.set(.10+cast*.19,t*.65,-.20+Math.sin(t*1.6)*.11);
+        }
+        relics.forEach((gem,i)=>{
+          const a=t*1.65+i*1.257;
+          gem.position.set(Math.sin(a)*.92,.90+i*.17+.23*Math.sin(a*1.7),Math.cos(a)*.79);
+          gem.rotation.set(a*.61,a,.3);gem.scale.setScalar((.29+cast*.25)*(1-fall));
         });
         barrier.rotation.y=t*.65;
       }};
