@@ -14,17 +14,24 @@ import { regionLabel } from './regions';
 import { elementalIds, type WeaponId } from './weapons';
 import { HunterHUD, HunterHotbar } from './ui/HunterHUD';
 import { HunterInventory } from './ui/HunterInventory';
+import { GrassOptions } from './ui/GrassOptions';
+import { readGrassSettings, saveGrassSettings, type GrassSettings } from './grassSettings';
 import { noticesBetween, observe, SystemNotifications, type Notice } from './ui/SystemNotifications';
 import './wilderness.css';
 import './ui/system.css';
+
+type Panel='map'|'bag'|'status'|'shadows'|'graphics'|null;
 
 const weaponLab=import.meta.env.DEV && new URLSearchParams(window.location.search).get('weaponLab')==='1';
 
 export default function Wilderness() {
   const canvas=useRef<HTMLCanvasElement>(null);
   const mapButton=useRef<HTMLButtonElement>(null);
-  const open=useRef<'map'|'bag'|'status'|'shadows'|null>(null);
-  const [panel,setPanel]=useState<'map'|'bag'|'status'|'shadows'|null>(null);
+  const graphicsButton=useRef<HTMLButtonElement>(null);
+  const open=useRef<Panel>(null);
+  const [panel,setPanel]=useState<Panel>(null);
+  const [grassSettings,setGrassSettings]=useState(readGrassSettings);
+  const grassPreferences=useRef(grassSettings);
   const [hero,setHero]=useState(newExploration);
   const [message,setMessage]=useState({notification:'',prompt:'',cooldown:0,bossHealth:0,shadowAvailable:false});
   const controller=useRef<ReturnType<typeof startWilderness>|null>(null);
@@ -37,7 +44,8 @@ export default function Wilderness() {
   const [error,setError]=useState('');
   const [saveNotice,setSaveNotice]=useState('');
 
-  const showPanel=(value:typeof panel)=>{
+  const showPanel=(value:Panel)=>{
+    const restoreFocus=open.current==='graphics'?graphicsButton:mapButton;
     if(closeTimer.current!==null) window.clearTimeout(closeTimer.current);
     closeTimer.current=null;
     if(!value&&open.current&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
@@ -47,15 +55,21 @@ export default function Wilderness() {
         open.current=null;
         setPanel(null);
         setClosing(false);
-        mapButton.current?.focus();
+        restoreFocus.current?.focus();
       },140);
       return;
     }
     setClosing(false);
     open.current=value;
     setPanel(value);
-    if(!value) mapButton.current?.focus();
+    if(!value) restoreFocus.current?.focus();
   };
+  function updateGrassSettings(next:GrassSettings){
+    grassPreferences.current=next;
+    setGrassSettings(next);
+    controller.current?.setGrassSettings(next);
+    saveGrassSettings(next);
+  }
   useEffect(()=>{
     if(!canvas.current) return;
     let save=newExploration(), writable=true, dirty=false;
@@ -118,7 +132,7 @@ export default function Wilderness() {
           if(noticeTimer!==undefined) window.clearTimeout(noticeTimer);
           noticeTimer=window.setTimeout(()=>setNotices([]),4200);
         }
-      });
+      },grassPreferences.current);
     } catch(e) {
       setError(e instanceof Error?e.message:'The wilderness could not start.');
     }
@@ -165,7 +179,8 @@ export default function Wilderness() {
     <nav className="system-nav"><button ref={mapButton} onClick={()=>showPanel(open.current==='map'?null:'map')} aria-expanded={panel==='map'}>Map · M</button>
       <button onClick={()=>showPanel(open.current==='bag'?null:'bag')} aria-expanded={panel==='bag'}>Inventory · Tab</button>
       <button onClick={()=>showPanel(open.current==='status'?null:'status')} aria-expanded={panel==='status'}>Status · P</button>
-      <button onClick={()=>showPanel(open.current==='shadows'?null:'shadows')} aria-expanded={panel==='shadows'}>Shadows · K</button></nav>
+      <button onClick={()=>showPanel(open.current==='shadows'?null:'shadows')} aria-expanded={panel==='shadows'}>Shadows · K</button>
+      <button ref={graphicsButton} onClick={()=>showPanel(open.current==='graphics'?null:'graphics')} aria-expanded={panel==='graphics'}>Graphics</button></nav>
     {error && <p className="wild-error" role="alert">{error}</p>}
     <footer>
       {clearing(position.x,position.z)<10 && <p>Ember Clearing · Campfire nearby</p>}
@@ -177,6 +192,16 @@ export default function Wilderness() {
       <HunterHotbar hero={hero} locked={!!panel} cooldown={message.cooldown} equip={equip}/>
       <small>WASD Move · E Interact · Q Ability · R Potion · H Horse · M Atlas</small>
     </footer>
+    {panel==='graphics'&&<GrassOptions settings={grassSettings} close={()=>showPanel(null)}
+      changeQuality={quality=>updateGrassSettings({...grassPreferences.current,quality})}
+      changeBudget={(quality,budget)=>{
+        const current=grassPreferences.current;
+        if(current.budgets[quality]===budget) return;
+        const budgets={...current.budgets};
+        if(budget===undefined) delete budgets[quality];
+        else budgets[quality]=budget;
+        updateGrassSettings({...current,budgets});
+      }}/>}
     {panel==='shadows'&&<ShadowArmyPanel hero={hero} close={()=>showPanel(null)}
       toggle={id=>controller.current?.toggleShadow(id)} summonAll={strongest=>controller.current?.summonAllShadows(strongest)}
       dismissAll={()=>controller.current?.dismissAllShadows()} rename={(id,name)=>controller.current?.renameShadow(id,name)}

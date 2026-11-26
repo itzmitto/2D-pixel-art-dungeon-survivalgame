@@ -69,6 +69,8 @@ export function groundMaterial(){
       float seam=(1.-smoothstep(.04,.22,band))*(.24+.64*crumbs);
       float mineral=grain(fracturePoint*1.9);
       diffuseColor.rgb*=mix(vec3(1.),mix(vec3(.79,.93,1.10),vec3(1.26,1.14,.94),mineral)*(1.17-seam*.82),soilMask.z*.82);
+      float groundCover=smoothstep(.45,.89,base*.71+crumbs*.29)*(1.-pathMix)*(1.-moist*.82)*(1.-soilMask.z);
+      diffuseColor.rgb=mix(diffuseColor.rgb,diffuseColor.rgb*vec3(.90,1.14,.87)+vec3(.009,.018,.006),groundCover*.58);
       float soilRelief=(stone*.8+crumbs*.23+grit*.12+roots*.57)*(1.-moist*.66)-seam*soilMask.z*.82;
     `).replace('#include <roughnessmap_fragment>',`#include <roughnessmap_fragment>
       roughnessFactor=mix(roughnessFactor,.42,moist*(.51+crumbs*.27)*(1.-stone));`)
