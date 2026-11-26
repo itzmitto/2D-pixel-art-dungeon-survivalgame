@@ -3,7 +3,7 @@ import { surface } from './layout.ts';
 import type { Ability } from './weapons.ts';
 
 export type Point={x:number;z:number};
-type Shape='spark'|'ring'|'arc'|'frost'|'scorch'|'ray'|'mist'|'crystal';
+type Shape='spark'|'ring'|'arc'|'frost'|'scorch'|'ray'|'mist'|'crystal'|'vortex';
 type Options={lift?:number;grow?:number;y?:number;dx?:number;dz?:number;yaw?:number;opacity?:number;aspect?:number;limit?:number;delay?:number};
 
 function crescent(){
@@ -28,7 +28,7 @@ function crescent(){
 
 const tones:Record<Ability,readonly [number,number]> = {
   fire:[0xff561c,0xffcf77], lightning:[0x487dff,0xe5f8ff], ice:[0x58bdff,0xdafaff],
-  water:[0x337adc,0x95faff], wind:[0x83cbaf,0xe4fff5],
+  water:[0x337adc,0x95faff], wind:[0x83cbaf,0xe4fff5],darkness:[0x8432dd,0xe4b6ff],
 };
 
 export function createMagicEffects(group:T.Group) {
@@ -36,10 +36,10 @@ export function createMagicEffects(group:T.Group) {
   const dome=new T.SphereGeometry(1,24,14);
   const geometries={
     spark:new T.OctahedronGeometry(.23), crystal:new T.OctahedronGeometry(.23).scale(.65,2,.65),
-    ring:disc, frost:disc, scorch:disc, arc:crescent(),
+    vortex:disc, ring:disc, frost:disc, scorch:disc, arc:crescent(),
     ray:new T.CylinderGeometry(.035,.31,1,12,1,true), mist:new T.PlaneGeometry(2,2),
   };
-  const modes:Record<Shape,number>={spark:0,crystal:0,ring:1,arc:2,frost:3,scorch:4,ray:5,mist:6};
+  const modes:Record<Shape,number>={spark:0,crystal:0,ring:1,arc:2,frost:3,scorch:4,ray:5,mist:6,vortex:8};
   const glow=new T.ShaderMaterial({
     uniforms:{tint:{value:new T.Color()},strength:{value:1},age:{value:0},mode:{value:0},clock:{value:0}},
     vertexShader:`
@@ -93,6 +93,15 @@ export function createMagicEffects(group:T.Group) {
           alpha=.024+.42*rim+stream*(.05+.23*rim);
           alpha*=smoothstep(0.,.13,vUv.y);
           core=stream*.57+.20*rim;
+        } else if(mode==8.){
+          float spiral=pow(.5+.5*sin(a*6.+r*20.-clock*5.5+2.*sin(r*9.-clock*2.)),8.);
+          float glyph=pow(.5+.5*cos(a*18.),6.)*(1.-smoothstep(.02,.06,abs(r-.83)));
+          float seal=(1.-smoothstep(.018,.044,abs(r-.94)));
+          alpha=(.22+.82*spiral)*(1.-smoothstep(.75,1.,r))+.63*seal+.73*glyph;
+          core=.24*spiral+.5*glyph+.24*seal;
+          gl_FragColor=vec4(mix(vec3(.014,.004,.032),mix(tint,vec3(.8,.51,1.),core),max(spiral,glyph+seal)),clamp(alpha*strength,0.,1.));
+          #include <colorspace_fragment>
+          return;
         }
         gl_FragColor=vec4(mix(tint,vec3(1.),max(0.,core)*.72),clamp(alpha*strength,0.,1.));
         #include <colorspace_fragment>
@@ -100,6 +109,9 @@ export function createMagicEffects(group:T.Group) {
     transparent:true,depthWrite:false,side:T.DoubleSide,forceSinglePass:true,
     blending:T.AdditiveBlending,toneMapped:false,
   });
+  const vortexMaterial=glow.clone();
+  vortexMaterial.blending=T.NormalBlending;
+  vortexMaterial.uniforms.clock=glow.uniforms.clock;
   const pools=[48,52].map((capacity,index)=>Array.from({length:capacity},()=>{
     const mesh=new T.Mesh<T.BufferGeometry,T.ShaderMaterial>(geometries.spark,glow);
     mesh.visible=false;
@@ -113,6 +125,12 @@ export function createMagicEffects(group:T.Group) {
       glow.uniforms.age.value=1-effect.life/effect.max;
       glow.uniforms.strength.value=effect.opacity*T.MathUtils.smoothstep(effect.life/effect.max,0,.8);
       glow.uniformsNeedUpdate=true;
+      if(effect.shape==='vortex'){
+        vortexMaterial.uniforms.tint.value.copy(effect.tint);
+        vortexMaterial.uniforms.mode.value=8;
+        vortexMaterial.uniforms.strength.value=glow.uniforms.strength.value;
+        vortexMaterial.uniformsNeedUpdate=true;
+      }
     };
     return effect;
   }));
@@ -177,6 +195,7 @@ export function createMagicEffects(group:T.Group) {
     p.dx=options.dx??0;p.dz=options.dz??0;p.opacity=options.opacity??.76;
     p.aspect=options.aspect??1;p.delay=options.delay??0;p.limit=options.limit??Infinity;p.tint.setHex(color);p.mode=modes[shape];p.shape=shape;
     mesh.geometry=geometries[shape];
+    mesh.material=shape==='vortex'?vortexMaterial:glow;
     mesh.position.set(point.x,surface(point.x,point.z)+(options.y??.09),point.z);
     mesh.scale.set(size,size*p.aspect,size);
     mesh.rotation.set(shape==='mist'?-.83:0,options.yaw??0,0);
@@ -192,8 +211,9 @@ export function createMagicEffects(group:T.Group) {
         {y:height,lift:.8+i%3,dx:Math.cos(a)*(2+i%3),dz:Math.sin(a)*(2+i%3),yaw:a,aspect:1.3});
     }
   }
-  function lightning(from:Point,to:Point,strike=false,small=false,ground=false){
+  function lightning(from:Point,to:Point,strike=false,small=false,ground=false,color?:number){
     const bolt=bolts[boltCursor++%bolts.length];
+    bolt.line.material.color.setHex(color??0xc1dbff);
     bolt.life=bolt.max=small?.12:.31;
     bolt.line.visible=true;
     bolt.x=from.x;bolt.z=from.z;bolt.y=surface(from.x,from.z)+(strike?10:ground?.19:small?1.65:.9);
@@ -212,6 +232,11 @@ export function createMagicEffects(group:T.Group) {
     if(element==='fire'){
       scatter(ahead,color,5,.54);
       emit(ahead,0xdb3c15,'scorch',.79,.6,{y:.05,opacity:.65});
+    }
+    if(element==='darkness'){
+      emit(point,0x160a28,'arc',size*1.08,.39,{y:.90,yaw,aspect:1.1,opacity:.86});
+      emit(point,0xbd66ff,'arc',size,.29,{y:1.13,yaw,aspect:1.15,grow:1.85});
+      scatter(ahead,0x8e43dc,power?10:5,.82);
     }
     if(element==='wind') emit(ahead,0xbfb8a7,'mist',.58,.27,{y:.18,grow:1.45,opacity:.34});
     if(element==='lightning') lightning({x:point.x-Math.cos(yaw),z:point.z+Math.sin(yaw)},ahead,false,true);
@@ -316,7 +341,7 @@ export function createMagicEffects(group:T.Group) {
       }
     },
     dispose(){
-      glow.dispose();dome.dispose();particleMaterial.dispose();
+      glow.dispose();vortexMaterial.dispose();dome.dispose();particleMaterial.dispose();
       for(const {mesh} of particleBatches) mesh.dispose();
       for(const {line} of bolts){line.geometry.dispose();line.material.dispose();}
       for(const geometry of new Set(Object.values(geometries))) geometry.dispose();

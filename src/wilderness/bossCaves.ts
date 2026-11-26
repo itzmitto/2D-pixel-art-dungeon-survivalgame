@@ -61,3 +61,11 @@ export function caveStatus(cave:BossCave,runs:CaveRuns,opened:readonly string[],
   if(!opened.includes(caveRewardId(cave,run.cycle))) return 'Boss defeated · Reward chest available'+(seconds?' · Respawn in '+time:'');
   return seconds?'Reward claimed · Boss respawning in '+time:'Boss available · Previous reward claimed';
 }
+
+
+export const voidReaperDropChance=.085;
+export function dragonScytheReward(seed:number,cycle:number,received:boolean){
+  if(!received) return true;
+  const roll=Math.imul(seed^Math.imul(cycle,0x9e3779b1)^0x6719,0x85ebca6b);
+  return ((roll^(roll>>>16))>>>0)/0x1_0000_0000<voidReaperDropChance;
+}

@@ -30,7 +30,7 @@ export function shapedPlate(points:readonly (readonly [number,number])[], depth:
   return new T.ExtrudeGeometry(path,{depth,bevelEnabled:bevel>0,bevelSegments:1,bevelThickness:bevel,bevelSize:bevel});
 }
 
-export type CreaturePose={time:number;gait:number;phase:number;windup:number;recovery:number;hit:number;leap:number;dead:number;frozen:boolean;turn?:number;alert?:number;distance?:number;technique?:string};
+export type CreaturePose={time:number;gait:number;phase:number;windup:number;recovery:number;hit:number;leap:number;dead:number;frozen:boolean;turn?:number;alert?:number;distance?:number;technique?:string;stage?:number;flight?:number};
 export type CreatureRig={root:T.Group; animate:(pose:CreaturePose)=>void};
 export function meshPart(parent:T.Object3D,geometry:T.BufferGeometry,material:T.Material,x=0,y=0,z=0){
   const mesh=new T.Mesh(geometry,material);

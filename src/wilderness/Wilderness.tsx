@@ -64,8 +64,8 @@ export default function Wilderness() {
       save.arsenal.push(...elementalIds);
       save.items.push(...elementalIds.map(legacyItem));
       save.selectedItem='greatsword';
-      save.hotbar=[...elementalIds,null,null,null,null];
-      save.slotItems=[...elementalIds,null,null,null,null];
+      save.hotbar=[...elementalIds,null,null,null];
+      save.slotItems=[...elementalIds,null,null,null];
       save.equipped='greatsword';
     } else try {
       const raw=localStorage.getItem(saveKey);

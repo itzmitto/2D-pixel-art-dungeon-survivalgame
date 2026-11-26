@@ -4,9 +4,9 @@ export const rarity = {
   Legendary:{color:'#e9bd6f', multiplier:2.5}, Mythic:{color:'#ee718d', multiplier:3.2},
 } as const;
 export type Rarity = keyof typeof rarity;
-export type WeaponId = 'longsword'|'greatsword'|'axe'|'staff'|'shield'|'katana';
-export type Element = 'Steel'|'Fire'|'Lightning'|'Ice'|'Water'|'Wind';
-export type Ability = 'fire'|'lightning'|'ice'|'water'|'wind';
+export type WeaponId = 'longsword'|'greatsword'|'axe'|'staff'|'shield'|'katana'|'scythe';
+export type Element = 'Steel'|'Fire'|'Lightning'|'Ice'|'Water'|'Wind'|'Darkness';
+export type Ability = 'fire'|'lightning'|'ice'|'water'|'wind'|'darkness';
 type Pose = readonly [torso:number, shoulder:number, arm:number, lift:number, elbow:number, wrist:number, pitch:number, roll:number];
 export interface Weapon {
   id:WeaponId; name:string; description:string; element:Element; category:string;
@@ -19,7 +19,18 @@ const starterAnimation:Weapon['animation']={
   windup:[-.42,-.62,-.65,.64,-1.08,-.18,.98,1.5],
   strike:[.53,1.28,-1.13,.43,-.26,.28,1.6,2.4],
 };
+export const scytheCombo=[
+  {damage:1,range:4.30,reachAngle:1.43,cooldown:.83,attackDuration:.78,impactTime:.34,
+    animation:{windup:[-.81,-1.08,-.68,.47,-.97,-.22,.72,1.16],strike:[.94,1.45,-1.12,.65,-.21,.51,1.28,2.65]}},
+  {damage:1.16,range:4.45,reachAngle:1.31,cooldown:.93,attackDuration:.87,impactTime:.41,
+    animation:{windup:[.65,.82,-1.9,.61,-.75,.31,.39,2.59],strike:[-.83,-.7,-.87,.3,-.25,-.41,1.92,.97]}},
+  {damage:1.45,range:4.8,reachAngle:Math.PI,cooldown:1.19,attackDuration:1.09,impactTime:.56,
+    animation:{windup:[-.95,-.6,-.82,.66,-.88,-.48,.62,1.69],strike:[1.24,1.38,-.93,.57,-.18,.43,1.48,2.94]}},
+] as const;
 export const weapons:Record<WeaponId,Weapon>={
+  scythe:{...scytheCombo[0],id:'scythe',name:'Void Reaper',description:'A three-hit scythe combo. Soul Harvest restores health from damage you deal with this weapon.',
+    category:'Scythe',element:'Darkness',damage:6.2,ability:'darkness',abilityName:'Abyssal Execution',abilityCooldown:15,
+    rarity:'Mythic',color:0xb665ff,model:{grip:-1.52,twoHanded:true}},
   longsword:{id:'longsword',name:'Longsword',description:'A reliable steel blade.',category:'Sword',element:'Steel',
     damage:3,range:2.9,reachAngle:1.05,cooldown:.78,attackDuration:.73,impactTime:.32,ability:null,
     abilityName:'',abilityCooldown:0,rarity:'Common',color:0xd9cfb8,model:{grip:-1.93},animation:starterAnimation},
@@ -44,7 +55,8 @@ export const weapons:Record<WeaponId,Weapon>={
     abilityName:'Gale Slash',abilityCooldown:6,rarity:'Epic',color:0xc5e3ca,model:{grip:-1.93,twoHanded:true},
     animation:{windup:[-.65,-.45,-.28,.1,-.82,-.45,.15,1.34],strike:[.7,1.39,-1.11,.53,-.25,.64,1.48,2.98]}},
 };
-export const elementalIds=['greatsword','axe','staff','shield','katana'] as const;
+export const commonElementalIds=['greatsword','axe','staff','shield','katana'] as const;
+export const elementalIds=[...commonElementalIds,'scythe'] as const;
 export function isWeaponId(value:unknown):value is WeaponId {
   return typeof value==='string'&&Object.hasOwn(weapons,value);
 }

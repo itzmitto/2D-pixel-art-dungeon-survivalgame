@@ -3,7 +3,7 @@ import { effectiveStats } from '../progression';
 import { useState, type CSSProperties } from 'react';
 import type { Exploration } from '../exploration';
 import { instanceWeapon } from '../itemInstances';
-import { elementalIds, rarity, weapons, type Rarity, type WeaponId } from '../weapons';
+import { commonElementalIds, rarity, weapons, type Rarity, type WeaponId } from '../weapons';
 import { SystemPanel } from './SystemPanel';
 import { Glyph, categoryIcon } from './Glyph';
 import { ItemButton, weaponStats } from './ItemTooltip';
@@ -136,9 +136,9 @@ export function HunterInventory({hero,close,equip,assign,redeem,canRedeem,equipA
           </>:<p>No items in this category.</p>}
         </aside>
       </div>
-      {canRedeem&&elementalIds.some(id=>!hero.arsenal.includes(id))&&<details className="armory-exchange">
+      {canRedeem&&commonElementalIds.some(id=>!hero.arsenal.includes(id))&&<details className="armory-exchange">
         <summary>Ember Clearing exchange · 1 Wolf Fang per weapon</summary>
-        {elementalIds.filter(id=>!hero.arsenal.includes(id)).map(id=><button key={id} onClick={()=>redeem(id)}>{weapons[id].name}</button>)}
+        {commonElementalIds.filter(id=>!hero.arsenal.includes(id)).map(id=><button key={id} onClick={()=>redeem(id)}>{weapons[id].name}</button>)}
       </details>}
     </>}
   </SystemPanel>;

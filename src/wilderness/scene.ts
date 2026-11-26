@@ -481,7 +481,7 @@ export function startWilderness(
       onSaveChange();
     },
     redeem(id:WeaponId){
-      if(id==='longsword'||save.arsenal.includes(id)||save.fangs<1||
+      if(id==='longsword'||id==='scythe'||save.arsenal.includes(id)||save.fangs<1||
         Math.hypot((body.position.x+45)*.85,body.position.z)>=9.5 || !weapons[id].ability) return;
       save.fangs--;
       save.arsenal.push(id);

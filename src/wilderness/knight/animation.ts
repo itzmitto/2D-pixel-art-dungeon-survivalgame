@@ -11,7 +11,7 @@ export function createDarkKnight() {
   const model = createKnightModel();
   const armor=armorModels(model);
   const {root,hips,torso,head,arms,legs,cape} = model;
-  let time=0, phase=0, stride=0, run=0, guard=0, turn=0, attack=1;
+  let time=0, spin=0, phase=0, stride=0, run=0, guard=0, turn=0, attack=1;
   let weapon=weapons.longsword, poseWeapon=weapon, duration=weapon.attackDuration, casting=false;
   const starter=arms[1].socket.children.slice();
   const models=new Map(elementalIds.map(id=>{
@@ -34,7 +34,7 @@ export function createDarkKnight() {
 
   function playAttack(config:Weapon=weapon, ability=false) {
     if (attack < duration) return false;
-    poseWeapon=config;
+    poseWeapon=config;spin=0;
     casting=ability;
     duration=ability ? abilityAnimationSeconds : config.attackDuration;
     attack=0;
@@ -58,6 +58,10 @@ export function createDarkKnight() {
     attack=Math.min(duration,attack+dt);
     guard=T.MathUtils.lerp(guard,motion.blocking && attack===duration ? 1 : 0,weight);
     const fraction=attack/duration;
+    const fullSpin=poseWeapon.id==='scythe'&&!casting&&poseWeapon.reachAngle===Math.PI;
+    const newSpin=fullSpin?Math.PI*2*T.MathUtils.smoothstep(fraction,.22,.91):0;
+    if(fullSpin) root.rotation.y+=newSpin-spin;
+    spin=newSpin;
     const impact=poseWeapon.impactTime/poseWeapon.attackDuration;
     const windupEnd=impact*(poseWeapon.id==='katana'?.86:.78), followEnd=impact+(poseWeapon.id==='katana'?.075:.14);
     const groundStrike=casting&&poseWeapon.ability==='lightning';

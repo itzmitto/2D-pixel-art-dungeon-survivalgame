@@ -1,7 +1,7 @@
 import { armorSlots, type ArmorId } from './armor.ts';
 import { wolf } from './combatRules.ts';
 import { bossResistance, ordinaryResistance } from './statusEffects.ts';
-import { elementalIds, type Rarity, type WeaponId } from './weapons.ts';
+import { commonElementalIds, type Rarity, type WeaponId } from './weapons.ts';
 
 const regional = {...wolf,awareness:31,leash:47,recovery:1.45,windup:1.1,reach:4.3,respawn:0};
 export const regionalMonsters={
@@ -74,7 +74,7 @@ export function rollDrop(kind:MonsterKind,random:()=>number,luck:number,guarante
   const index=odds.findIndex(weight=>(roll-=weight)<0);
   const tier=kind==='guardian'||kind==='elite'||kind==='ritualElite'||kind==='sentinel'?Math.max(3,index):Math.max(0,index);
   const weapon=guaranteed??(wizard&&(kind==='ritualElite'||random()<.40)?'staff':undefined)??((kind==='guardian'||kind==='elite'||kind==='sentinel')||random()<(orc?.26:.13)+luck*.14
-    ? elementalIds[Math.floor(random()*elementalIds.length)] : undefined);
+    ? commonElementalIds[Math.floor(random()*commonElementalIds.length)] : undefined);
   return {gold:ranked?.gold??spec.gold,material:kind==='skeleton'&&random()<.35?'Iron':spec.material,rarity:rarityOrder[tier],weapon,
     potion:(kind==='guardian'||kind==='elite'||kind==='sentinel')||random()<(wizard?.72:orc?.54:.19)?1:0,
     extra:orc?(kind==='brute'?'Iron':'Leather'):undefined};

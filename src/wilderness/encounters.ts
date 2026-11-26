@@ -1,3 +1,4 @@
+import { dragonModels } from './ancientDragon.ts';
 import { inAurelia } from './aurelia.ts';
 import { frontierCamps, outdoorBounds } from './frontier.ts';
 import { isRegional } from './huntData.ts';
@@ -8,7 +9,7 @@ import { caveArts, isAdvancedBoss, type BossCast } from './caveArts.ts';
 import { spectralModels } from './shadowModels.ts';
 import { defaultShadowGrade } from './shadowData.ts';
 import { shadowArmy } from './shadowArmy.ts';
-import { caveAt, caveBossId, caveBossPoint, caveRewardArmor, caveRewardId, caveRewardTier, caveTreasurePoint, type BossCave } from './bossCaves.ts';
+import { caveAt, dragonScytheReward, caveBossId, caveBossPoint, caveRewardArmor, caveRewardId, caveRewardTier, caveTreasurePoint, type BossCave } from './bossCaves.ts';
 import { floorRemaining, towerFloorAt, dungeonFloors } from './briarWatch.ts';
 import { hollowSentinel } from './sentinel.ts';
 import { encounterCell, eliteName, roaming, roamingEncounter, roamingKind, type EncounterMember } from './roaming.ts';
@@ -31,7 +32,7 @@ import { inArc, swingTimer, wolfLoot } from './combatRules.ts';
 import type { Exploration } from './exploration.ts';
 import { randomSequence, spawn, surface, trailDistance, landmarks, path, southPath } from './layout.ts';
 import { wolfModels } from './wolves.ts';
-import { abilityAnimationSeconds, elementalIds, weaponDamage, weapons, rarity, type Weapon, type WeaponId } from './weapons.ts';
+import { abilityAnimationSeconds, commonElementalIds, scytheCombo, weaponDamage, weapons, rarity, type Weapon, type WeaponId } from './weapons.ts';
 import { createMagicEffects } from './magicEffects.ts';
 import { abilityCombat } from './abilities.ts';
 import { statuses, statusTuning } from './statusEffects.ts';
@@ -79,7 +80,7 @@ export function createEncounters(
       attackDuration:weapon.attackDuration/speed, impactTime:weapon.impactTime/speed,cooldown:weapon.cooldown/speed};
   }
   const models=wolfModels(), skeletons=skeletonModels(), goblins=goblinModels(), orcs=orcModels(), wizards=wizardModels();
-  const elementals=elementalBossModels();
+  const elementals=elementalBossModels(), dragons=dragonModels();
   const sentinel=hollowSentinel(), frostGuardian=hollowSentinel(true);
   const group=new T.Group();
   scene.add(group);
@@ -124,6 +125,7 @@ export function createEncounters(
   const caveRewards=new Map<BossCave['id'],{chest:Chest;group:T.Group;view:ReturnType<typeof chestModels>}>();
   const chestViews=chestModels(group,chests,save.opened);
   const cooldowns=new Map<WeaponId,number>();
+  let comboIndex=0,comboFrom=0,comboUntil=0,harvestUntil=0,harvested=0,harvestEffectAt=0;
   let attackWeapon=weapons.longsword, queued:{weapon:Weapon;delay:number;yaw:number}|undefined;
   let time=0, notification='', noticeUntil=0;
   const notify=(message:string)=>{
@@ -132,6 +134,7 @@ export function createEncounters(
   const spectral=spectralModels(), regional=regionalModels();
   const arts=caveArts<Enemy>(group,player,fx,canWalk,clearLine,hitPlayer,summonUndead,notify);
   const shadows=shadowArmy<Enemy>(group,player,save,kind=>{
+    if(kind==='ancientDragon') return dragons.makeDragon(true);
     if(isRegional(kind)) return spectral.decorate(regional.make(kind),kind);
     if(kind==='wild'||kind==='dire'||kind==='elite'||kind==='guardian') return models.make(kind,true);
     if(kind==='sentinel'||kind==='frostGuardian'){
@@ -140,7 +143,7 @@ export function createEncounters(
     }
     const rig=kind==='skeleton'||kind==='skeletonKing'?skeletons.make(kind==='skeletonKing'):kind==='goblin'?goblins.make():
       kind==='wizard'||kind==='ritualElite'||kind==='darkArchmage'?wizards.make(kind!=='wizard',kind==='darkArchmage'):
-      kind==='infernalGolem'?elementals.makeGolem():kind==='ancientDragon'?elementals.makeDragon():orcs.make(kind!=='assassin',kind==='warlord');
+      kind==='infernalGolem'?elementals.makeGolem():orcs.make(kind!=='assassin',kind==='warlord');
     return spectral.decorate(rig,kind);
   },canWalk,clearLine,fx,notify,changed);
   const barGeometry=new T.PlaneGeometry(1.2,.115);
@@ -240,7 +243,7 @@ export function createEncounters(
     };
     const actor:CreatureRig&{barrier?:T.Mesh}=kind==='sentinel'?sentinel:kind==='frostGuardian'?frostGuardian:rigPool.get(kind)?.pop()??(
       isRegional(kind)?regional.make(kind):wizard?wizards.make(kind!=='wizard',kind==='darkArchmage'):kind==='skeleton'||kind==='skeletonKing'?skeletons.make(kind==='skeletonKing'):
-      kind==='infernalGolem'?elementals.makeGolem():kind==='ancientDragon'?elementals.makeDragon():kind==='goblin'?goblins.make():
+      kind==='infernalGolem'?elementals.makeGolem():kind==='ancientDragon'?dragons.makeDragon():kind==='goblin'?goblins.make():
       orc?orcs.make(kind!=='assassin',kind==='warlord'):models.make(kind));
     if(actor.barrier) actor.barrier.visible=false;
     actor.root.visible=false;
@@ -276,7 +279,10 @@ export function createEncounters(
     const enemy:Enemy={...actor,id,kind,spec,home,affinity,wizard,barrier:actor.barrier,
       roaming:Boolean(roamingKind(id)),roamGroup,elite,level,announced:false,patrol:!!member&&trailDistance(spot.x,spot.z)<5,
       target:{point:actor.root.position,alive:()=>enemy.hp>0,get effects(){return enemy.statuses;},
-        hit:(damage,element,heavy)=>hitEnemy(enemy,damage,element,heavy)},ward:0,wardCool:0,wolfRig:kind!=='sentinel'&&!isAdvancedBoss(kind)&&!wizard&&!orc&&kind!=='skeleton'&&kind!=='goblin',turn:0,posePhase:enemies.length*.92,gait:0,anticipation:0,collapse:1,
+        pull:defaultShadowGrade(kind)==='boss'?undefined:(x,z)=>{
+          if(!enemy.charge&&spaceAround(enemy,x,z)) actor.root.position.set(x,surface(x,z),z);
+        },
+        hit:(damage,element,heavy)=>hitEnemy(enemy,damage,element,heavy,element==='darkness')},ward:0,wardCool:0,wolfRig:kind!=='sentinel'&&!isAdvancedBoss(kind)&&!wizard&&!orc&&kind!=='skeleton'&&kind!=='goblin',turn:0,posePhase:enemies.length*.92,gait:0,anticipation:0,collapse:1,
       impactAge:3,retreat:0,strikes:0,hp:(oldDefeats.has(id)||save.defeatedBosses.includes(id))?0:spec.health,hpBar,fill,
       statuses:statuses(spec.resistance),visualTick:0,lastVisual:null,cooldown:0,windup:0,heading:rand()*6.28,phase:rand()*10,hitFlash:0,charge:0,chargeWindup:false,chargeHit:false,loot,beam};
     if(elite){
@@ -309,7 +315,7 @@ export function createEncounters(
     return {sprite,age:1,base:0,strong:false};
   });
   let numberCursor=0;
-  const magic=abilityCombat(player.position,targets,canWalk,clearLine,fx);
+  const magic=abilityCombat(player.position,targets,canWalk,clearLine,fx,()=>{shake=Math.max(shake,.73);});
   function visibleAt(x:number,z:number){
     sphere.center.set(x,surface(x,z)+1.2,z);
     return frustum.intersectsSphere(sphere);
@@ -401,7 +407,7 @@ export function createEncounters(
     number.sprite.material.map=texture;
     number.sprite.material.needsUpdate=true;
     number.sprite.material.color.set(strong?0xffcf5b:element?{
-      fire:0xffa567,lightning:0xb6ceff,ice:0x9eeeff,water:0x85ddff,wind:0xaff8d4,
+      fire:0xffa567,lightning:0xb6ceff,ice:0x9eeeff,water:0x85ddff,wind:0xaff8d4,darkness:0xd799ff,
     }[element]:0xffead7);
     number.sprite.position.copy(point);
     number.sprite.position.x+=((numberCursor%5)-2)*.15;
@@ -452,13 +458,27 @@ export function createEncounters(
       }
     }
   }
-  function hitEnemy(enemy:Enemy, amount:number,element:Weapon['ability']=null,heavy=false){
+  function hitEnemy(enemy:Enemy, amount:number,element:Weapon['ability']=null,heavy=false,harvest=false){
     if(enemy.hp<=0) return;
     combatUntil=time+4;
     const parry=enemy.regionalCast?.move==='counter'&&!element&&inArc(enemy.root.position,player.position,enemy.heading,6,1.2);
     const defense=enemy.kind==='stoneGolem'&&!element ? .73 : 1;
     const damage=Math.round(amount*(parry?.22:enemy.ward>0?.35:1)*defense*10)/10;
-    enemy.hp=Math.max(0,enemy.hp-damage);
+    const dealt=Math.min(enemy.hp,damage);
+    if(dealt<=0) return;
+    enemy.hp-=dealt;
+    if(harvest&&save.health>0){
+      if(time>=harvestUntil){harvestUntil=time+1.5;harvested=0;}
+      const heal=Math.min(dealt*.05,maxHealth()-save.health,Math.max(0,Math.min(14,maxHealth()*.035)-harvested));
+      if(heal>.0001){
+        harvested+=heal;save.health+=heal;changed();
+        if(time>=harvestEffectAt){
+          harvestEffectAt=time+.35;
+          fx.emit(player.position,0xad63e8,'mist',.51,.46,{y:.57,lift:1.07,opacity:.48});
+          fx.emit(player.position,0x9865d7,'ring',.62,.34,{y:.13,grow:2.3});
+        }
+      }
+    }
     enemy.hitFlash=.22;
     impact(enemy.root.position,damage,element,heavy);
     if(enemy.hp){
@@ -497,7 +517,7 @@ export function createEncounters(
     enemy.loot.position.copy(enemy.root.position);
     enemy.loot.visible=true;
     save.pending[enemy.id]={x:enemy.loot.position.x,z:enemy.loot.position.z};
-    const guaranteed=/^wolf-[0-4]$/.test(enemy.id)&&!collected.has(enemy.id)?elementalIds[Number(enemy.id.slice(-1))]:undefined;
+    const guaranteed=/^wolf-[0-4]$/.test(enemy.id)&&!collected.has(enemy.id)?commonElementalIds[Number(enemy.id.slice(-1))]:undefined;
     if(enemy.roaming){
       const cell=encounterCell(enemy.home.x,enemy.home.z), until=Date.now()+30_000+Math.floor(Math.random()*30_000);
       spawnCooldown.set(cell,until);save.returns[cell]=until;
@@ -659,7 +679,7 @@ export function createEncounters(
       fx.emit(point,0x805eff,'ring',.43,.48,{grow:6.4,y:.19,delay:.07});
       fx.scatter(point,0x91e7ff,15,.98);
     },
-    transition(){spawnClock=.6;arts.clear();
+    transition(){comboUntil=0;spawnClock=.6;arts.clear();
       for(let i=enemies.length-1;i>=0;i--) if(enemies[i].summonedBy) removeRoamer(i);
       for(const enemy of enemies) if(isAdvancedBoss(enemy.kind)||isRegional(enemy.kind)){
         enemy.regionalCast=undefined;enemy.bossCast=undefined;enemy.windup=0;enemy.charge=0;enemy.cooldown=.62;
@@ -679,15 +699,25 @@ export function createEncounters(
     get abilityRemaining(){return Math.max(0,(cooldowns.get(save.equipped)??0)-time);},
     attack(startAnimation:(weapon:Weapon)=>boolean){
       if(!save.health||queued||magic.dashing) return;
-      const weapon=tunedWeapon(weapons[save.equipped]);
+      let weapon=tunedWeapon(weapons[save.equipped]);
+      const step=weapon.id==='scythe'&&time>=comboFrom&&time<=comboUntil?(comboIndex+1)%scytheCombo.length:0;
+      if(weapon.id==='scythe'){
+        const move=scytheCombo[step], rate=attackSpeed(effectiveStats(save));
+        weapon={...weapon,...move,damage:weapon.damage*move.damage,cooldown:move.cooldown/rate,
+          attackDuration:move.attackDuration/rate,impactTime:move.impactTime/rate};
+      }
       if(!rangeTimer.start(weapon)) return;
       if(!startAnimation(weapon)){rangeTimer.cancel();return;}
       attackWeapon=weapon;
+      if(weapon.id==='scythe'){
+        comboIndex=step;comboFrom=time+weapon.cooldown;comboUntil=comboFrom+.55;
+      }else comboUntil=0;
     },
     cast(startAnimation:(weapon:Weapon,ability:boolean)=>boolean){
       const weapon=tunedWeapon(weapons[save.equipped],true);
       if(!save.health||!weapon.ability||queued||magic.dashing||rangeTimer.busy||
         (cooldowns.get(weapon.id)??0)>time||!startAnimation(weapon,true)) return;
+      comboUntil=0;
       cooldowns.set(weapon.id,time+weapon.abilityCooldown);
       queued={weapon,delay:abilityAnimationSeconds*weapon.impactTime/weapon.attackDuration,yaw:player.rotation.y};
     },
@@ -709,7 +739,7 @@ export function createEncounters(
         save.collected=[...collected];
         delete save.pending[loot.id];
         const drop=save.drops[loot.id]??{gold:wolfLoot.gold,material:loot.spec.material,rarity:'Common',
-          weapon:elementalIds[Number(loot.id.split('-')[1])],potion:0};
+          weapon:commonElementalIds[Number(loot.id.split('-')[1])],potion:0};
         delete save.drops[loot.id];
         save.gold+=drop.gold;
         if(loot.kind==='wild') save.fangs+=wolfLoot.count;
@@ -739,8 +769,18 @@ export function createEncounters(
           }
           fx.treasure(chest,Number.parseInt(rarity[chest.rarity].color.slice(1),16),rarityOrder.indexOf(chest.rarity));
           grantWeapon('chest-'+chest.id,chest.weapon,chest.rarity);
+          let dragonLoot='';
+          if(cave?.kind==='ancientDragon'){
+            const run=save.caveRuns[cave.id];
+            for(const [name,amount] of [['Dragon Scale',6],['Mythic Core',1],['Legendary Core',2],['Greater Enhancement Stone',5]] as const)
+              save.materials[name]=(save.materials[name]??0)+amount;
+            if(run&&dragonScytheReward(save.seed,run.cycle,save.arsenal.includes('scythe'))){
+              grantWeapon('chest-'+chest.id+'-scythe','scythe','Mythic');
+              dragonLoot=' · Mythic Void Reaper';
+            }
+          }
           const equipment=grantArmor(bonus.armorPiece);
-          notify('Opened '+chest.rarity+' Chest · '+weapons[chest.weapon].name+' · Armor '+save.armor+' · '+material+' × '+count+equipment);
+          notify('Opened '+chest.rarity+' Chest · '+weapons[chest.weapon].name+' · Armor '+save.armor+' · '+material+' × '+count+equipment+dragonLoot);
           return;
         }
         if(atCamp()&&save.health<maxHealth()){
@@ -799,12 +839,22 @@ export function createEncounters(
         const weapon=attackWeapon;
         if(weapon.id==='staff') magic.bolt(weapon,player.rotation.y);
         else {
-          fx.slash(player.position,weapon.ability,player.rotation.y,weapon.range*.68,rarity[weapon.rarity].multiplier>=2.5);
+          const scythe=weapon.id==='scythe', critical=scythe&&comboIndex===2;
+          const yaw=player.rotation.y;
+          fx.slash(player.position,weapon.ability,yaw,weapon.range*.68,scythe?critical:rarity[weapon.rarity].multiplier>=2.5);
+          if(critical){
+            for(const angle of [2.1,4.2]) fx.slash(player.position,'darkness',yaw+angle,weapon.range*.68,true);
+            shake=Math.max(shake,.31);
+          }
           for(const enemy of enemies){
             const p=enemy.root.position;
-            if(enemy.hp && Math.abs(player.position.y-p.y)<2 &&
-              inArc(player.position,p,player.rotation.y,weapon.range,weapon.reachAngle) &&
-              clearLine(player.position.x,player.position.z,p.x,p.z)) hitEnemy(enemy,weaponDamage(weapon),weapon.ability,rarity[weapon.rarity].multiplier>=2.5);
+            const dragon=enemy.kind==='ancientDragon';
+            if(enemy.hp && Math.abs(player.position.y-p.y)<(dragon?3.55:2) &&
+              inArc(player.position,p,yaw,weapon.range+(dragon?2.05:0),weapon.reachAngle) &&
+              clearLine(player.position.x,player.position.z,p.x,p.z)){
+              hitEnemy(enemy,weaponDamage(weapon)*(critical?1.17:1),weapon.ability,
+                scythe?critical:rarity[weapon.rarity].multiplier>=2.5,scythe);
+            }
           }
         }
       }
@@ -1284,7 +1334,7 @@ export function createEncounters(
       models.dispose();skeletons.dispose();goblins.dispose();orcs.dispose();wizards.dispose();
       affinityGeometry.dispose();Object.values(affinities).forEach(material=>material.dispose());
       for(const resource of [barGeometry,backing,red,alert,lootGeometry,drawstring,lootFang,lootCoin,bagTie,boneLoot,metalLoot,lootBeamGeometry,lootMaterial,sparkGeometry,sparks.material,echoMaterial]) resource.dispose();
-      shadows.dispose();spectral.dispose();regional.dispose();elementals.dispose();arts.dispose();fx.dispose();
+      shadows.dispose();spectral.dispose();regional.dispose();elementals.dispose();dragons.dispose();arts.dispose();fx.dispose();
       chestViews.dispose();
       for(const enemy of enemies){enemy.loot.material.dispose();enemy.beam.material.dispose();enemy.title?.material.dispose();}
       for(const texture of labels.values()) texture.dispose();

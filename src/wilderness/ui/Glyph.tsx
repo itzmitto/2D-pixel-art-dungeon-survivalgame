@@ -3,6 +3,9 @@ import { useId } from 'react';
 
 type Art={color:string; silhouette:string; shade:string; detail:string};
 const art:Record<string,Art>={
+  scythe:{color:'#be7afa',silhouette:'M5 57l5-9 4 1 23-28-8-1Q15 22 7 32 13 13 34 8q15-5 26 1l-5 8-8 1-7 6-22 29 1 5-7 4Z',shade:'M10 28q14-18 26-19 14-4 22 0l-6 5-12 1-10 1ZM16 51l25-30 3-1-26 34Z',detail:'m13 24 10-7 9-1 8-5 11 1M34 27l3 3m-9 3 3 3m-9 4 3 3m-10 4 3 3'},
+  Darkness:{color:'#bd71ef',silhouette:'M7 26 20 10 43 5 57 17 58 41 43 56 23 58 8 44Z M17 32 27 21 43 18 50 26 43 41 29 47 19 43Z',shade:'M7 26 20 10 43 5 57 17 43 16 28 18 15 33 8 44Z',detail:'m10 29 11-6 3-8 12-4m-5 41 10-3 10-10m-30-4 7-8 11-3 5 4-5 8-10 4-3-4 4-5'},
+
   'Mountain Crystal':{color:'#86d9ff',silhouette:'M8 49 16 24l10 12 3-21L42 4l9 16-6 20 11-5-2 14-18 10Z',shade:'M29 15 42 4l-5 24-12 28-9-10 12-9ZM42 33l9-13-5 25-10 13Z',detail:'m31 17 7 9 9-6M16 27l6 18m15-18-9 25'},
   'Ancient Stone':{color:'#95a0b9',silhouette:'M7 38 15 19l18-8 20 7 5 20-13 16-23 2Z',shade:'m7 38 15-8 23 2 13 6-13 16-23 2Z',detail:'m20 24 8-4 5 5 8-8m-8 8-7 10 10 8 12-4m-12 4-5 9'},
   'Troll Fang':{color:'#d8d3a2',silhouette:'M12 18 23 8l18 2 9 12-7 15Q28 55 10 59l-3-6q18-14 18-25Z',shade:'m12 18 12-9 17 2 7 10-13 5-12-1Zm23 10q-4 15-24 28 22-6 31-24Z',detail:'m18 17 8 3 7-4 9 3m-10 13-7 12'},
