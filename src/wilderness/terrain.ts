@@ -13,7 +13,7 @@ export function terrain(scene: T.Scene) {
       diffuseColor.rgb*=.94+fleck*.056+moss*.075;
       diffuseColor.rgb+=vec3(.04,.036,.026)*gravel;`);
   };
-  const span=40;
+  const span=40, chunks:{mesh:T.Mesh;x:number;z:number}[]=[];
   for(let cz=-extent;cz<extent;cz+=span) for(let cx=-extent;cx<extent;cx+=span){
   const geo = new T.PlaneGeometry(span,span,26,26).rotateX(-Math.PI/2).translate(cx+span/2,0,cz+span/2);
   const p = geo.attributes.position;
@@ -36,7 +36,7 @@ export function terrain(scene: T.Scene) {
   geo.setAttribute('color',new T.Float32BufferAttribute(colors,3));
   const ground = new T.Mesh(geo,material);
   ground.receiveShadow=true;
-  scene.add(ground);
+  scene.add(ground);chunks.push({mesh:ground,x:cx+span/2,z:cz+span/2});
   }
   const waterGeo=new T.PlaneGeometry(15,extent*2,4,180).rotateX(-Math.PI/2);
   const wp=waterGeo.attributes.position;
@@ -57,5 +57,11 @@ export function terrain(scene: T.Scene) {
   const stream=new T.Mesh(waterGeo,water);
   stream.position.y=.12;
   scene.add(stream);
-  return clock;
+  return {
+    update(time:number,player:T.Vector3){
+      clock.value=time;
+      for(const {mesh,x,z} of chunks) mesh.visible=Math.hypot(x-player.x,z-player.z)<160;
+      stream.visible=player.z>-extent-42&&player.z<extent+25&&Math.abs(player.x-32)<135;
+    },
+  };
 }

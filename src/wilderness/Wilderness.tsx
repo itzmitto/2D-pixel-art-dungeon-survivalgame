@@ -139,9 +139,9 @@ export default function Wilderness() {
   const waypointDistance=waypoint?Math.hypot(waypoint.x-position.x,waypoint.z-position.z):0;
   const cave=caveAt(position.z);
   const boss=cave?monsters[cave.kind]:floor?.final?monsters[floor.guards[0].kind]:monsters.guardian;
-  const announcement=/^(Elite encountered|Boss encounter|Boss phase II|Boss technique|New region discovered|Cave victory|Cave reward|Shadow extracted|Shadow extraction failed|Army command|Briar Watch · Floor) · (.+)$/.exec(message.notification);
+  const announcement=/^(Elite encountered|Boss encounter|Boss phase II|Boss technique|Cave victory|Cave reward|Shadow extracted|Shadow extraction failed|Army command|Briar Watch · Floor) · (.+)$/.exec(message.notification);
   const visibleNotices=announcement
-    ? [...notices,{kind:announcement[1]==='New region discovered'?'region':announcement[1].startsWith('Boss')?'boss':'dungeon',title:announcement[1],detail:announcement[2]} as Notice]
+    ? [...notices,{kind:announcement[1].startsWith('Boss')?'boss':'dungeon',title:announcement[1],detail:announcement[2]} as Notice]
     : notices;
   const canRedeem=clearing(position.x,position.z)<9.5&&hero.fangs>0;
   return <main className="wild" data-overlay-closing={closing} aria-label="Vonkje">

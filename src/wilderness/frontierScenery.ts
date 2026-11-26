@@ -1,5 +1,5 @@
 import * as T from 'three';
-import { fallsX, fortress, frontierAt, frontierCamps, frontierLandmarks, frontierStones, highlandRiver, highlands, routeDistance, waterfall } from './frontier.ts';
+import { fallsX, fortress, frontierAt, frontierCamps, frontierLandmarks, frontierRegions, frontierStones, highlandRiver, highlands, marshBridge, marshes, marshWaterLevel, routeDistance, waterfall } from './frontier.ts';
 import { bossCaves } from './bossCaves.ts';
 import { height, randomSequence, surface } from './layout.ts';
 import { meshPart, rigidBatcher, shapedPlate } from './creatureGeometry.ts';
@@ -15,6 +15,19 @@ export function frontierScenery(scene:T.Scene, obstacles:{x:number;z:number;r:nu
   const crystal=new T.MeshStandardMaterial({color:0x73bdd3,emissive:0x256a9d,emissiveIntensity:.67,roughness:.3});
   const groundMaterial=new T.MeshStandardMaterial({vertexColors:true,roughness:1});
   const waterMaterial=new T.MeshStandardMaterial({color:0x406d8a,roughness:.23,metalness:.38,transparent:true,opacity:.78,side:T.DoubleSide});
+  const bogWater=waterMaterial.clone();
+  bogWater.color.set(0x244b42);bogWater.opacity=.9;
+  const stem=new T.MeshStandardMaterial({color:0x4f625b,roughness:.94});
+  const caps=new T.MeshStandardMaterial({color:0x72dfb7,emissive:0x26785e,emissiveIntensity:.84,roughness:.56});
+  const mist=new T.ShaderMaterial({
+    transparent:true,depthWrite:false,side:T.DoubleSide,uniforms:{clock:{value:0}},
+    vertexShader:`varying vec2 p;void main(){p=uv*2.-1.;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+    fragmentShader:`varying vec2 p;uniform float clock;void main(){
+      float edge=pow(max(0.,1.-dot(p,p)),1.35);
+      float current=.60+.31*sin(p.x*8.+sin(p.y*5.+clock*.32)*2.+clock*.55);
+      gl_FragColor=vec4(.27,.58,.55,edge*current*.27);
+    }`,
+  });
   const streamClock={value:0};
   waterMaterial.onBeforeCompile=shader=>{
     shader.uniforms.streamTime=streamClock;
@@ -23,12 +36,16 @@ export function frontierScenery(scene:T.Scene, obstacles:{x:number;z:number;r:nu
       float streak=pow(.5+.5*sin(streamPos.x*7.+streamPos.y*1.9+streamPos.z*1.4-streamTime*5.+sin(streamPos.z*3.2)),8.);
       diffuseColor.rgb+=vec3(.18,.29,.36)*streak;`);
   };
+  bogWater.onBeforeCompile=waterMaterial.onBeforeCompile;
   const rock=new T.DodecahedronGeometry(1,0), box=new T.BoxGeometry(), cone=new T.ConeGeometry(1,1,7);
   const log=new T.CylinderGeometry(.65,1,1,7), shard=new T.OctahedronGeometry(1);
+  const cap=new T.SphereGeometry(1,8,4,0,Math.PI*2,0,Math.PI/2);
+  const mistPlane=new T.PlaneGeometry(34,21).rotateX(-Math.PI/2);
+  const reed=new T.ConeGeometry(1,1,4);
   const arch=shapedPlate([[-1,0],[1,0],[1,1.85],[.72,2.64],[0,3.46],[-.72,2.64],[-1,1.85]],.19,.041);
-  const geometries:T.BufferGeometry[]=[rock,box,cone,log,shard,arch];
+  const geometries:T.BufferGeometry[]=[rock,box,cone,log,shard,arch,cap,mistPlane,reed];
   const batch=rigidBatcher();
-  const chunks:{root:T.Group;x:number;z:number}[]=[];
+  const chunks:{root:T.Group;x:number;z:number;swamp:boolean}[]=[];
   function block(parent:T.Group,m:T.Material,x:number,y:number,z:number,sx:number,sy:number,sz:number,geo:T.BufferGeometry=box){
     const mesh=meshPart(parent,geo,m,x,y,z);mesh.scale.set(sx,sy,sz);return mesh;
   }
@@ -44,25 +61,53 @@ export function frontierScenery(scene:T.Scene, obstacles:{x:number;z:number;r:nu
   }
   const protectedSpots=[...frontierLandmarks,...frontierStones,...frontierCamps,...bossCaves,...worldChests];
   const shale=new T.Color(0x566176), gravel=new T.Color(0x8a8073), tundra=new T.Color(0x414f4d), frost=new T.Color(0x9aacba);
-  for(let startZ=highlands.north;startZ<highlands.south;startZ+=44) for(let startX=-110;startX<110;startX+=44){
+  const silt=new T.Color(0x343f37), moss=new T.Color(0x4e6452), wet=new T.Color(0x233d38);
+  for(const region of frontierRegions) for(let startZ=region.north;startZ<region.south;startZ+=44) for(let startX=-110;startX<110;startX+=44){
+    const swamp=region.id==='mournshade';
     const root=new T.Group(), geo=new T.PlaneGeometry(44,44,32,32).rotateX(-Math.PI/2).translate(startX+22,0,startZ+22);
     const pos=geo.attributes.position, colors=[];
     for(let i=0;i<pos.count;i++){
       const x=pos.getX(i),z=pos.getZ(i), y=height(x,z);
       pos.setY(i,y);
-      tint.copy(tundra).lerp(shale,.4+.3*Math.sin(x*.26+z*.21)).lerp(frost,T.MathUtils.smoothstep(y,23,43))
+      if(swamp){
+        tint.copy(silt).lerp(moss,.46+.32*Math.sin((x+z)*.38)).lerp(wet,1-T.MathUtils.smoothstep(y,.14,1.15));
+      }else tint.copy(tundra).lerp(shale,.4+.3*Math.sin(x*.26+z*.21)).lerp(frost,T.MathUtils.smoothstep(y,23,43))
         .lerp(gravel,1-T.MathUtils.smoothstep(routeDistance(x,z,highlands.road),1.9,5.2));
       colors.push(tint.r,tint.g,tint.b);
     }
     geo.setAttribute('color',new T.Float32BufferAttribute(colors,3));geo.computeVertexNormals();geometries.push(geo);
     const mesh=new T.Mesh(geo,groundMaterial);mesh.receiveShadow=true;root.add(mesh);
-    const trunks:Prop[]=[], pines:Prop[]=[], rocks:Prop[]=[], crystals:Prop[]=[];
+    const trunks:Prop[]=[], pines:Prop[]=[], rocks:Prop[]=[], crystals:Prop[]=[], mushrooms:Prop[]=[], stalks:Prop[]=[], grasses:Prop[]=[];
+    const branches=new T.Group(), waterGeo=new T.PlaneGeometry(44,44).rotateX(-Math.PI/2).translate(startX+22,marshWaterLevel,startZ+22);
+    if(swamp){geometries.push(waterGeo);root.add(new T.Mesh(waterGeo,bogWater));root.add(branches);}
+    else waterGeo.dispose();
     for(let i=0;i<122;i++){
       const x=startX+random()*44,z=startZ+random()*44,y=height(x,z);
-      if(z>-244||routeDistance(x,z,highlands.road)<5||highlandRiver(x,z)||
+      if(z>-244||routeDistance(x,z,region.road)<4.8||highlandRiver(x,z)||
         protectedSpots.some(p=>Math.hypot(x-p.x,z-p.z)<(p===fortress?25:5))) continue;
       const a=random()*6.28;
-      if(y<18&&random()<.57){
+      if(swamp){
+        if(y>.43&&y<1.4) for(let j=0;j<6;j++){
+          const xx=x+(random()-.5)*1.08, zz=z+(random()-.5)*1.08,h=.27+random()*.65;
+          grasses.push([xx,height(xx,zz)+h*.43,zz,.033,h,.043,a+j]);
+        }
+        if(random()<.23){
+          const h=2.2+random()*4.6,r=.19+random()*.23;
+          trunks.push([x,y+h*.47,z,r,h,r,a]);
+          for(const side of [-1,1]){
+            const branch=block(branches,wood,x+side*h*.17,y+h*.69,z+Math.sin(a)*h*.10,r*.62,h*.54,r*.65,log);
+            branch.rotation.set(.19*side,a,-side*.84);
+          }
+          if(y>marshWaterLevel) obstacles.push({x,z,r:r*.87});
+        }else if(y>.84&&random()<.46){
+          for(let j=0;j<4;j++){
+            const xx=x+Math.cos(j*2.39)*j*.25,zz=z+Math.sin(j*2.39)*j*.25;
+            const base=height(xx,zz), h=.11+random()*.42;
+            stalks.push([xx,base+h*.47,zz,.051,h,.051,a]);
+            mushrooms.push([xx,base+h*.91,zz,h*.66,h*.42,h*.66,a]);
+          }
+        }
+      }else if(y<18&&random()<.57){
         const h=2.8+random()*4.6;
         trunks.push([x,y+h*.36,z,.16,h*.78,.16,a]);
         for(let layer=0;layer<3;layer++){
@@ -79,7 +124,15 @@ export function frontierScenery(scene:T.Scene, obstacles:{x:number;z:number;r:nu
     }
     instances(root,trunks,log,wood);instances(root,pines,cone,needles);instances(root,rocks,rock,stone);
     instances(root,crystals,shard,crystal,false);
-    scene.add(root);chunks.push({root,x:startX+22,z:startZ+22});
+    if(swamp){
+      instances(root,stalks,log,stem,false);instances(root,mushrooms,cap,caps,false);instances(root,grasses,reed,needles,false);batch.bake(branches);
+      for(let i=0;i<3;i++){
+        const haze=new T.Mesh(mistPlane,mist);
+        haze.position.set(startX+8+random()*28,.68+i*.21,startZ+6+random()*30);
+        haze.rotation.y=i*1.1;root.add(haze);
+      }
+    }
+    scene.add(root);chunks.push({root,x:startX+22,z:startZ+22,swamp});
   }
   const aqueduct=new T.Group();
   const strip:number[]=[], index:number[]=[];
@@ -135,30 +188,58 @@ export function frontierScenery(scene:T.Scene, obstacles:{x:number;z:number;r:nu
   }
   block(keep,slate,0,2.85,-22,26,6.1,1.9);
   for(let x=-12;x<=12;x+=2) obstacles.push({x:fortress.x+x,z:fortress.z-22,r:1.35});
-  const camps=new T.Group();
+  const boardwalk=new T.Group(), planks:Prop[]=[], pilings:Prop[]=[];
+  for(let i=1;i<marshes.road.length;i++){
+    const [ax,az]=marshes.road[i-1], [bx,bz]=marshes.road[i];
+    const dx=bx-ax,dz=bz-az,length=Math.hypot(dx,dz),yaw=Math.atan2(dx,dz);
+    const count=Math.ceil(length/.49);
+    for(let j=0;j<count;j++){
+      const x=ax+dx*j/count,z=az+dz*j/count;
+      if(!marshBridge(x,z)) continue;
+      const y=surface(x,z);
+      planks.push([x,y-.081,z,6.18+random()*.16,.20,.54,yaw]);
+      if(j%6===0) for(const side of [-1,1]){
+        const px=x+side*Math.cos(yaw)*2.92,pz=z-side*Math.sin(yaw)*2.92;
+        pilings.push([px,y-.30,pz,.21,1.47,.21,yaw]);
+      }
+    }
+  }
+  instances(boardwalk,planks,box,wood);instances(boardwalk,pilings,log,wood);
+  const camps=new T.Group(), bogRuins=new T.Group();
   for(const site of frontierLandmarks.filter(site=>site.kind==='camp'||site.kind==='ruin')){
+    const swamp=site.z<marshes.south, root=swamp?bogRuins:camps;
+    if(swamp&&site.kind==='ruin'){
+      const y=height(site.x,site.z);
+      for(let i=0;i<4;i++){
+        const x=site.x+(i-1.5)*2.4;
+        block(root,stone,x,y+.93,site.z-2.6,1.14,2.1+i*.17,1.02,rock);
+        block(root,slate,x,y-.15,site.z-1.4,2.15,.55,2.15);
+      }
+      block(root,slate,site.x,y+1.65,site.z-3,1.65,1.25,.77,arch).rotation.z=.21;
+    }
     for(let i=0;i<12;i++){
       const angle=i*2.399,r=5+random()*5,x=site.x+Math.sin(angle)*r,z=site.z+Math.cos(angle)*r;
       const y=height(x,z);
       if(site.kind==='camp'){
-        block(camps,wood,x,y+.95,z,.16,2.2+random(),.19).rotation.z=.16*Math.sin(i);
-        if(i%4===0) block(camps,torch,x,y+2.4,z,.24,.48,.24,shard);
-      }else block(camps,stone,x,y+.5,z,.88,1.5+random()*1.8,1.08,rock);
+        block(root,wood,x,y+.95,z,.16,2.2+random(),.19).rotation.z=.16*Math.sin(i);
+        if(i%4===0) block(root,torch,x,y+2.4,z,.24,.48,.24,shard);
+      }else block(root,stone,x,y+.5,z,.88,1.5+random()*1.8,1.08,rock);
     }
   }
-  for(const root of [aqueduct,keep,camps]){batch.bake(root);scene.add(root);}
+  for(const root of [aqueduct,keep,camps,boardwalk,bogRuins]){batch.bake(root);scene.add(root);}
   return {
     update(time:number,p:T.Vector3){
-      streamClock.value=time;
+      streamClock.value=time;mist.uniforms.clock.value=time;
       const near=!!frontierAt(p.z)||p.z>-245&&p.z<-160;
-      for(const {root,x,z} of chunks) root.visible=near&&Math.hypot(p.x-x,p.z-z)<133;
+      for(const {root,x,z,swamp} of chunks) root.visible=near&&Math.hypot(p.x-x,p.z-z)<(swamp?86:133);
       aqueduct.visible=near&&Math.abs(p.z+317)<109;
       keep.visible=near&&Math.abs(p.z-fortress.z)<109;
+      boardwalk.visible=near&&p.z<-445;bogRuins.visible=near&&p.z<-500;
       camps.visible=near&&Math.abs(p.z+369)<108;
     },
     dispose(){
       batch.dispose();
-      for(const resource of [...geometries,stone,slate,wood,needles,torch,crystal,groundMaterial,waterMaterial]) resource.dispose();
+      for(const resource of [...geometries,stone,slate,wood,needles,torch,crystal,groundMaterial,waterMaterial,bogWater,stem,caps,mist]) resource.dispose();
     },
   };
 }

@@ -6,6 +6,8 @@ import { loft, meshPart, rigidBatcher, shapedPlate } from './creatureGeometry.ts
 export function caveScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number}[]){
   const slab=new T.DodecahedronGeometry(1,0).scale(1,.72,1);
   const stone=new T.MeshStandardMaterial({color:0x5f5b61,roughness:.94,flatShading:true});
+  const bog=new T.MeshStandardMaterial({color:0x3c6356,roughness:.84,metalness:.14});
+  const mushroom=new T.SphereGeometry(1,8,4,0,Math.PI*2,0,Math.PI/2);
   const basalt=new T.MeshStandardMaterial({color:0x43414f,roughness:.95});
   const frozen=new T.MeshStandardMaterial({color:0x647d91,metalness:.29,roughness:.39});
   const voidMaterial=new T.MeshBasicMaterial({color:0x080714});
@@ -56,10 +58,10 @@ export function caveScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number}
   const arenaProps:{x:number;z:number;r:number}[]=[];
   const views=bossCaves.map(cave=>{
     const ice=cave.kind==='frostGuardian',crypt=cave.kind==='skeletonKing',arcane=cave.kind==='darkArchmage'||cave.kind==='cursedWarlord';
-    const troll=cave.kind==='trollKing';
+    const troll=cave.kind==='trollKing', venom=cave.kind==='venomQueen';
     const volcanic=cave.kind==='infernalGolem'||cave.kind==='ancientDragon',dragon=cave.kind==='ancientDragon';
     const light=ice?blue:cave.kind==='warlord'?amber:new T.MeshBasicMaterial({color:cave.color,toneMapped:false});
-    const ground=ice?frozen:crypt||troll?stone:volcanic?rockGlow:basalt;
+    const ground=venom?bog:ice?frozen:crypt||troll?stone:volcanic?rockGlow:basalt;
     let sign:T.Sprite|undefined;
     const floats:T.Mesh[]=[], entryMotes=new T.InstancedMesh(dust,light,12);
     entryMotes.instanceMatrix.setUsage(T.DynamicDrawUsage);entryMotes.frustumCulled=false;
@@ -116,7 +118,7 @@ export function caveScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number}
     grid.forEach(([x,z],i)=>{
       stamp.position.set(x,-.19,cave.arena+z);stamp.scale.set(2.04,.36,2.04);stamp.rotation.set(0,0,0);
       stamp.updateMatrix();tiles.setMatrixAt(i,stamp.matrix);
-      tint.setHSL(ice?.55+random()*.065:volcanic?.02+random()*.04:crypt?.14+random()*.02:.69+random()*.043,ice||volcanic?.24:.10,.48+random()*.20);
+      tint.setHSL(venom?.43+random()*.08:ice?.55+random()*.065:volcanic?.02+random()*.04:crypt?.14+random()*.02:.69+random()*.043,ice||volcanic?.24:.10,.48+random()*.20);
       tiles.setColorAt(i,tint);
     });
     tiles.receiveShadow=true;tiles.computeBoundingSphere();arena.add(tiles);
@@ -151,7 +153,13 @@ export function caveScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number}
     for(const side of [-1,1]){
       for(let i=0;i<7;i++){
         const x=side*(cave.width*.67+(i%2)*1.45),z=cave.arena-10+i*3.20;
-        if(crypt){
+        if(venom){
+          for(let n=0;n<5;n++){
+            const xx=x+Math.cos(n*2.4)*1.83,zz=z+Math.sin(n*2.4)*1.25,h=.24+random()*.64;
+            meshPart(arena,pillar,timber,xx,.01,zz).scale.set(.12,h*.28,.12);
+            meshPart(arena,mushroom,light,xx,h,zz).scale.set(h*.7,h*.38,h*.62);
+          }
+        }else if(crypt){
           arenaProps.push({x,z,r:.83});
           meshPart(arena,sarcophagus,stone,x,.35,z).rotation.y=.41*side;
           meshPart(arena,rune,brass,x,.64,z).rotation.x=-Math.PI/2;
@@ -190,7 +198,7 @@ export function caveScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number}
         const liquid=meshPart(arena,mistGeo,lavaMat,side*cave.width*.79,.023,cave.arena+3.7);
         liquid.scale.set(cave.width*.18,1,cave.depth*.48);liquid.castShadow=false;
       }
-      if(ice){
+      if(ice||venom){
         const haze=meshPart(arena,mistGeo,mistMat,side*7.9,.27,cave.arena+1.9);
         haze.scale.set(8.2,1,8.6);haze.castShadow=false;
       }

@@ -59,7 +59,7 @@ export function startWilderness(
     mounted=false;summoning=0;horse.root.visible=false;
   }
   const water=terrain(scene);
-  const {obstacles,rocks,fireY,animateCamp,animateRitual,tower,caves,expedition}=scenery(scene,save.seed);
+  const {obstacles,rocks,fireY,animateCamp,animateRitual,tower,caves,expedition,capital}=scenery(scene,save.seed);
   const frontier=frontierScenery(scene,obstacles,save.seed);
   const stones=waystoneModels(scene);
   obstacles.push(...waystones.map(({x,z})=>({x,z,r:.95})));
@@ -365,7 +365,7 @@ export function startWilderness(
         lastRegion=region?.id;
         if(region&&!save.discoveredRegions.includes(region.id)){
           save.discoveredRegions.push(region.id);
-          encounters.feedback('New region discovered · '+region.name+' · '+region.difficulty);
+          onSaveChange();
         }
       }
       const travelled=Math.hypot(p.x-beforeX,p.z-beforeZ);
@@ -424,7 +424,8 @@ export function startWilderness(
       expedition.update(time);
       caves.update(time,body.position);
       tower.update(time,body.position,save.defeated);
-      water.value=time;
+      water.update(time,body.position);
+      capital.update(time,body.position);
       grass.update(time,encounters.dashing,encounters.grassInfluences);
       stones.update(time,body.position,save.waystones);
       animateCamp(time,body.position);
@@ -488,7 +489,7 @@ export function startWilderness(
       onSaveChange();
     },
     dispose(){
-    loop.stop(); controller.abort(); observer.disconnect(); encounters.dispose();stones.dispose();grass.dispose();tower.dispose();caves.dispose();expedition.dispose();frontier.dispose();horse.dispose();knight.disposeArmor();
+    loop.stop(); controller.abort(); observer.disconnect(); encounters.dispose();stones.dispose();grass.dispose();tower.dispose();caves.dispose();expedition.dispose();capital.dispose();frontier.dispose();horse.dispose();knight.disposeArmor();
     const geometries=new Set<T.BufferGeometry>(),materials=new Set<T.Material>();
     scene.traverse(object=>{
       if(object instanceof T.InstancedMesh) object.dispose();

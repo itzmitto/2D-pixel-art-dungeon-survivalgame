@@ -1,8 +1,8 @@
-import { outdoorBounds } from './frontier.ts';
+import { marshes, outdoorBounds } from './frontier.ts';
 import { readEssences, readShadows, readShadowCommand, type ShadowCommand, type ShadowEssence, type ShadowSoldier } from './shadowData.ts';
 import { bossCaves, caveWalkable, type CaveRuns } from './bossCaves.ts';
 import { towerWalkable } from './briarWatch.ts';
-import { armorPiece, armorSlots, isArmorId, type ArmorId, type EquippedArmor } from './armor.ts';
+import { armorPiece, armorSlots, isArmorId, type ArmorEnhancements, type ArmorId, type EquippedArmor } from './armor.ts';
 import { waystones } from './worldSites.ts';
 import { denWalkable } from './denLayout.ts';
 import { bossRelics, legacyItem, relicForReward, type RelicId, type WeaponItem } from './itemInstances.ts';
@@ -14,6 +14,10 @@ import { extent, spawn } from './layout.ts';
 
 export const cellSize = 20;
 export const cellsPerSide = extent * 2 / cellSize;
+const legacyCells=cellsPerSide**2;
+const atlasCells=legacyCells+Math.ceil((Math.abs(marshes.north)-extent)/cellSize)*cellsPerSide;
+export const atlasCellZ=(id:number)=>id<legacyCells?-extent+Math.floor(id/cellsPerSide)*cellSize:
+  -extent-(Math.floor((id-legacyCells)/cellsPerSide)+1)*cellSize;
 export const defaultSeed = 294;
 export const saveKey = 'vonkje-wilderness-v1';
 export type Position = { x: number; z: number; yaw: number };
@@ -28,7 +32,9 @@ export type Exploration = Hunter & { version: 1; seed: number; position: Positio
 
 export function cellAt(x: number, z: number) {
   const col = Math.floor((x+extent)/cellSize), row = Math.floor((z+extent)/cellSize);
-  return col < 0 || row < 0 || col >= cellsPerSide || row >= cellsPerSide ? -1 : row*cellsPerSide+col;
+  if(col<0||col>=cellsPerSide||row>=cellsPerSide) return -1;
+  if(row<0) return outdoorBounds(x,z)?legacyCells+(-row-1)*cellsPerSide+col:-1;
+  return row*cellsPerSide+col;
 }
 
 export function reveal(discovered: Set<number>, {x,z}: Position) {
@@ -38,7 +44,7 @@ export function reveal(discovered: Set<number>, {x,z}: Position) {
       const id = cellAt(xx,zz);
       if (id < 0) continue;
       const cx = -extent + (id%cellsPerSide+.5)*cellSize;
-      const cz = -extent + (Math.floor(id/cellsPerSide)+.5)*cellSize;
+      const cz = atlasCellZ(id)+cellSize/2;
       if (Math.hypot(cx-x,cz-z) <= radius || id===cellAt(x,z)) discovered.add(id);
     }
   }
@@ -57,7 +63,7 @@ export function readExploration(raw: string | null): Exploration | null {
       !('z' in position) || typeof position.z!=='number' || !Number.isFinite(position.z) || (!outdoorBounds(position.x,position.z)&&!denWalkable(position.x,position.z)&&!towerWalkable(position.x,position.z)&&!caveWalkable(position.x,position.z)) ||
       !('yaw' in position) || typeof position.yaw!=='number' || !Number.isFinite(position.yaw)) return null;
     const known=discovered.filter((id: unknown): id is number =>
-      typeof id==='number' && Number.isInteger(id) && id>=0 && id<cellsPerSide**2);
+      typeof id==='number' && Number.isInteger(id) && id>=0 && id<atlasCells);
     const integer=(key:string,fallback:number,min:number,max:number)=>{
       const number=Object.getOwnPropertyDescriptor(value,key)?.value as unknown;
       return typeof number==='number' && Number.isSafeInteger(number) && number>=min && number<=max ? number : fallback;
@@ -143,6 +149,12 @@ export function readExploration(raw: string | null): Exploration | null {
       const id:unknown=Object.getOwnPropertyDescriptor(savedEquipment,slot)?.value;
       if(isArmorId(id)&&armorItems.includes(id)&&armorPiece(id).slot===slot) equippedArmor[slot]=id;
     }
+    const armorEnhancements:ArmorEnhancements={};
+    const storedEnhancements:unknown=Object.getOwnPropertyDescriptor(value,'armorEnhancements')?.value;
+    if(storedEnhancements&&typeof storedEnhancements==='object') for(const id of armorItems){
+      const level=enhancementLevel(Object.getOwnPropertyDescriptor(storedEnhancements,id)?.value);
+      if(level) armorEnhancements[id]=level;
+    }
     const caveRuns:CaveRuns={};
     const savedCaves:unknown=Object.getOwnPropertyDescriptor(value,'caveRuns')?.value;
     if(savedCaves&&typeof savedCaves==='object') for(const {id} of bossCaves){
@@ -151,11 +163,11 @@ export function readExploration(raw: string | null): Exploration | null {
         Number.isSafeInteger(state.readyAt)&&state.readyAt>=0) caveRuns[id]={cycle:state.cycle,readyAt:state.readyAt,rewardVersion:state.rewardVersion===2?2:undefined};
     }
     const savedHealth:unknown=Object.getOwnPropertyDescriptor(value,'health')?.value;
-    const boundHealth=maxHunterHealth({level,stats,equippedArmor});
+    const boundHealth=maxHunterHealth({level,stats,equippedArmor,armorEnhancements});
     return {version:1,seed,caveRuns,
       shadows:readShadows(Object.getOwnPropertyDescriptor(value,'shadows')?.value),
       shadowCommand:readShadowCommand(Object.getOwnPropertyDescriptor(value,'shadowCommand')?.value),
-      shadowEssences:readEssences(Object.getOwnPropertyDescriptor(value,'shadowEssences')?.value),armorItems,equippedArmor,arsenal,equipped,hotbar,items,selectedItem,slotItems,drops,opened:namedIds('opened'),discoveredRegions:namedIds('discoveredRegions'),seenChests:namedIds('seenChests'),
+      shadowEssences:readEssences(Object.getOwnPropertyDescriptor(value,'shadowEssences')?.value),armorItems,equippedArmor,armorEnhancements,arsenal,equipped,hotbar,items,selectedItem,slotItems,drops,opened:namedIds('opened'),discoveredRegions:namedIds('discoveredRegions'),seenChests:namedIds('seenChests'),
       waystones:namedIds('waystones').filter(id=>waystones.some(stone=>stone.id===id)),
       returns:counts('returns'),materials:counts('materials'),potions:integer('potions',0,0,100000),position:{x:position.x,z:position.z,yaw:position.yaw},discovered:[...new Set(known)],
       health:typeof savedHealth==='number'&&Number.isFinite(savedHealth)&&savedHealth>=0?Math.min(boundHealth,savedHealth):boundHealth,level,stats,

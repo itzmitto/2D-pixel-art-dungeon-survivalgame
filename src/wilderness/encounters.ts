@@ -1,3 +1,4 @@
+import { inAurelia } from './aurelia.ts';
 import { frontierCamps, outdoorBounds } from './frontier.ts';
 import { isRegional } from './huntData.ts';
 import { regionalModels } from './regionalModels.ts';
@@ -39,7 +40,7 @@ const territories = [
   { x:-66,z:-20 }, { x:-97,z:-68 }, { x:-162,z:67 }, { x:-170,z:-111 },
   { x:83,z:-67 }, { x:142,z:-117 }, { x:99,z:91 }, { x:173,z:-154 },
 ];
-const safe = (x:number,z:number) => Math.hypot(x+45,z)<12 || Math.hypot(x-154,z-103)<11;
+const safe = (x:number,z:number) => inAurelia(x,z)||Math.hypot(x+45,z)<12 || Math.hypot(x-154,z-103)<11;
 const nearDistance = 48;
 const direTerritories=[{x:-163,z:57},{x:-167,z:63},{x:137,z:-124},{x:160,z:-151},{x:182,z:-157}];
 const packTerritories=[{x:-79,z:-24},{x:-85,z:-27},{x:98,z:96}];
@@ -101,6 +102,9 @@ export function createEncounters(
   });
   echo.visible=false;group.add(echo);
   let echoLife=0,shake=0,waterTime=0,combatUntil=0,slowUntil=0;
+  let poisonedUntil=0, nextPoison=0, poisonDamage=0;
+  const venomBolts:{owner:Enemy;point:T.Vector3;velocity:T.Vector3;life:number;trail:number}[]=[];
+  const venomPools:{owner:Enemy;point:{x:number;z:number};radius:number;until:number;next:number}[]=[];
   const arcane=arcaneCombat<Enemy>(player.position,fx,canWalk,(enemy,guarded)=>{hitPlayer(enemy,guarded);});
   const knockback=new T.Vector2();
   function leaveEcho(){
@@ -458,7 +462,7 @@ export function createEncounters(
     enemy.hitFlash=.22;
     impact(enemy.root.position,damage,element,heavy);
     if(enemy.hp){
-      if((enemy.kind==='sentinel'||enemy.kind==='warlord'||enemy.kind==='frostGuardian'||isAdvancedBoss(enemy.kind)||enemy.kind==='ancientTitan'||enemy.kind==='trollKing'||enemy.kind==='cursedWarlord')&&!enemy.enraged&&enemy.hp<=enemy.spec.health*.5){
+      if((enemy.kind==='sentinel'||enemy.kind==='warlord'||enemy.kind==='frostGuardian'||isAdvancedBoss(enemy.kind)||enemy.kind==='ancientTitan'||enemy.kind==='trollKing'||enemy.kind==='cursedWarlord'||enemy.kind==='venomQueen')&&!enemy.enraged&&enemy.hp<=enemy.spec.health*.5){
         enemy.enraged=true;
         const phaseColor=caveAt(enemy.home.z)?.color??0xcf66ff;
         fx.emit(enemy.root.position,phaseColor,'ring',1.3,.72,{grow:8.5,opacity:.92});
@@ -538,10 +542,15 @@ export function createEncounters(
     if(damage===0){notify('Water barrier absorbed the attack.');return false;}
     save.health=Math.max(0,Math.round((save.health-damage)*100)/100);
     if(enemy.kind==='frostGuardian') slowUntil=time+Math.min(1.75,statusTuning.slow);
+    if(enemy.kind==='swampStalker'||enemy.kind==='venomQueen'){
+      if(time>=poisonedUntil) nextPoison=time+.85;
+      poisonDamage=Math.max(time<poisonedUntil?poisonDamage:0,damage*.21);
+      poisonedUntil=time+4.25;
+    }
     if(!save.health) knockback.set(0,0);
     impact(player.position);
     if(!save.health){rangeTimer.cancel();queued=undefined;magic.reset();}
-    notify(save.health?enemy.spec.name+' hit you.':'You fell in the Blackwater Wilds.');
+    notify(save.health?enemy.spec.name+(enemy.kind==='swampStalker'||enemy.kind==='venomQueen'?' poisoned you.':' hit you.'):'You fell.');
     return true;
   }
 
@@ -656,7 +665,7 @@ export function createEncounters(
         enemy.regionalCast=undefined;enemy.bossCast=undefined;enemy.windup=0;enemy.charge=0;enemy.cooldown=.62;
         enemy.root.position.y=surface(enemy.root.position.x,enemy.root.position.z);
       }
-      shadows.transition();slowUntil=0;arcane.clear();combatUntil=0;knockback.set(0,0);magic.reset();fx.clear();queued=undefined;rangeTimer.cancel();echoLife=shake=0;echo.visible=false;},
+      shadows.transition();slowUntil=0;poisonedUntil=0;venomBolts.length=venomPools.length=0;arcane.clear();combatUntil=0;knockback.set(0,0);magic.reset();fx.clear();queued=undefined;rangeTimer.cancel();echoLife=shake=0;echo.visible=false;},
     get bossHealth(){
       const floor=towerFloorAt(player.position.z);
       const kind=caveAt(player.position.z)?.kind??(floor?.final?floor.guards[0].kind:inDen(player.position.z)?'guardian':undefined);
@@ -757,7 +766,11 @@ export function createEncounters(
     update(dt:number,blocking:boolean){
       time+=dt;
       spawnClock-=dt;
-      if(spawnClock<=0){spawnClock=.42;populate();}
+      if(spawnClock<=0){
+        spawnClock=.42;populate();
+        const cave=caveAt(player.position.z), run=cave&&save.caveRuns[cave.id];
+        if(cave&&run?.readyAt&&run.readyAt<=Date.now()&&save.opened.includes(caveRewardId(cave,run.cycle))) prepareCave(cave);
+      }
       if(save.health&&knockback.lengthSq()>.04){
         const {x,z}=player.position, dx=knockback.x*dt,dz=knockback.y*dt;
         if(canWalk(x+dx,z)) player.position.x+=dx;
@@ -798,6 +811,37 @@ export function createEncounters(
       magic.update(dt);
       arcane.update(dt,blocking);
       arts.update(dt,blocking);
+      if(save.health&&time<poisonedUntil&&time>=nextPoison){
+        nextPoison=time+.85;
+        save.health=Math.max(0,Math.round((save.health-poisonDamage)*100)/100);
+        impact(player.position);
+        fx.emit(player.position,0x7ef1ab,'mist',.76,.58,{y:.45,grow:.4,lift:.61});
+        if(!save.health){rangeTimer.cancel();queued=undefined;magic.reset();notify('Venom overcame you.');}
+        else changed();
+      }
+      for(let i=venomBolts.length-1;i>=0;i--){
+        const bolt=venomBolts[i], p=bolt.point;
+        p.addScaledVector(bolt.velocity,dt);bolt.life-=dt;bolt.trail-=dt;
+        const ground=surface(p.x,p.z), q=player.position;
+        const hit=Math.hypot(q.x-p.x,q.z-p.z)<1.05&&Math.abs(q.y+1-p.y)<1.4;
+        if(hit||bolt.life<=0||p.y<ground+.15){
+          if(hit) hitPlayer(bolt.owner,blocking,false,.85);
+          fx.emit(p,0x64e7a7,'mist',1.12,.45,{grow:1.9,y:.19});
+          venomBolts.splice(i,1);
+        }else if(bolt.trail<=0){
+          bolt.trail=.036;
+          fx.emit(p,0x77ffc2,'crystal',.41,.19,{y:Math.max(.15,p.y-ground),aspect:1.67});
+        }
+      }
+      for(let i=venomPools.length-1;i>=0;i--){
+        const pool=venomPools[i];
+        if(time>=pool.until||pool.owner.hp<=0){venomPools.splice(i,1);continue;}
+        if(time<pool.next) continue;
+        pool.next=time+.58;
+        fx.emit(pool.point,0x4ad19b,'mist',pool.radius,.65,{y:.15,opacity:.64});
+        if(Math.hypot(player.position.x-pool.point.x,player.position.z-pool.point.z)<pool.radius)
+          hitPlayer(pool.owner,blocking,true,.43);
+      }
       for(let i=enemies.length-1;i>=0;i--){
         const enemy=enemies[i];
         if(enemy.summonedBy&&(!enemies.some(owner=>owner.id===enemy.summonedBy&&owner.hp>0)||!enemy.hp&&enemy.collapse>=1)) removeRoamer(i);
@@ -826,6 +870,11 @@ export function createEncounters(
           continue;
         }
         const {spec}=enemy;
+        if(enemy.kind==='ancientTitan'&&enemy.gait>.36&&Math.floor(enemy.posePhase/Math.PI)!==Math.floor((enemy.posePhase-dt*(3.1+enemy.gait*9.4))/Math.PI)&&
+          Math.hypot(p.x-player.position.x,p.z-player.position.z)<14){
+          fx.emit(p,0x94bad0,'mist',.7,.39,{grow:1.22,opacity:.54});
+          shake=Math.max(shake,.18);
+        }
         enemy.impactAge+=dt;
         enemy.retreat=Math.max(0,enemy.retreat-dt);
         const returnAt=save.returns[enemy.id];
@@ -903,7 +952,8 @@ export function createEncounters(
         if(!active) continue;
         const homeGap=Math.hypot(p.x-enemy.home.x,p.z-enemy.home.z);
         const playerHome=Math.hypot(player.position.x-enemy.home.x,player.position.z-enemy.home.z);
-        const aggro=save.health>0&&gap<spec.awareness&&playerHome<spec.leash&&!safe(player.position.x,player.position.z);
+        const awareness=enemy.kind==='swampStalker'&&enemy.strikes===0&&enemy.hitFlash<=0?13:spec.awareness;
+        const aggro=save.health>0&&gap<awareness&&playerHome<spec.leash&&!safe(player.position.x,player.position.z);
         enemy.ward=Math.max(0,enemy.ward-dt);
         enemy.wardCool=Math.max(0,enemy.wardCool-dt);
         if(enemy.barrier){
@@ -925,7 +975,7 @@ export function createEncounters(
           enemy.shadowTarget=shadow;enemy.windup=spec.windup;
         } else if(enemy.charge>0){
           enemy.charge=Math.max(0,enemy.charge-dt);
-          const speed=isRegional(enemy.kind)?(enemy.enraged?23:19):enemy.kind==='infernalGolem'?19:(enemy.kind==='sentinel'||enemy.kind==='warlord')?(enemy.enraged?23:19):enemy.kind==='assassin'?19:16;
+          const speed=isRegional(enemy.kind)?(enemy.lastRegionalMove==='ambush'?22:enemy.enraged?23:19):enemy.kind==='infernalGolem'?19:(enemy.kind==='sentinel'||enemy.kind==='warlord')?(enemy.enraged?23:19):enemy.kind==='assassin'?19:16;
           const x=p.x+Math.sin(enemy.heading)*dt*speed,z=p.z+Math.cos(enemy.heading)*dt*speed;
           if(canWalk(x,z)&&spaceAround(enemy,x,z)){p.x=x;p.z=z;gait=1;}
           else enemy.charge=0;
@@ -954,7 +1004,20 @@ export function createEncounters(
               const cast=enemy.regionalCast;
               enemy.regionalCast=undefined;enemy.lastRegionalMove=cast.move;
               enemy.cooldown=spec.recovery*(enemy.enraged?.72:1);
-              if(cast.move==='rush'){enemy.charge=.66;enemy.chargeHit=false;}
+              if(cast.move==='rush'||cast.move==='ambush'){
+                enemy.charge=cast.move==='ambush'?.47:.66;enemy.chargeHit=false;
+              }else if(cast.move==='spit'){
+                const volleys=enemy.kind==='venomQueen'?(enemy.enraged?5:3):1;
+                for(let i=0;i<volleys;i++){
+                  const yaw=cast.yaw+(i-(volleys-1)/2)*.16;
+                  if(venomBolts.length>=24) break;
+                  venomBolts.push({owner:enemy,point:new T.Vector3(p.x,p.y+1.1,p.z),
+                    velocity:new T.Vector3(Math.sin(yaw)*17,0,Math.cos(yaw)*17),life:1.32,trail:0});
+                }
+              }else if(cast.move==='miasma'){
+                venomPools.push({owner:enemy,point:cast.point,radius:cast.radius,until:time+(enemy.enraged?6:4.5),next:time});
+                fx.emit(cast.point,cast.color,'ring',cast.radius,.56,{y:.17,opacity:.87});
+              }
               else {
                 const arc=sweeping(cast.move);
                 fx.emit(cast.point,cast.color,arc?'arc':'ring',arc?cast.radius*.75:.8,.48,
@@ -1030,9 +1093,9 @@ export function createEncounters(
           clearLine(p.x,p.z,player.position.x,player.position.z)){
           const cast=regionalCast(enemy.kind,enemy.strikes++,p,player.position,!!enemy.enraged);
           enemy.regionalCast=cast;enemy.heading=cast.yaw;enemy.windup=cast.duration;
-          if(enemy.kind==='ancientTitan'&&regionalName[cast.move]) notify(regionalName[cast.move]!);
-          if(cast.move==='rush'){
-            for(let i=2;i<cast.radius;i+=1.6){
+          if(enemy.kind==='ancientTitan'&&regionalName[cast.move]) notify('Boss technique · '+regionalName[cast.move]);
+          if(cast.move==='rush'||cast.move==='ambush'||cast.move==='spit'){
+            for(let i=2;i<(cast.move==='spit'?gap:cast.radius);i+=1.6){
               const point={x:p.x+Math.sin(cast.yaw)*i,z:p.z+Math.cos(cast.yaw)*i};
               if(!canWalk(point.x,point.z)) break;
               fx.emit(point,cast.color,'ring',1.65,cast.duration,{opacity:.73});

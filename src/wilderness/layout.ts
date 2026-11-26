@@ -77,8 +77,8 @@ export const bank = (x: number, z: number) => Math.abs(x - river(z));
 export const clearing = (x: number, z: number) => Math.hypot((x+45)*0.85, z);
 export const height = (x: number, z: number):number => {
   if(z<=marshes.south&&z>=marshes.north)
-    return marshHeight(x,z,frontierHeight(x,marshes.south,height(x,-extent)));
-  if(frontierAt(z)) return frontierHeight(x,z,height(x,-extent));
+    return marshHeight(x,z,z<=marshes.south-29?0:frontierHeight(x,marshes.south,0));
+  if(frontierAt(z)) return frontierHeight(x,z,z<=-extent-24?0:height(x,-extent));
   if(inDen(z)||towerFloorAt(z)||caveAt(z)) return 0;
   const base = 1.7 + 1.3*Math.sin(x*.048)*Math.cos(z*.04) + .65*Math.sin((x+z)*.09);
   const ridge = hills.reduce((sum,h)=>sum+h.rise*Math.max(0,1-((x-h.x)**2+(z-h.z)**2)/h.radius**2)**2,0);
@@ -90,7 +90,7 @@ export const height = (x: number, z: number):number => {
   return aurelia.elevation+(terrain-aurelia.elevation)*blend;
 };
 export const onBridge = (x: number,z: number) => frontierCrossing(x,z) || bridges.some(b=>Math.abs(z-b.z)<2.03 && Math.abs(x-b.x)<13);
-export const surface = (x: number,z: number) => highlandBridge(x,z)?frontierHeight(x,z,height(x,-extent),true):marshBridge(x,z)?Math.max(1.75,height(x,z)):onBridge(x,z) ? Math.max(height(x,z),1.6) : height(x,z);
+export const surface = (x: number,z: number) => highlandBridge(x,z)?frontierHeight(x,z,0,true):marshBridge(x,z)?Math.max(1.75,height(x,z)):onBridge(x,z) ? Math.max(height(x,z),1.6) : height(x,z);
 export function walkable(x: number,z: number, obstacles: readonly {x:number;z:number;r:number}[]) {
   if(frontierBounds(x,z)||z<=-extent+1&&z>=-extent&&outdoorBounds(x,z)&&Math.abs(x)<109){
     if(obstacles.some(o=>Math.hypot(x-o.x,z-o.z)<o.r+.45)) return false;

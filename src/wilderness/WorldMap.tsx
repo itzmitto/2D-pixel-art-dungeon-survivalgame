@@ -1,4 +1,4 @@
-import { fallsX, fortress, frontierAt, highlands } from './frontier';
+import { fallsX, fortress, frontierAt, highlands, marshes, marshPools } from './frontier';
 import { monsters } from './huntData';
 import { rarity, type Rarity } from './weapons';
 import { bossCaves, caveAt, caveBossPoint, caveExit, caveLootLabel, caveRewardId, caveRewardTier, caveStatus, caveTreasurePoint, type CaveRuns } from './bossCaves';
@@ -8,7 +8,7 @@ import { denChests, towerChests, worldChests } from './treasure';
 import { memo, useId, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { branchTrails, bridges, extent, hills, landmarks, path, river, southPath } from './layout';
 import { den, inDen } from './denLayout';
-import { cellAt, cellsPerSide, cellSize, type Position } from './exploration';
+import { atlasCellZ, cellAt, cellsPerSide, cellSize, type Position } from './exploration';
 import { regions, type RegionId } from './regions';
 import { cartographicTrees, contours, terrainTexture } from './ui/atlasTerrain';
 import { SystemPanel } from './ui/SystemPanel';
@@ -22,7 +22,7 @@ const trails=[
   ...branchTrails.map(trail=>trail.map(point=>point.join(',')).join(' ')),
 ];
 const bound=(value:number,half:number)=>Math.max(-extent+half,Math.min(extent-half,value));
-const boundZ=(value:number,half:number)=>Math.max(highlands.north-half*.15+half,Math.min(extent-half,value));
+const boundZ=(value:number,half:number)=>Math.max(marshes.north-20+half,Math.min(extent-half,value));
 let cartography:string[]|undefined;
 const symbols={
   capital:'M-6 5v-7h3v-3h6v3h3v7zM-2 5V1h4v4',
@@ -45,7 +45,7 @@ const symbols={
   boss:'M-5-5-3 1 0 5 3 1 5-5M-4-2 0-4 4-2M-2 1l2 2 2-2',
 };
 const descriptions:Record<keyof typeof symbols,string>={
-  capital:'Safe capital',capitalService:'Capital landmark',ruin:'Ancient ruin',bridge:'River crossing',campfire:'Safe campfire',camp:'Abandoned camp',
+  capital:'Safe capital',capitalService:'Capital landmark',ruin:'Ancient ruin',bridge:'River crossing',campfire:'Safe campfire',camp:'Camp or ambush site',
   waystone:'Waystone',orcCamp:'Orc encampment',briar:'Tower dungeon',ritual:'Wizard encounter · Veil Hierophant',
   chest:'Discovered treasure',cave:'Cave landmark',tower:'Tower landmark · interior closed',gate:'Dungeon gate',boss:'Boss arena',bossCave:'Boss cave',encounter:'Active encounter',explore:'Exploration site',
 };
@@ -90,7 +90,7 @@ const AtlasTerrain=memo(function AtlasTerrain({roads}:{roads:boolean}){
 });
 const Discovery=memo(function Discovery({id,cells}:{id:string;cells:number[]}){
   return <defs><clipPath id={id}>{cells.map(cell=><rect key={cell}
-    x={-extent+(cell%cellsPerSide)*cellSize} y={-extent+Math.floor(cell/cellsPerSide)*cellSize} width={cellSize} height={cellSize}/>)}</clipPath></defs>;
+    x={-extent+(cell%cellsPerSide)*cellSize} y={atlasCellZ(cell)} width={cellSize} height={cellSize}/>)}</clipPath></defs>;
 });
 
 function Compass(){
@@ -125,7 +125,7 @@ function filterFor(kind:MarkerKind):MapFilter|undefined{
     case 'waystone':return 'waystone';
     case 'orcCamp':case 'camp':case 'ritual':return 'camp';
     case 'ruin':return 'ruin';
-    case 'campfire':return 'safe';
+    case 'campfire':case 'capital':case 'capitalService':return 'safe';
     case 'encounter':return 'encounter';
     default:return undefined;
   }
@@ -143,7 +143,7 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
   });
   const select=(id:string)=>{setSelection(id);reportTravel('');};
   const seen=useMemo(()=>new Set(discovered),[discovered]);
-  const [view,setView]=useState(()=>frontierAt(position.z)?{x:0,z:-350,size:247}:{x:0,z:0,size:span});
+  const [view,setView]=useState(()=>frontierAt(position.z)?{x:0,z:frontierAt(position.z)?.id==='mournshade'?-548:-350,size:247}:{x:0,z:0,size:span});
   const drag=useRef<{id:number;x:number;y:number;moved:boolean}|null>(null);
   const unlocked=waystones.filter(stone=>waystonesActive.includes(stone.id));
   const zoom=(factor:number)=>setView(current=>{
@@ -303,6 +303,9 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
             </g>)}
             <polyline points={Array.from({length:71},(_,i)=>`${fallsX(-349+i)},${-349+i}`).join(' ')} fill="none" stroke="#759cba" strokeWidth="5"/>
             {filters.roads&&<polyline points={highlands.road.map(point=>point.join(',')).join(' ')} fill="none" stroke="#c1b391" strokeWidth="1.8" strokeDasharray="4 2"/>}
+            <rect x={-110} y={marshes.north} width={220} height={marshes.south-marshes.north} fill="#263e39" stroke="#6c9387" strokeWidth="1"/>
+            {marshPools.map(([x,z,w,d])=><ellipse key={x+','+z} cx={x} cy={z} rx={w} ry={d} fill="#1c4c4d" stroke="#608e80" strokeWidth=".8"/>)}
+            {filters.roads&&<polyline points={marshes.road.map(point=>point.join(',')).join(' ')} fill="none" stroke="#beaa82" strokeWidth="2.1" strokeDasharray="3 1"/>}
             {charted.map(item=><g
               key={item.id} className={'atlas-pin '+item.kind+(item.id===selection?' selected':'')+(item.claimed?' claimed':'')+
                 (item.kind==='waystone'&&waystonesActive.includes(item.id)?' unlocked':'')} role="button" tabIndex={0}
@@ -346,7 +349,7 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
         </div>}
         <span className="system-kicker">Region index</span>
         <div className="atlas-regions" role="group" aria-label="Select region">
-          {regions.map(item=><button key={item.id} type="button" aria-pressed={item.id===region} onClick={()=>{setRegion(item.id);select('');if(item.id==='elaris') setView({x:0,z:-350,size:247});else if(item.id==='velren'||item.id==='aurelia') setView({x:0,z:0,size:span});}}>
+          {regions.map(item=><button key={item.id} type="button" aria-pressed={item.id===region} onClick={()=>{setRegion(item.id);select('');if(item.id==='elaris'||item.id==='mournshade') setView({x:0,z:item.id==='elaris'?-350:-548,size:247});else if(item.id==='velren'||item.id==='aurelia') setView({x:0,z:0,size:span});}}>
             <strong>{item.name}</strong><small>{item.difficulty} · {item.state}</small>
           </button>)}
         </div>

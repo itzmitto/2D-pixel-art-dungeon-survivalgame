@@ -1,4 +1,4 @@
-import { fortress } from '../frontier';
+import { fortress, frontierRegions } from '../frontier';
 import { instanceWeapon } from '../itemInstances';
 import { shadowRank } from '../shadowData';
 import { bossCaves, caveRewardTier } from '../bossCaves';
@@ -15,7 +15,7 @@ import { tint } from './HunterInventory';
 type Reward={icon:string;label:string;tier?:Rarity};
 export type Notice={kind:'level'|'item'|'boss'|'dungeon'|'region';title:string;detail:string;tier?:Rarity;rewards?:Reward[]};
 export const observe=(hero:Exploration)=>({
-  opened:new Set(hero.opened),
+  regions:new Set(hero.discoveredRegions),opened:new Set(hero.opened),
   shadows:new Map(hero.shadows.map(shadow=>[shadow.id,shadowRank(shadow.level)])),
   armorItems:new Set(hero.armorItems),level:hero.level,xp:hero.xp,items:new Set(hero.items.map(item=>item.id)),
   bosses:new Set(hero.defeatedBosses),dungeons:new Set(hero.completedDungeons),
@@ -25,6 +25,9 @@ export const observe=(hero:Exploration)=>({
 
 export function noticesBetween(before:ReturnType<typeof observe>,hero:Exploration):Notice[]{
   const notices:Notice[]=[];
+  for(const region of frontierRegions) if(hero.discoveredRegions.includes(region.id)&&!before.regions.has(region.id)){
+    notices.push({kind:'region',title:'New Region Discovered',detail:region.name+' · Recommended '+region.difficulty});
+  }
   if(hero.level>before.level){
     const gained=hero.level-before.level;
     let xp=hero.xp-before.xp;

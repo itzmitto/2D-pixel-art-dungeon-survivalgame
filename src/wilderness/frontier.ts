@@ -3,7 +3,7 @@ type Point = readonly [number, number];
 export const highlands = {
   id: 'elaris', name: 'Elaris Highlands', difficulty: 'Levels 15–30',
   south: -240, north: -460, color: '#192941', fog: .0135,
-  road: [[-27,-205],[-27,-240],[-17,-269],[21,-298],[21,-329],[38,-354],[25,-381],[5,-385],[4,-402],[-14,-413],[-20,-460]] as readonly Point[],
+  road: [[-55,0],[-59,-31],[-61,-79],[-54,-110],[-40,-153],[-31,-186],[-27,-205],[-27,-240],[-17,-269],[21,-298],[21,-329],[38,-354],[25,-381],[5,-385],[4,-402],[-14,-413],[-20,-460]] as readonly Point[],
 } as const;
 
 export const marshes = {
@@ -43,7 +43,8 @@ export function frontierHeight(x:number,z:number,seam:number,deck=false){
   const roughness=Math.min(1,Math.max(0,(road-5)/12));
   const riverFade=Math.max(0,1-Math.abs(x-fallsX(z))/8)*Math.max(0,Math.min(1,(-279-z)/5,(z+349)/4));
   const blend=Math.max(0,Math.min(1,(-240-z)/24));
-  return seam+(shelf+roughness*(detail+bulk)-(deck?0:riverFade*3.3)-seam)*blend;
+  const alpine=shelf+roughness*(detail+bulk)-(deck?0:riverFade*3.3);
+  return blend===1?alpine:seam+(alpine-seam)*blend;
 }
 export const marshPools=[[-43,-502,37,19],[31,-518,44,19],[27,-565,49,24],[-43,-575,34,20],[43,-610,32,17]] as const;
 const poolDepth=(x:number,z:number)=>Math.max(0,...marshPools.map(([a,b,w,d])=>1-Math.hypot((x-a)/w,(z-b)/d)));
@@ -60,6 +61,7 @@ export const frontierBlocked=(x:number,z:number)=>highlandRiver(x,z)&&!highlandB
 
 export const fortress={id:'forsaken-fortress',name:'Forsaken Fortress',kind:'briar',x:25,z:-387,boss:'tower-ancient-titan'} as const;
 export const frontierLandmarks=[
+  {name:'North Road',kind:'explore',x:-40,z:-153},
   {name:'Elaris Pass',kind:'explore',x:-27,z:-243},
   {name:'Moonfall Aqueduct',kind:'bridge',x:21,z:-314},
   {name:'Moonfall Cascade',kind:'explore',...waterfall},
@@ -72,19 +74,19 @@ export const frontierLandmarks=[
   {name:'Mournshade Gate',kind:'explore',x:-20,z:-464},
   {name:'Witchwater Pools',kind:'explore',x:17,z:-547},
   {name:'Pale Reed Ruins',kind:'ruin',x:-38,z:-595},
-  {name:'Hushfen Ambush',kind:'camp',x:28,z:-584},
+  {name:'Hushfen Ambush',kind:'camp',x:28,z:-594},
   {name:'Bleakroot Walk',kind:'bridge',x:-4,z:-568},
 ] as const;
 export const frontierStones=[
-  {id:'drowned-crossing',name:'Drowned Crossing Waystone',x:-32,z:-489,yaw:0},
+  {id:'drowned-crossing',name:'Drowned Crossing Waystone',x:-34,z:-479,yaw:0},
   {id:'pale-reed',name:'Pale Reed Waystone',x:-30,z:-610,yaw:0},
   {id:'frostpine',name:'Frostpine Waystone',x:-26,z:-274,yaw:0},
   {id:'crownroad',name:'Crownroad Waystone',x:-5,z:-410,yaw:0},
 ] as const;
 
 export const frontierCamps=[
-  {id:'orc-hushfen-stalker',kind:'swampStalker',x:28,z:-584},
-  {id:'orc-hushfen-ambusher',kind:'swampStalker',x:34,z:-587},
+  {id:'orc-hushfen-stalker',kind:'swampStalker',x:28,z:-594},
+  {id:'orc-hushfen-ambusher',kind:'swampStalker',x:34,z:-593},
   {id:'orc-slatefang-troll',kind:'mountainTroll',x:-24,z:-364},
   {id:'orc-slatefang-golem',kind:'stoneGolem',x:-28,z:-369},
   {id:'orc-slatefang-guard',kind:'cursedKnight',x:-18,z:-367},
