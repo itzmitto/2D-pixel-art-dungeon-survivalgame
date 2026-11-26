@@ -1,12 +1,13 @@
+import type { EquippedArmor } from '../armor';
 import { useEffect, useRef, useState } from 'react';
 import * as T from 'three';
 import { createDarkKnight } from '../knight/animation';
 import type { Rarity, WeaponId } from '../weapons';
 import { Glyph } from './Glyph';
 
-export function KnightPreview({weapon,tier}:{weapon:WeaponId;tier:Rarity}){
+export function KnightPreview({weapon,tier,armor}:{weapon:WeaponId;tier:Rarity;armor:EquippedArmor}){
   const canvas=useRef<HTMLCanvasElement>(null);
-  const draw=useRef<((id:WeaponId,tier:Rarity)=>void)|null>(null);
+  const draw=useRef<((id:WeaponId,tier:Rarity,armor:EquippedArmor)=>void)|null>(null);
   const [unavailable,setUnavailable]=useState(false);
   useEffect(()=>{
     if(!canvas.current) return;
@@ -25,7 +26,8 @@ export function KnightPreview({weapon,tier}:{weapon:WeaponId;tier:Rarity}){
     scene.add(knight.root,new T.HemisphereLight(0xdcf0ff,0x3c4a63,2.8));
     const rim=new T.DirectionalLight(0x8ddaff,3.2);
     rim.position.set(-3,4,1);scene.add(rim);
-    draw.current=(id,tier)=>{
+    draw.current=(id,tier,armor)=>{
+      knight.equipArmor(armor);
       knight.equip(id,tier);
       knight.update(.016,{speed:0,sprinting:false});
       renderer.render(scene,camera);
@@ -42,10 +44,10 @@ export function KnightPreview({weapon,tier}:{weapon:WeaponId;tier:Rarity}){
       });
       geometries.forEach(g=>g.dispose());
       materials.forEach(m=>m.dispose());
-      renderer.dispose();
+      knight.disposeArmor();renderer.dispose();
     };
   },[]);
-  useEffect(()=>{draw.current?.(weapon,tier);},[weapon,tier]);
+  useEffect(()=>{draw.current?.(weapon,tier,armor);},[weapon,tier,armor]);
   return <div className="knight-preview">
     {unavailable?<div className="preview-fallback" aria-label="3D preview unavailable"><Glyph kind="armor"/></div>:
       <canvas ref={canvas} width={230} height={300} aria-label="Dark Knight equipment preview"/>}

@@ -1,13 +1,15 @@
+import { armorModels } from './armorModels.ts';
 import * as T from 'three';
 import { createKnightModel } from './model.ts';
 
 import { abilityAnimationSeconds, weapons, elementalIds, type Weapon, type WeaponId } from '../weapons.ts';
 import { weaponModel } from '../weaponModels.ts';
 
-type Motion = { speed: number; sprinting: boolean; blocking?: boolean; facing?: number };
+type Motion = { speed: number; sprinting: boolean; blocking?: boolean; facing?: number; saddleBob?:number };
 
 export function createDarkKnight() {
   const model = createKnightModel();
+  const armor=armorModels(model);
   const {root,hips,torso,head,arms,legs,cape} = model;
   let time=0, phase=0, stride=0, run=0, guard=0, turn=0, attack=1;
   let weapon=weapons.longsword, poseWeapon=weapon, duration=weapon.attackDuration, casting=false;
@@ -41,6 +43,7 @@ export function createDarkKnight() {
 
   function update(dt: number, motion: Motion) {
     time+=dt;
+    armor.update(time);
     if(weapon.id!=='longsword') models.get(weapon.id)?.update(time,equippedRarity);
     const weight=1-Math.exp(-13*dt);
     const motionWeight=T.MathUtils.clamp(motion.speed/6,0,1);
@@ -115,6 +118,21 @@ export function createDarkKnight() {
     }
     arms[1].socket.rotation.set(-.38+swing[6]+1.08*guard,0,weapon.model.grip+swing[7]+2.57*guard);
 
+    if(motion.saddleBob!==undefined){
+      hips.position.y=1.81+motion.saddleBob/1.18;
+      hips.rotation.y=0;
+      torso.rotation.x=.075+run*.15;
+      for(const [i,leg] of legs.entries()){
+        const side=i===0?-1:1;
+        leg.upper.rotation.set(-.54,0,side*.46);
+        leg.lower.rotation.x=.95;
+        leg.foot.rotation.x=-.32;
+        const arm=arms[i];
+        arm.upper.rotation.x=-1.03;
+        arm.fore.rotation.x=-.76;
+        arm.hand.rotation.y=side*.32;
+      }
+    }
     const cloth=cape.geometry.attributes.position;
     for(let row=0;row<=12;row++){
       const down=row/12;
@@ -135,5 +153,5 @@ export function createDarkKnight() {
   }
 
   update(0,{speed:0,sprinting:false});
-  return {root,update,playAttack,equip,get animating(){return attack<duration;}};
+  return {root,update,playAttack,equip,equipArmor:armor.equip,disposeArmor:armor.dispose,get animating(){return attack<duration;}};
 }

@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import type { Exploration } from '../exploration';
 import { instanceWeapon, legacyItem } from '../itemInstances';
-import { maxHunterHealth, rank, xpNeeded } from '../progression';
+import { effectiveStats, maxHunterHealth, rank, xpNeeded } from '../progression';
 import type { regionLabel } from '../regions';
 import { weapons, type WeaponId } from '../weapons';
 import { Glyph } from './Glyph';
@@ -34,7 +34,7 @@ export const HunterHotbar=memo(function HunterHotbar({hero,locked,cooldown,equip
         const item=hero.items.find(entry=>entry.id===hero.slotItems[i]);
         const model=item&&instanceWeapon(item);
         return <ItemButton key={i} disabled={!item||locked} data-rarity={item?.rarity}
-          item={model&&{name:model.name,icon:model.id,tier:model.rarity,description:model.description,stats:weaponStats(model,hero.stats)}} aria-pressed={!!item&&item.id===hero.selectedItem}
+          item={model&&{name:model.name,icon:model.id,tier:model.rarity,description:model.description,stats:weaponStats(model,effectiveStats(hero))}} aria-pressed={!!item&&item.id===hero.selectedItem}
           aria-label={item?item.rarity+' '+weapons[item.type].name:'Empty slot '+(i+1)}
           style={item?tint(item.rarity):undefined}
           onClick={()=>item&&equip(item.type,item.id)}><kbd>{i+1}</kbd>{item&&<Glyph kind={item.type}/>}</ItemButton>;

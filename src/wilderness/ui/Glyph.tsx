@@ -1,3 +1,4 @@
+import { armorPiece, isArmorId, type ArmorSlot } from '../armor';
 import { useId } from 'react';
 
 type Art={color:string; silhouette:string; shade:string; detail:string};
@@ -30,16 +31,29 @@ const art:Record<string,Art>={
   Water:{color:'#78c8ff',silhouette:'M32 5c6 11 21 24 21 35a21 21 0 0 1-42 0C11 29 26 16 32 5Z',shade:'M14 41q9-9 17-1t20-2q0 18-19 19-15-1-18-16Z',detail:'M20 38q0-7 9-17m-8 26q4 6 10 6'},
   Wind:{color:'#b3efd6',silhouette:'M5 30q21 3 33-10 7-8-4-11 18-5 20 9 3 17-25 22 16 4 21-4 5 11-8 16-14 7-37-14l19-3Z',shade:'M6 32q35 8 47-14 0 19-28 22l-9-4Z',detail:'M18 44q13 9 23 4m-22-15q20 0 27-15'},
 };
+const armorArt:Record<ArmorSlot,Art>={
+  helmet:{color:'#bccbef',silhouette:'M10 30Q10 9 32 5q22 4 22 25l-2 18-13 9v-8H25v8l-13-9Z',shade:'M32 6q22 5 23 24l-3 18-13 9v-8l9-8 2-12-10-5Z',detail:'M15 29 32 21l17 8-3 8-11-4v9h-6v-9l-11 4Zm4-6 7-9m20 10-7-10M32 7v12'},
+  chestplate:{color:'#bdc7f2',silhouette:'M5 17 16 8l11 4 5 3 5-3 11-4 11 9-5 15-7-2-3 22-12 8-12-8-3-22-7 2Z',shade:'M32 16l17-7 10 8-6 14-6-2-3 23-12 7Z',detail:'m9 19 13-6 10 7 10-7 13 6M17 30l15 4 15-4M22 43l10 6 10-6m-10-9v20'},
+  gauntlets:{color:'#aeb9dd',silhouette:'M25 58 10 43l5-11-4-8 3-5 7 4-4-14 5-4 8 13 1-13h6l2 14 4-9 6 2-2 13 7-3 4 4-9 17-13 15Z',shade:'m24 34 13-7 4-10-2 18 12-4-5 14-11 12Z',detail:'M13 42l13 3 12 9m-19-22 8 5m-2-15 5 10m3-12 2 9m4 15 10-8'},
+  legs:{color:'#b7bfe6',silhouette:'M13 7h39l-3 19 1 26-6 6H35l-5-24-6 23H13L9 49l4-21Z',shade:'M31 8h21l-3 18 1 26-6 6h-9l-5-24Z',detail:'M14 15h35M15 25l9 5-6 17m17-22 8 5 1 20m-30 0h10m12 0h12M32 16l-1 14'},
+  boots:{color:'#a9b5d6',silhouette:'M13 8h26l-3 19 6 14 15 4 3 10-7 5H13L7 55l3-20Z',shade:'M27 9h12l-3 19 6 13 15 4 3 10-7 5H22l5-12-4-12Z',detail:'M13 14h24M11 27l25 1m-26 8 27 1m-19 13 13-6 25 5M10 55h47'},
+  cape:{color:'#c888b2',silhouette:'M14 6 26 13h12L50 6l3 22 7 28-12-2-9 6-10-3-11 3L5 56l6-28Z',shade:'M28 15h14l8-9 3 24 6 26-13-3-8 5-1-30Z',detail:'M15 12l6 8-6 31m34-38-7 9 7 28M32 15v40m-5-28 5-6 5 6-5 8Z'},
+  amulet:{color:'#9bd8f4',silhouette:'M9 7h7l4 9 12 9 12-9 4-9h7l-5 14-12 9 10 10-16 19-16-19 10-10-12-9Z',shade:'M32 29l16 11-16 19-6-12 6-6Z',detail:'M32 32l8 9-8 12-8-12ZM15 12l4 8m31-8-4 8m-14 16v13'},
+  ring:{color:'#b9a7fc',silhouette:'M12 28 22 11l10-5 10 5 10 17 1 16-8 12-13 6-13-6-8-12Z M24 34l-4 9 5 8 7 3 7-3 5-8-4-9Z',shade:'M32 7l10 5 9 16-17 2-6-9Z M46 30l7 13-8 13-13 6 6-8 6-5 1-9Z',detail:'M19 22l13-12 13 12-13 8Zm13-12v20m-19 6 5 9m33-9-5 9'},
+};
 export const categoryIcon:Record<string,string>={All:'All',Weapons:'longsword',Armor:'armor',Consumables:'potion',Materials:'Magic Crystal',Accessories:'Accessories'};
 export function Glyph({kind}:{kind:string}){
   const id=useId();
-  const {color,silhouette,shade,detail}=art[kind]??art.Iron;
+  const piece=isArmorId(kind)?armorPiece(kind):undefined;
+  const {color:base,silhouette,shade,detail}=piece?armorArt[piece.slot]:art[kind]??art.Iron;
+  const color=piece?(piece.set==='iron'?'#c7aa8c':piece.set==='abyssal'?'#b57bf2':base):base;
   return <svg className="item-glyph" viewBox="0 0 64 64" aria-hidden="true">
     <defs><linearGradient id={id} x2=".88" y2="1">
       <stop stopColor="#fff"/><stop offset=".42" stopColor={color}/><stop offset="1" stopColor="#29243e"/>
     </linearGradient></defs>
     <path d={silhouette} fill={'url(#'+id+')'} stroke="#f7f6ff" strokeWidth="1.1"/>
     <path d={shade} fill={color} opacity=".48"/>
+    {piece?.set!=='iron'&&piece&&<path d="m51 7 2 5 5 2-5 2-2 5-2-5-5-2 5-2Z" fill={color} opacity=".86"/>}
     <path d={detail} fill="none" stroke="#fff" strokeWidth="1.3" opacity=".86"/>
   </svg>;
 }

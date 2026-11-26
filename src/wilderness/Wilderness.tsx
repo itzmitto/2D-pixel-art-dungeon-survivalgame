@@ -149,7 +149,7 @@ export default function Wilderness() {
       {saveNotice && <p role="status">{saveNotice}</p>}
       {weaponLab && <p>Weapon Lab · Unsaved session</p>}
       <HunterHotbar hero={hero} locked={!!panel} cooldown={message.cooldown} equip={equip}/>
-      <small>WASD Move · E Interact · Q Ability · R Potion · M Atlas</small>
+      <small>WASD Move · E Interact · Q Ability · R Potion · H Horse · M Atlas</small>
     </footer>
     {panel==='status' && <CharacterStatus hero={hero} close={()=>showPanel(null)} spend={stat=>controller.current?.allocate(stat)}/>}
     {panel==='map' && <WorldMap position={position} discovered={discovered}
@@ -160,6 +160,7 @@ export default function Wilderness() {
       }} cleared={hero.completedDungeons.includes(den.id)} bossDefeated={hero.defeatedBosses.includes(den.boss)} close={()=>showPanel(null)}/>}
     {panel==='bag' && <HunterInventory hero={hero} close={()=>showPanel(null)} canRedeem={canRedeem}
       equip={equip}
+      equipArmor={(slot,id)=>controller.current?.equipArmor(slot,id)}
       assign={(slot,id)=>controller.current?.assign(slot,id)}
       redeem={id=>controller.current?.redeem(id)}/>}
   </main>;

@@ -357,11 +357,11 @@ export function createEncounters(
       for(;i<actors.length;i++) actors[i].set(0,0,1,0);
       fx.grassInfluences(gusts,player.position);
     },
-    waystoneEffect(){
-      fx.emit(player.position,0x79bfff,'ray',1.95,.53,{y:2.12,aspect:3.2});
-      fx.emit(player.position,0xe1faff,'ring',.64,.55,{grow:7.4});
-      fx.emit(player.position,0x805eff,'ring',.43,.48,{grow:6.4,y:.19,delay:.07});
-      fx.scatter(player.position,0x91e7ff,15,.98);
+    waystoneEffect(point=player.position,color=0x79bfff){
+      fx.emit(point,color,'ray',1.95,.53,{y:2.12,aspect:3.2});
+      fx.emit(point,0xe1faff,'ring',.64,.55,{grow:7.4});
+      fx.emit(point,0x805eff,'ring',.43,.48,{grow:6.4,y:.19,delay:.07});
+      fx.scatter(point,0x91e7ff,15,.98);
     },
     transition(){combatUntil=0;knockback.set(0,0);magic.reset();fx.clear();queued=undefined;rangeTimer.cancel();echoLife=shake=0;echo.visible=false;},
     get bossHealth(){

@@ -1,3 +1,4 @@
+import { armorPiece } from '../armor';
 import type { Exploration } from '../exploration';
 import { den } from '../denLayout';
 import { monsters } from '../huntData';
@@ -9,7 +10,7 @@ import { tint } from './HunterInventory';
 type Reward={icon:string;label:string;tier?:Rarity};
 export type Notice={kind:'level'|'item'|'boss'|'dungeon';title:string;detail:string;tier?:Rarity;rewards?:Reward[]};
 export const observe=(hero:Exploration)=>({
-  level:hero.level,xp:hero.xp,items:new Set(hero.items.map(item=>item.id)),
+  armorItems:new Set(hero.armorItems),level:hero.level,xp:hero.xp,items:new Set(hero.items.map(item=>item.id)),
   bosses:hero.defeatedBosses.length,dungeons:hero.completedDungeons.length,
   gold:hero.gold,potions:hero.potions,armor:hero.armor,fangs:hero.fangs,materials:{...hero.materials},
 });
@@ -33,6 +34,12 @@ export function noticesBetween(before:ReturnType<typeof observe>,hero:Exploratio
     if(before.items.has(item.id)) continue;
     tier=item.rarity;
     rewards.push({icon:item.type,label:weapons[item.type].name,tier});
+  }
+  for(const id of hero.armorItems){
+    if(before.armorItems.has(id)) continue;
+    const piece=armorPiece(id);
+    rewards.push({icon:piece.icon,label:piece.name,tier:piece.rarity});
+    tier??=piece.rarity;
   }
   for(const [name,count] of Object.entries(hero.materials)){
     const added=count-(before.materials[name]??0);

@@ -14,7 +14,7 @@ export function weaponStats(weapon:Weapon,stats:Exploration['stats']){
   ] as const;
 }
 
-type ItemInfo={name:string;icon:string;tier:Rarity;description:string;stats?:ReturnType<typeof weaponStats>};
+type ItemInfo={name:string;icon:string;tier:Rarity;description:string;stats?:readonly (readonly (string|number)[])[]};
 
 export function ItemButton({item,children,...props}:ButtonHTMLAttributes<HTMLButtonElement>&{item?:ItemInfo}){
   const [hover,setHover]=useState(false),[focused,setFocused]=useState(false);

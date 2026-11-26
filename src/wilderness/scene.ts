@@ -1,10 +1,12 @@
+import { armorPiece, type ArmorId, type ArmorSlot } from './armor';
+import { warhorse } from './horse';
 import { waystones } from './worldSites';
 import { waystoneModels } from './waystones';
 import { den, denWalkable, inDen } from './denLayout';
 import { denScenery } from './denScene';
 import { legacyItem } from './itemInstances';
 import { rarity } from './weapons';
-import { allocate, moveSpeed, type Stat } from './progression';
+import { allocate, effectiveStats, maxHunterHealth, moveSpeed, type Stat } from './progression';
 import * as T from 'three';
 import { browserFrameScheduler, createGameLoop } from '../game/core/loop';
 import { atmosphere } from './atmosphere';
@@ -43,7 +45,13 @@ export function startWilderness(
   const body=knight.root;
   knight.equip(save.equipped,save.items.find(item=>item.id===save.selectedItem)?.rarity);
 
-  scene.add(body);
+  knight.equipArmor(save.equippedArmor);
+  const horse=warhorse();
+  scene.add(body,horse.root);
+  let mounted=false;
+  function dismissHorse(){
+    mounted=false;horse.root.visible=false;
+  }
   const water=terrain(scene);
   const {obstacles,rocks,fireY,animateCamp}=scenery(scene,save.seed);
   const stones=waystoneModels(scene);
@@ -59,6 +67,15 @@ export function startWilderness(
   const animateNight=atmosphere(scene,fireY);
   const encounters=createEncounters(scene,camera,body,save,canWalk,onSaveChange);
   let travel:{target:Position;remaining:number;arrived:boolean}|undefined;
+  function horseClear(x:number,z:number,yaw:number){
+    if(inDen(z)||!canWalk(x,z)) return false;
+    const a=Math.sin(yaw),b=Math.cos(yaw),y=surface(x,z);
+    for(const [forward,side] of [[1.23,0],[-1.15,0],[.28,.54],[.28,-.54],[-.72,.54],[-.72,-.54]]){
+      const xx=x+a*forward+b*side,zz=z+b*forward-a*side;
+      if(!canWalk(xx,zz)||Math.abs(surface(xx,zz)-y)>.78) return false;
+    }
+    return true;
+  }
   const nearStone=()=>waystones.find(stone=>Math.hypot(body.position.x-stone.x,body.position.z-stone.z)<3.65);
   let blocking=false, frameDelta=0, prompt='', notification='', abilitySeconds=0,bossHealth=0;
   function equip(id:WeaponId,itemId?:string){
@@ -84,6 +101,41 @@ export function startWilderness(
   const keys=new Set<string>();
   let shakePhase=0;
   let zoom=36,distance=zoom,lastReport=0,reportedX=start.x,reportedZ=start.z,reportedYaw=start.yaw;
+  function handleHorse(){
+    if(!save.health||inDen(body.position.z)) return;
+    const p=body.position,yaw=body.rotation.y;
+    if(mounted){
+      for(const angle of [yaw+Math.PI/2,yaw-Math.PI/2,yaw+Math.PI,yaw]){
+        const x=p.x+Math.sin(angle)*1.65,z=p.z+Math.cos(angle)*1.65;
+        if(!canWalk(x,z)||Math.abs(surface(x,z)-p.y)>.8) continue;
+        mounted=false;
+        p.set(x,surface(x,z),z);
+        onPosition({x,z,yaw});
+        encounters.feedback('Dismounted.');
+        return;
+      }
+      encounters.feedback('Move onto open ground to dismount.');
+      return;
+    }
+    if(knight.animating||encounters.weaponLocked) return;
+    if(horse.root.visible&&horse.root.position.distanceTo(p)<3.15&&
+      horseClear(horse.root.position.x,horse.root.position.z,horse.root.rotation.y)){
+      mounted=true;blocking=false;
+      p.copy(horse.root.position);body.rotation.y=horse.root.rotation.y;
+      encounters.feedback('Mounted · Hold Shift to gallop');
+      return;
+    }
+    if(encounters.inCombat){encounters.feedback('Leave combat before summoning your warhorse.');return;}
+    for(const angle of [yaw+Math.PI/2,yaw-Math.PI/2,yaw+Math.PI,yaw,yaw+.75,yaw-.75]){
+      const x=p.x+Math.sin(angle)*2.74,z=p.z+Math.cos(angle)*2.74;
+      if(!horseClear(x,z,yaw)) continue;
+      horse.root.position.set(x,surface(x,z),z);horse.root.rotation.y=yaw;horse.root.visible=true;
+      encounters.waystoneEffect(horse.root.position,0x9778ff);
+      encounters.feedback('Warhorse summoned · H to mount');
+      return;
+    }
+    encounters.feedback('Move onto open ground to summon your warhorse.');
+  }
   function resize(){
     const width=Math.max(1,canvas.clientWidth),height=Math.max(1,canvas.clientHeight);
     renderer.setSize(width,height,false);
@@ -106,7 +158,8 @@ export function startWilderness(
       return;
     }
     if(!uiOpen()&&!e.repeat){
-      if(e.code==='KeyQ'&&!blocking){e.preventDefault();encounters.cast(knight.playAttack);}
+      if(e.code==='KeyH'){e.preventDefault();handleHorse();}
+      if(e.code==='KeyQ'&&!blocking&&!mounted){e.preventDefault();encounters.cast(knight.playAttack);}
       if(/^Digit[1-9]$/.test(e.code)){
         const id=save.hotbar[Number(e.code.slice(-1))-1];
         if(id) equip(id,save.slotItems[Number(e.code.slice(-1))-1]??undefined);
@@ -121,6 +174,7 @@ export function startWilderness(
       const wasInside=inDen(p.z);
       const stone=save.health?nearStone():undefined;
       if(save.health&&(atGate||atExit)){
+        dismissHorse();
         const point=atGate?den.entry:{x:den.gate.x,z:den.gate.z+3.9};
         p.set(point.x,surface(point.x,point.z),point.z);
         body.rotation.y=atGate?Math.PI:0;
@@ -147,7 +201,7 @@ export function startWilderness(
   window.addEventListener('pointercancel',()=>{blocking=false;},{signal});
   canvas.addEventListener('contextmenu',e=>e.preventDefault(),{signal});
   canvas.addEventListener('pointerdown',e=>{
-    if(!e.isPrimary||uiOpen()||travel) return;
+    if(!e.isPrimary||uiOpen()||travel||mounted) return;
     if(e.button===2) blocking=true;
     if(e.button===0&&!blocking) encounters.attack(knight.playAttack);
   },{signal});
@@ -174,29 +228,55 @@ export function startWilderness(
         if(travel.remaining<=0){travel=undefined;body.visible=true;}
       }
       shakePhase+=frameDelta;
+      if(!save.health&&mounted) dismissHorse();
       if(uiOpen()||!save.health||travel) {keys.clear(); blocking=false;}
       const x=Number(keys.has('KeyD'))-Number(keys.has('KeyA'));
       const z=Number(keys.has('KeyS'))-Number(keys.has('KeyW'));
       const length=encounters.dashing?0:Math.hypot(x,z);
       const sprinting=keys.has('ShiftLeft')||keys.has('ShiftRight');
-      const speed=(blocking?3:sprinting?12:6)*moveSpeed(save.stats);
+      const speed=(mounted?(sprinting?17.8:10.8):blocking?3:sprinting?12:6)*moveSpeed(effectiveStats(save));
+      const previousYaw=body.rotation.y;
+      let heading=previousYaw;
+      if(length&&mounted){
+        const delta=Math.atan2(x,z)-heading;
+        const next=heading+Math.atan2(Math.sin(delta),Math.cos(delta))*(1-Math.exp(-10*dt));
+        if(horseClear(body.position.x,body.position.z,next)) heading=next;
+      }
       const p=body.position;
       const beforeX=p.x,beforeZ=p.z;
       if(length){
-        const dx=x/length*speed*dt,dz=z/length*speed*dt;
-        if(canWalk(p.x+dx,p.z)) p.x+=dx;
-        if(canWalk(p.x,p.z+dz)) p.z+=dz;
+        const dx=(mounted?Math.sin(heading):x/length)*speed*dt,dz=(mounted?Math.cos(heading):z/length)*speed*dt;
+        if(mounted){
+          const steps=Math.max(1,Math.ceil(Math.hypot(dx,dz)/.34));
+          for(let i=0;i<steps;i++){
+            if(!horseClear(p.x+dx/steps,p.z+dz/steps,heading)) break;
+            p.x+=dx/steps;p.z+=dz/steps;
+          }
+        }else{
+          if(canWalk(p.x+dx,p.z)) p.x+=dx;
+          if(canWalk(p.x,p.z+dz)) p.z+=dz;
+        }
       }
       const travelled=Math.hypot(p.x-beforeX,p.z-beforeZ);
+      if(mounted){
+        body.rotation.y=heading;
+        horse.root.position.set(p.x,surface(p.x,p.z),p.z);horse.root.rotation.y=heading;
+      }
+      if(horse.root.visible) horse.update(frameDelta,mounted?travelled/Math.max(dt,.001):0,sprinting,(heading-previousYaw)/Math.max(.01,dt)*.28);
       knight.update(frameDelta,{
         speed:dt>0?travelled/dt:0,
         sprinting:sprinting&&!blocking,
         blocking,
-        facing:length?Math.atan2(x,z):undefined,
+        facing:length&&!mounted?Math.atan2(x,z):undefined,
+        saddleBob:mounted?horse.saddleBob:undefined,
       });
       p.y=T.MathUtils.lerp(p.y,surface(p.x,p.z),1-Math.exp(-22*dt));
       if(!uiOpen()&&!travel) {
         encounters.update(dt,blocking);
+        if(mounted){
+          if(!horseClear(p.x,p.z,heading)){p.x=horse.root.position.x;p.z=horse.root.position.z;}
+          horse.root.position.set(p.x,surface(p.x,p.z),p.z);
+        }
         const view=encounters.ui();
         if(save.health&&Math.hypot(p.x-den.gate.x,p.z-den.gate.z)<3.4)
           view.prompt='E · Enter Hollow Fang Den · Rank E · Suggested level 5';
@@ -210,7 +290,7 @@ export function startWilderness(
           onCombat(notification,prompt,abilitySeconds,bossHealth);
         }
       }
-      destination.set(p.x,p.y+.75,p.z);
+      destination.set(p.x,p.y+(mounted?1.57:.75),p.z);
       focus.lerp(destination,1-Math.exp(-7*dt));
       distance=T.MathUtils.lerp(distance,zoom,1-Math.exp(-9*dt));
       camera.position.copy(focus).addScaledVector(offset,distance);
@@ -248,12 +328,22 @@ export function startWilderness(
       if(Math.hypot(body.position.x-target.x,body.position.z-target.z)<3) return 'You are already at this Waystone.';
       if(!canWalk(target.x,target.z)||!encounters.arrivalClear(target.x,target.z)) return 'The destination is obstructed or threatened.';
       keys.clear();blocking=false;
+      dismissHorse();
       encounters.transition();
       encounters.waystoneEffect();
       travel={target,remaining:.88,arrived:false};
       return '';
     },
     equip,
+    equipArmor(slot:ArmorSlot,id:ArmorId|null){
+      if(id&&(!save.armorItems.includes(id)||armorPiece(id).slot!==slot)) return;
+      const next={...save.equippedArmor};
+      if(id) next[slot]=id;else delete next[slot];
+      save.equippedArmor=next;
+      if(save.health>0) save.health=Math.min(save.health,maxHunterHealth(save));
+      knight.equipArmor(next);
+      onSaveChange();
+    },
     allocate(stat:Stat){if(allocate(save,stat)) onSaveChange();},
     assign(slot:number,itemId:string|null){
       if(!Number.isInteger(slot)||slot<0||slot>=save.hotbar.length) return;
@@ -272,7 +362,7 @@ export function startWilderness(
       onSaveChange();
     },
     dispose(){
-    loop.stop(); controller.abort(); observer.disconnect(); encounters.dispose();stones.dispose();grass.dispose();
+    loop.stop(); controller.abort(); observer.disconnect(); encounters.dispose();stones.dispose();grass.dispose();horse.dispose();knight.disposeArmor();
     const geometries=new Set<T.BufferGeometry>(),materials=new Set<T.Material>();
     scene.traverse(object=>{
       if(object instanceof T.InstancedMesh) object.dispose();

@@ -256,3 +256,7 @@ body:has([data-overlay-closing=true]) .system-tooltip { opacity:0; }
 @media(prefers-reduced-motion:reduce) {
   .system-frame::after,.system-sigil,.frame-edge-light,.system-toast::after,.system-tooltip { animation:none; }
 }
+.armor-equipment-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.4rem; }
+.armor-equipment-point { justify-self:stretch; display:grid; grid-template-columns:auto minmax(0,1fr); }
+.armor-equipment-point select { display:block; width:100%; min-width:0; font-size:.7rem; }
+@media(max-width:740px){ .armor-equipment-grid { grid-template-columns:1fr; } }

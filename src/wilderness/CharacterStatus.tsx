@@ -1,5 +1,5 @@
 import type { Exploration } from './exploration';
-import { attackSpeed, elemental, lootBonus, maxHunterHealth, mitigation, moveSpeed, physical, progression, rank, statNames, xpNeeded, type Stat } from './progression';
+import { effectiveStats, attackSpeed, elemental, lootBonus, maxHunterHealth, mitigation, moveSpeed, physical, progression, rank, statNames, xpNeeded, type Stat } from './progression';
 import { weapons } from './weapons';
 import { SystemPanel } from './ui/SystemPanel';
 import { healthNotation } from './ui/HunterInventory';
@@ -11,7 +11,7 @@ const labels:Record<Stat,[string,string]>={
 const percent=(n:number)=>Number((n*100).toFixed(1))+'%';
 
 export function CharacterStatus({hero,close,spend}:{hero:Exploration;close:()=>void;spend:(stat:Stat)=>void}){
-  const stats=hero.stats, max=maxHunterHealth(hero), needed=xpNeeded(hero.level);
+  const stats=effectiveStats(hero), max=maxHunterHealth(hero), needed=xpNeeded(hero.level);
   const bonuses:Record<Stat,string>={
     strength:'+'+percent(physical(stats)-1)+' physical damage',
     vitality:'+'+stats.vitality*progression.vitalityHealth+' maximum health',
@@ -35,7 +35,7 @@ export function CharacterStatus({hero,close,spend}:{hero:Exploration;close:()=>v
       <span className="attribute-code">{labels[stat][0]}</span>
       <div><strong>{labels[stat][1]}</strong><small>{bonuses[stat]}</small></div>
       <b>{stats[stat]}</b>
-      <button aria-label={'Increase '+labels[stat][1]} disabled={!hero.statPoints||stats[stat]>=progression.statCap} onClick={()=>spend(stat)}>+</button>
+      <button aria-label={'Increase '+labels[stat][1]} disabled={!hero.statPoints||hero.stats[stat]>=progression.statCap} onClick={()=>spend(stat)}>+</button>
     </li>)}</ul>
     <dl className="hunter-ledger"><div><dt>Gold</dt><dd>{hero.gold}</dd></div><div><dt>Defeated</dt><dd>{hero.kills}</dd></div>
       <div><dt>Dungeons cleared</dt><dd>{hero.completedDungeons.length}</dd></div><div><dt>Bosses defeated</dt><dd>{hero.defeatedBosses.length}</dd></div></dl>
