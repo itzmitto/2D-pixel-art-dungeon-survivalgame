@@ -1,7 +1,7 @@
 import * as T from 'three';
 import { fracturedRock, weatherStone } from './rockDetail';
 import { fieldNoise, groundMaterial as detailedGround } from './surfaceDetail';
-import { fallsX, fortress, frontierAt, frontierCamps, frontierLandmarks, frontierRegions, frontierStones, highlandRiver, highlands, marshBridge, marshes, marshWaterLevel, routeDistance, waterfall } from './frontier.ts';
+import { fallsX, fortress, frontierAt, frontierCamps, frontierLandmarks, frontierRegions, frontierStones, highlandRiver, marshBridge, marshes, marshWaterLevel, routeDistance, waterfall } from './frontier.ts';
 import { bossCaves } from './bossCaves.ts';
 import { height, randomSequence, surface } from './layout.ts';
 import { meshPart, rigidBatcher, shapedPlate } from './creatureGeometry.ts';
@@ -54,12 +54,12 @@ export function frontierScenery(scene:T.Scene, obstacles:{x:number;z:number;r:nu
     const mesh=meshPart(parent,geo,m,x,y,z);mesh.scale.set(sx,sy,sz);return mesh;
   }
   type Prop=[number,number,number,number,number,number,number];
-  function instances(root:T.Group,props:Prop[],geo:T.BufferGeometry,mat:T.Material,shadows=true){
+  function instances(root:T.Group,props:Prop[],geo:T.BufferGeometry,mat:T.Material,shadows=true,randomTint=random){
     if(!props.length) return;
     const mesh=new T.InstancedMesh(geo,mat,props.length);
     props.forEach(([x,y,z,w,h,d,a],i)=>{
       stamp.position.set(x,y,z);stamp.scale.set(w,h,d);stamp.rotation.set(0,a,0);stamp.updateMatrix();
-      mesh.setMatrixAt(i,stamp.matrix);mesh.setColorAt(i,tint.setScalar(.67+random()*.33));
+      mesh.setMatrixAt(i,stamp.matrix);mesh.setColorAt(i,tint.setScalar(.67+randomTint()*.33));
     });
     mesh.castShadow=shadows;mesh.receiveShadow=true;mesh.computeBoundingSphere();root.add(mesh);
   }
@@ -154,9 +154,9 @@ export function frontierScenery(scene:T.Scene, obstacles:{x:number;z:number;r:nu
         chips.push([xx,height(xx,zz)-.05,zz,s,s*.83,s*.86,a+j]);
       }
     }
-    instances(root,shelves,rock,cliffStone);
-    instances(root,ribs,shardRock,cliffStone);
-    instances(root,chips,blockRock,naturalStone,false);
+    instances(root,shelves,rock,cliffStone,true,fractureRandom);
+    instances(root,ribs,shardRock,cliffStone,true,fractureRandom);
+    instances(root,chips,blockRock,naturalStone,false,fractureRandom);
     instances(root,trunks,log,wood);instances(root,pines,cone,needles);instances(root,rocks,rock,naturalStone);
     instances(root,crystals,shard,crystal,false);
     if(swamp){

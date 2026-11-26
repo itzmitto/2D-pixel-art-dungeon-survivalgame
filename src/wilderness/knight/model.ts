@@ -41,10 +41,9 @@ export function createKnightModel() {
     new T.MeshStandardMaterial({ color: '#30343A', metalness: .47, roughness: .57 }),
     new T.MeshStandardMaterial({ color: '#656C73', metalness: .42, roughness: .48 }),
     new T.MeshStandardMaterial({ color: '#30251F', roughness: .92 }),
-    new T.MeshStandardMaterial({ color: '#A8ADB3', metalness: .48, roughness: .42 }),
     new T.MeshStandardMaterial({ color: '#101317', roughness: .98 }),
   ];
-  const [steel, edge, leather, blade, shadow] = materials;
+  const [steel, edge, leather, shadow] = materials;
   const parts = new Map<T.Group, Map<T.Material, T.BufferGeometry[]>>();
   const joint = (parent: T.Group, name: string, x = 0, y = 0, z = 0) => {
     const group = new T.Group();
@@ -119,18 +118,6 @@ export function createKnightModel() {
     plate(foot,edge,[[-.079,.083,.218,.046],[-.054,.094,.231,.049],[-.023,.082,.189,.038]],10);
     return { upper, lower, foot };
   });
-
-  const sword = arms[1].socket;
-  plate(sword,blade,[[.219,.061,.018,.018],[.25,.072,.022,.022],[.83,.059,.017,.017],[1.149,.035,.011,.011],[1.313,.001,.001,.001]],4);
-  plate(sword,edge,[[.23,.015,.006,.004],[.27,.027,.013,.006],[.86,.016,.009,.005],[1.04,.006,.004,.004]],4,0,0,.013);
-  plate(sword,leather,[[-.161,.039,.031,.031],[-.129,.039,.033,.033],[.134,.035,.029,.029],[.18,.041,.035,.035]],8);
-  for (const y of [-.125,-.066,-.009,.05,.108]) {
-    plate(sword,edge,[[y,.036,.031,.031],[y+.009,.04,.034,.034]],8);
-  }
-  plate(sword,steel,[[-.254,.022,.026,.026],[-.225,.058,.041,.041],[-.181,.054,.041,.041],[-.158,.035,.032,.032]],8);
-  for(const side of [-1,1]) {
-    plate(sword,edge,[[-.224,.02,.026,.026],[-.18,.033,.036,.036],[-.055,.037,.043,.043],[.03,.051,.045,.045]],8,0,.184,0,side*(Math.PI/2-.19));
-  }
 
   // Bake rigid details per joint/material. Articulation remains in the scene tree.
   for (const [parent, group] of parts) for (const [material, geometries] of group) {

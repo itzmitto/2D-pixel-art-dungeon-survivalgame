@@ -50,7 +50,8 @@ export function startWilderness(
   const camera=new T.PerspectiveCamera(43,1,.3,400);
   const knight=createDarkKnight();
   const body=knight.root;
-  knight.equip(save.equipped,save.items.find(item=>item.id===save.selectedItem)?.rarity);
+  const carried=save.items.find(item=>item.id===save.selectedItem);
+  knight.equip(save.equipped,carried?.rarity,carried?.relic);
 
   knight.equipArmor(save.equippedArmor);
   const horse=warhorse();
@@ -111,7 +112,7 @@ export function startWilderness(
     }
     save.equipped=id;
     save.selectedItem=item.id;
-    knight.equip(id,item.rarity);
+    knight.equip(id,item.rarity,item.relic);
     abilitySeconds=Math.ceil(encounters.abilityRemaining);
     onCombat(notification,prompt,abilitySeconds,bossHealth,shadowAvailable);
     onSaveChange();
@@ -498,7 +499,7 @@ export function startWilderness(
       onSaveChange();
     },
     dispose(){
-    loop.stop(); controller.abort(); observer.disconnect();dragonAudio.dispose(); encounters.dispose();stones.dispose();grass.dispose();tower.dispose();caves.dispose();expedition.dispose();capital.dispose();frontier.dispose();horse.dispose();knight.disposeArmor();
+    loop.stop(); controller.abort(); observer.disconnect();dragonAudio.dispose(); encounters.dispose();stones.dispose();grass.dispose();tower.dispose();caves.dispose();expedition.dispose();capital.dispose();frontier.dispose();horse.dispose();knight.disposeArmor();knight.disposeWeapon();
     const geometries=new Set<T.BufferGeometry>(),materials=new Set<T.Material>();
     scene.traverse(object=>{
       if(object instanceof T.InstancedMesh) object.dispose();

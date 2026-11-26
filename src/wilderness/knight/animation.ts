@@ -2,8 +2,9 @@ import { armorModels } from './armorModels.ts';
 import * as T from 'three';
 import { createKnightModel } from './model.ts';
 
-import { abilityAnimationSeconds, weapons, elementalIds, type Weapon, type WeaponId } from '../weapons.ts';
+import { abilityAnimationSeconds, weapons, type Weapon, type WeaponId } from '../weapons.ts';
 import { weaponModel } from '../weaponModels.ts';
+import { bossRelics, type RelicId } from '../itemInstances.ts';
 
 type Motion = { speed: number; sprinting: boolean; blocking?: boolean; facing?: number; saddleBob?:number };
 
@@ -13,21 +14,22 @@ export function createDarkKnight() {
   const {root,hips,torso,head,arms,legs,cape} = model;
   let time=0, spin=0, phase=0, stride=0, run=0, guard=0, turn=0, attack=1;
   let weapon=weapons.longsword, poseWeapon=weapon, duration=weapon.attackDuration, casting=false;
-  const starter=arms[1].socket.children.slice();
-  const models=new Map(elementalIds.map(id=>{
-    const model=weaponModel(id);
-    arms[1].socket.add(model.right);
-    arms[0].fore.add(model.left);
-    model.left.position.set(-.12,-.13,.12);
-    model.left.rotation.y=-.52;
-    return [id,model] as const;
-  }));
   let equippedRarity=weapon.rarity;
-  function equip(id:WeaponId,tier=weapons[id].rarity){
+  let equippedRelic:RelicId|undefined, equippedModel:ReturnType<typeof weaponModel>|undefined;
+  function equip(id:WeaponId,tier=weapons[id].rarity,relic?:RelicId){
+    const variant=relic&&bossRelics[relic]?.type===id?relic:undefined;
+    if(!equippedModel||weapon.id!==id||variant!==equippedRelic){
+      equippedModel?.dispose();
+      equippedModel=weaponModel(id,variant);
+      arms[1].socket.add(equippedModel.right);
+      arms[0].fore.add(equippedModel.left);
+      equippedModel.left.position.set(-.12,-.13,.12);
+      equippedModel.left.rotation.y=-.52;
+      equippedRelic=variant;
+    }
     weapon=weapons[id];
     equippedRarity=tier;
-    for(const part of starter) part.visible=id==='longsword';
-    for(const [key,model] of models) model.right.visible=model.left.visible=key===id;
+    equippedModel.update(time,equippedRarity);
   }
   equip('longsword');
   const swing = new Float32Array(8);
@@ -44,7 +46,7 @@ export function createDarkKnight() {
   function update(dt: number, motion: Motion) {
     time+=dt;
     armor.update(time);
-    if(weapon.id!=='longsword') models.get(weapon.id)?.update(time,equippedRarity);
+    equippedModel?.update(time,equippedRarity);
     const weight=1-Math.exp(-13*dt);
     const motionWeight=T.MathUtils.clamp(motion.speed/6,0,1);
     stride=T.MathUtils.lerp(stride,motionWeight,weight);
@@ -157,5 +159,5 @@ export function createDarkKnight() {
   }
 
   update(0,{speed:0,sprinting:false});
-  return {root,update,playAttack,equip,equipArmor:armor.equip,disposeArmor:armor.dispose,get animating(){return attack<duration;}};
+  return {root,update,playAttack,equip,equipArmor:armor.equip,disposeArmor:armor.dispose,disposeWeapon:()=>equippedModel?.dispose(),get animating(){return attack<duration;}};
 }

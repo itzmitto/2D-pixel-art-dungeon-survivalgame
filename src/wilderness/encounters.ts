@@ -675,16 +675,17 @@ export function createEncounters(
     arrivalClear(x:number,z:number){
       return !enemies.some(enemy=>enemy.hp>0&&Math.hypot(x-enemy.root.position.x,z-enemy.root.position.z)<7);
     },
-    grassInfluences(actors:T.Vector4[],gusts:T.Vector4[]){
+    grassInfluences(actors:T.Vector4[],gusts:T.Vector4[],elements:T.Vector2[]){
       let i=0;
       for(const enemy of enemies){
         const p=enemy.root.position;
-        if(i===actors.length) break;
+        if(i===actors.length-4) break;
         if(enemy.hp>0&&Math.hypot(p.x-player.position.x,p.z-player.position.z)<19)
-          actors[i++].set(p.x,p.z,enemy.spec.scale*1.12,.27+enemy.gait*.50);
+          actors[i++].set(p.x,p.z,Math.max(.84,enemy.spec.scale*(enemy.boss?1.54:1.22)),.15+enemy.gait*.72);
       }
+      i=shadows.vegetation(actors,i);
       for(;i<actors.length;i++) actors[i].set(0,0,1,0);
-      fx.grassInfluences(gusts,player.position);
+      fx.grassInfluences(gusts,elements,player.position);
     },
     waystoneEffect(point=player.position,color=0x79bfff){
       fx.emit(point,color,'ray',1.95,.53,{y:2.12,aspect:3.2});
