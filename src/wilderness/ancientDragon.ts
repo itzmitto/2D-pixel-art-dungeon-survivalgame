@@ -97,6 +97,14 @@ export function dragonModels(){
     const pupil=own(new T.MeshBasicMaterial({color:0x0d0a15}));
     const membrane=own(new T.MeshStandardMaterial({color:spectral?0x1a4569:0x5e2634,roughness:.89,side:T.DoubleSide,
       transparent:spectral,opacity:spectral?.78:1,depthWrite:true,emissive:spectral?0x072747:0x210611,emissiveIntensity:.57}));
+    if(spectral) for(const material of [hide,scales,armor,keratin]){
+      material.customProgramCacheKey=()=> 'vonkje-dragon-spectral-rim';
+      material.onBeforeCompile=shader=>{
+        shader.fragmentShader=shader.fragmentShader.replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
+          float spectralEdge=pow(1.-abs(dot(normalize(vViewPosition),normal)),3.4);
+          totalEmissiveRadiance+=vec3(.016,.13,.38)*(.11+spectralEdge*.56);`);
+      };
+    }
     const heat={value:spectral?1:0};
     membrane.customProgramCacheKey=()=> 'vonkje-dragon-membrane';
     membrane.onBeforeCompile=shader=>{

@@ -8,9 +8,16 @@ import { cleanShadowName, grantShadowXp, shadowCapacity, shadowName, shadowStats
   shadowStrength, shadowCommands, type ShadowCommand, type ShadowGrade, type ShadowKind, type ShadowSoldier } from './shadowData.ts';
 
 type Hostile={id:string;hp:number;root:T.Group;hitFlash:number};
+const dragonMoves=[
+  {name:'shadowBreath',range:10.5,power:1.04,windup:.65},
+  {name:'claw',range:5.9,power:1.19,windup:.55},
+  {name:'shadowFireball',range:13.3,power:1.16,windup:.67},
+  {name:'wingShock',range:7.3,power:.93,windup:.72},
+] as const;
+
 type Companion={
   record:ShadowSoldier;rig:CreatureRig;target?:Hostile;phase:number;gait:number;
-  bite:number;windup:number;recovery:number;hurt:number;seek:number;rise:number;strikes:number;
+  bite:number;windup:number;recovery:number;hurt:number;seek:number;rise:number;strikes:number;dragonMove?:typeof dragonMoves[number];
 };
 
 export function shadowArmy<Enemy extends Hostile>(
@@ -44,7 +51,7 @@ export function shadowArmy<Enemy extends Hostile>(
   const motes=new T.InstancedMesh(moteGeometry,moteMaterial,64);
   motes.count=0;motes.frustumCulled=false;motes.instanceMatrix.setUsage(T.DynamicDrawUsage);group.add(motes);
   const proxyMaterial=new T.MeshBasicMaterial({color:0xffffff,toneMapped:false});
-  function proxyGeometry(beast:boolean,caster=false){
+  function proxyGeometry(beast:boolean,caster=false,dragon=false){
     const body=new T.IcosahedronGeometry(1,0).scale(beast?.35:.36,beast?.43:.81,beast?.97:.27)
       .translate(0,beast?1.35:1.15,0);
     const head=new T.OctahedronGeometry(1).scale(.27,.32,beast?.44:.27).translate(0,beast?1.70:2.06,beast?1.0:.08);
@@ -56,17 +63,28 @@ export function shadowArmy<Enemy extends Hostile>(
     }
     if(caster) parts.push(new T.BoxGeometry(.083,2.65,.08).translate(.51,1.47,.14));
     if(beast) parts.push(new T.OctahedronGeometry(.39).scale(.51,.67,1.7).translate(0,1.42,-1.16));
+    if(dragon) for(const side of [-1,1]){
+      const sail=new T.BufferGeometry().setAttribute('position',new T.Float32BufferAttribute([
+        side*.27,1.52,.19,side*1.27,1.94,.27,side*2.17,1.54,-1.28,
+        side*.27,1.52,.19,side*2.17,1.54,-1.28,side*.43,1.22,-1.34,
+        side*.27,1.52,.19,side*2.17,1.54,-1.28,side*1.27,1.94,.27,
+        side*.27,1.52,.19,side*.43,1.22,-1.34,side*2.17,1.54,-1.28,
+      ],3));
+      sail.computeVertexNormals();
+      sail.setAttribute('uv',new T.Float32BufferAttribute(new Float32Array(24),2));
+      parts.push(sail);
+    }
     const nonIndexed=parts.map(part=>part.index?part.toNonIndexed():part);
     const geometry=mergeGeometries(nonIndexed)!;
     new Set([...parts,...nonIndexed]).forEach(part=>part.dispose());
     return geometry;
   }
-  const proxies=[proxyGeometry(true),proxyGeometry(false),proxyGeometry(false,true)].map(geometry=>{
+  const proxies=[proxyGeometry(true),proxyGeometry(false),proxyGeometry(false,true),proxyGeometry(true,false,true)].map(geometry=>{
     const mesh=new T.InstancedMesh(geometry,proxyMaterial,shadowTuning.limits.SSS);
     mesh.count=0;mesh.frustumCulled=false;mesh.castShadow=false;mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
     group.add(mesh);return mesh;
   });
-  const projectiles:{state:Companion;target:Hostile;point:Point;life:number;trail:number;radius:number}[]=[];
+  const projectiles:{state:Companion;target:Hostile;point:Point;life:number;trail:number;radius:number;damage?:number}[]=[];
   const spatialKey=(x:number,z:number,size:number)=>Math.floor(x/size)*4096+Math.floor(z/size);
   const nearbyHostiles=new Map<number,Enemy[]>(), nearbyAllies=new Map<number,Companion[]>();
   let nextIndex=0;
@@ -101,7 +119,7 @@ export function shadowArmy<Enemy extends Hostile>(
     const kind=record.kind;
     const rig=pool.get(kind)?.pop()??rigFor(kind);
     rig.root.name=record.name;
-    rig.root.scale.setScalar(kind==='guardian'?1.59:record.grade==='boss'?1.38:kind==='dire'||kind==='elite'?1.23:1);
+    rig.root.scale.setScalar(kind==='guardian'?1.59:kind==='ancientDragon'?1.42:record.grade==='boss'?1.38:kind==='dire'||kind==='elite'?1.23:1);
     rig.root.visible=true;group.add(rig.root);
     const state:Companion={record,rig,phase:0,gait:0,bite:.2,windup:0,recovery:0,hurt:0,seek:0,rise:visual?.73:0,strikes:0};
     active.set(record.id,state);
@@ -311,13 +329,14 @@ export function shadowArmy<Enemy extends Hostile>(
           projectiles.splice(i,1);continue;
         }
         p.x=x;p.z=z;
-        const frost=bolt.state.record.kind==='frostGuardian', color=shadowProfiles[bolt.state.record.kind].color;
+        const dragon=bolt.state.record.kind==='ancientDragon', frost=bolt.state.record.kind==='frostGuardian', color=shadowProfiles[bolt.state.record.kind].color;
         if(bolt.trail<=0){
           bolt.trail=.09;
-          fx.emit(p,color,'crystal',.53,.19,{y:1.13,aspect:.85,opacity:.83});
+          fx.emit(p,color,'crystal',dragon?.86:.53,.19,{y:dragon?1.72:1.13,aspect:.85,opacity:.83});
+          if(dragon&&active.size<32) fx.emit(p,0x2269bb,'mist',.59,.32,{y:1.35,opacity:.49});
         }
         if(gap<=step+.65){
-          const damage=shadowStats(bolt.state.record).damage;
+          const damage=bolt.damage??shadowStats(bolt.state.record).damage;
           deal(bolt.state,bolt.target as Enemy,damage,frost);
           if(bolt.radius){
             fx.emit(q,color,frost?'frost':'ring',bolt.radius,.57,{opacity:.65});
@@ -348,13 +367,16 @@ export function shadowArmy<Enemy extends Hostile>(
           });
         }
         const target=state.target;
-        const ranged=profile.style==='spell'||profile.style==='frost'||profile.style==='dragon';
+        const dragon=record.kind==='ancientDragon';
+        const move=dragon?dragonMoves[state.strikes%dragonMoves.length]:undefined;
+        const range=move?.range??profile.range, windup=move?.windup??profile.windup;
+        const ranged=profile.style==='spell'||profile.style==='frost'||move?.name==='shadowFireball'||move?.name==='shadowBreath';
         const charge=profile.style==='dash'||profile.style==='charge';
         if(state.windup>0){
           state.windup=Math.max(0,state.windup-dt);
           if(!state.windup){
             state.bite=profile.cooldown;state.recovery=.31;
-            if(fighting&&target&&target.hp>0&&Math.hypot(target.root.position.x-p.x,target.root.position.z-p.z)<profile.range+.45&&
+            if(fighting&&target&&target.hp>0&&Math.hypot(target.root.position.x-p.x,target.root.position.z-p.z)<range+.45&&
               clear(p.x,p.z,target.root.position.x,target.root.position.z)){
               const q=target.root.position;
               let damage=shadowStats(record).damage;
@@ -363,9 +385,33 @@ export function shadowArmy<Enemy extends Hostile>(
                 if(pack.some(ally=>ally!==state&&ally.target===target&&shadowProfiles[ally.record.kind].style==='bite')) damage*=1.12;
               }
               state.strikes++;
-              if(ranged){
+              if(move){
+                const yaw=Math.atan2(q.x-p.x,q.z-p.z);
+                damage*=move.power;
+                state.dragonMove=move;
+                if(move.name==='shadowFireball'){
+                  if(projectiles.length<18) projectiles.push({state,target,point:{x:p.x,z:p.z},trail:0,life:1.15,radius:3.8,damage});
+                }else{
+                  deal(state,target as Enemy,damage);
+                  if(move.name==='shadowBreath'){
+                    for(let i=1;i<=(active.size>30?3:6);i++){
+                      const step=range*i/(active.size>30?3:6);
+                      fx.emit({x:p.x+Math.sin(yaw)*step,z:p.z+Math.cos(yaw)*step},0x38aaff,'mist',.9+step*.105,.57,
+                        {yaw,y:1.32,grow:2.7,dx:Math.sin(yaw)*2,dz:Math.cos(yaw)*2,opacity:.79});
+                    }
+                    burst(state,q,2.7,damage*.38,target);
+                  }else if(move.name==='wingShock'){
+                    fx.emit(p,profile.color,'ring',1.3,.56,{y:.29,grow:11.2,opacity:.86});
+                    fx.emit(p,0x4282ed,'ring',.85,.49,{y:.47,grow:9.7,opacity:.69});
+                    burst(state,p,range,damage*.60,target);
+                  }else{
+                    fx.emit(p,profile.color,'arc',range*.62,.37,{yaw,y:1.15,aspect:1.64,opacity:.94});
+                    if(active.size<32) fx.scatter(q,0x7cd8ff,8,.98);
+                  }
+                }
+              }else if(ranged){
                 if(projectiles.length<18) projectiles.push({state,target,point:{x:p.x,z:p.z},trail:0,life:1.1,
-                  radius:state.strikes%3===0?(profile.style==='dragon'?4.2:3.4):0});
+                  radius:state.strikes%3===0?3.4:0});
               }else{
                 const yaw=Math.atan2(q.x-p.x,q.z-p.z);
                 if(charge){
@@ -388,8 +434,8 @@ export function shadowArmy<Enemy extends Hostile>(
           (state.seek<.16||distance>10?spot(n):p);
         const dx=goal.x-p.x,dz=goal.z-p.z,gap=Math.hypot(dx,dz), yaw=Math.atan2(dx,dz);
         let speed=0;
-        const desired=target?.hp?Math.max(1.42,profile.range-(ranged?1.5:.62)):.69;
-        if(!state.rise&&target?.hp&&gap<profile.range&&!state.bite&&!state.windup&&clear(p.x,p.z,goal.x,goal.z)) state.windup=profile.windup;
+        const desired=target?.hp?Math.max(1.42,range-(ranged?1.5:.82)):.69;
+        if(!state.rise&&target?.hp&&gap<range&&!state.bite&&!state.windup&&clear(p.x,p.z,goal.x,goal.z)) state.windup=windup;
         if(!state.rise&&!state.windup&&gap>desired){
           const step=Math.min(gap,(target?.hp?6.7:Math.min(23,Math.max(5.5,travelSpeed+Math.max(0,gap-1)*1.05)))*dt);
           for(const offset of [0,.61,-.61,1.20,-1.20]){
@@ -418,14 +464,14 @@ export function shadowArmy<Enemy extends Hostile>(
         p.y=surface(p.x,p.z)-.94*T.MathUtils.smoothstep(state.rise,0,.73);
         state.gait=T.MathUtils.damp(state.gait,Math.min(1,speed/7),12,dt);
         state.phase+=speed*dt*2.8;
-        const detailed=state.rise>0||distance<17&&(record.grade==='boss'||full<warmRigLimit);
+        const detailed=state.rise>0||distance<(dragon&&active.size>=28?12:17)&&(record.grade==='boss'||full<warmRigLimit);
         rig.root.visible=detailed;
         if(detailed){
           full++;
           if(distance<8||n%2===Math.floor(time*30)%2||state.windup>0)
-            rig.animate({time,phase:state.phase,gait:state.gait,windup:state.windup>0?.32+(1-state.windup/profile.windup)*.67:0,
-              recovery:state.recovery/.31,hit:state.hurt/.28,leap:charge?state.recovery/.31*.76:profile.style==='dragon'&&state.windup>0?.59:0,dead:0,frozen:false,
-              technique:profile.style==='slam'?'slam':profile.style==='sword'?'cleave':undefined,alert:target?.hp?1:0,distance});
+            rig.animate({time,phase:state.phase,gait:state.gait,windup:state.windup>0?.32+(1-state.windup/windup)*.67:0,
+              recovery:state.recovery/.31,hit:state.hurt/.28,leap:charge?state.recovery/.31*.76:dragon&&(move?.name==='wingShock'&&state.windup>0||state.dragonMove?.name==='wingShock'&&state.recovery>0)?.39:0,dead:0,frozen:false,
+              technique:dragon?(state.windup>0?move?.name:state.recovery>0?state.dragonMove?.name:undefined):profile.style==='slam'?'slam':profile.style==='sword'?'cleave':undefined,alert:target?.hp?1:0,distance:dragon&&active.size>=28?distance+6:distance});
         }
       }
     },
@@ -445,7 +491,7 @@ export function shadowArmy<Enemy extends Hostile>(
       for(const state of active.values()){
         const q=state.rig.root.position, kind=state.record.kind, profile=shadowProfiles[kind];
         if(save.health&&!state.rig.root.visible){
-          const mesh=proxies[profile.category==='Beast'||kind==='guardian'||kind==='ancientDragon'?0:profile.category==='Caster'||kind==='frostGuardian'||kind==='darkArchmage'?2:1];
+          const mesh=proxies[kind==='ancientDragon'?3:profile.category==='Beast'||kind==='guardian'?0:profile.category==='Caster'||kind==='frostGuardian'||kind==='darkArchmage'?2:1];
           stamp.position.copy(q);stamp.rotation.set(0,state.rig.root.rotation.y,0);stamp.scale.copy(state.rig.root.scale);stamp.updateMatrix();
           const i=mesh.count++;
           mesh.setMatrixAt(i,stamp.matrix);

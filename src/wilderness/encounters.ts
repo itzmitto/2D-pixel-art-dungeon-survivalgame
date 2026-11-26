@@ -69,6 +69,7 @@ function numberTexture(value:number) {
 export function createEncounters(
   scene:T.Scene, camera:T.Camera, player:T.Group, save:Exploration,
   canWalk:(x:number,z:number)=>boolean, changed:()=>void,
+  dragonCue:(kind:'step'|'roar'|'impact',strength:number)=>void=()=>{},
 ) {
   const maxHealth=()=>maxHunterHealth(save);
   function tunedWeapon(weapon:Weapon,magic=false):Weapon {
@@ -132,7 +133,7 @@ export function createEncounters(
     notification=message; noticeUntil=time+notificationsSeconds; changed();
   };
   const spectral=spectralModels(), regional=regionalModels();
-  const arts=caveArts<Enemy>(group,player,fx,canWalk,clearLine,hitPlayer,summonUndead,notify,strength=>{shake=Math.max(shake,strength);});
+  const arts=caveArts<Enemy>(group,player,fx,canWalk,clearLine,hitPlayer,summonUndead,notify,strength=>{shake=Math.max(shake,strength);dragonCue('impact',strength);});
   const shadows=shadowArmy<Enemy>(group,player,save,kind=>{
     if(kind==='ancientDragon') return dragons.makeDragon(true);
     if(isRegional(kind)) return spectral.decorate(regional.make(kind),kind);
@@ -166,7 +167,7 @@ export function createEncounters(
     affinity:T.Mesh<T.BufferGeometry,T.MeshBasicMaterial>;
     target:SpellTarget; roaming:boolean; roamGroup?:string; elite:boolean; level:number; announced:boolean; title?:T.Sprite; patrol:boolean;
     wolfRig:boolean; turn:number; wizard:boolean; barrier?:T.Mesh; ward:number;
-    spell?:'bolt'|'domain'|'shield'; wardCool:number; spellTarget?:{x:number;z:number}; slam?:{x:number;z:number}; sentinelMove?:'cleave'|'shock'|'shadow';bossCast?:BossCast;regionalCast?:RegionalCast;lastRegionalMove?:RegionalCast['move'];lastBossMove?:BossCast['move'];summonedBy?:string; shadowTarget?:string; enraged?:boolean;dragonRoarUntil?:number;
+    spell?:'bolt'|'domain'|'shield'; wardCool:number; spellTarget?:{x:number;z:number}; slam?:{x:number;z:number}; sentinelMove?:'cleave'|'shock'|'shadow';bossCast?:BossCast;regionalCast?:RegionalCast;lastRegionalMove?:RegionalCast['move'];lastBossMove?:BossCast['move'];summonedBy?:string; shadowTarget?:string; enraged?:boolean;dragonRoarUntil?:number;pendingDragonRoar?:boolean;
     posePhase:number; gait:number; anticipation:number; collapse:number; impactAge:number; retreat:number; strikes:number;
 
     id:string; kind:MonsterKind; spec:EnemySpec; home:T.Vector3; hp:number; hpBar:T.Group; fill:T.Mesh;
@@ -471,7 +472,7 @@ export function createEncounters(
     if(enemy.hp>0&&oldPhase){
       const stage=dragonPhase(enemy.hp/enemy.spec.health);
       if(stage>oldPhase){
-        enemy.strikes=0;enemy.dragonRoarUntil=time+1.15;
+        enemy.strikes=0;enemy.pendingDragonRoar=true;
         enemy.cooldown=Math.max(enemy.cooldown,1.48);
         fx.emit(enemy.root.position,stage===3?0xff4b17:0xffb55b,'ring',.71,.71,{grow:12,y:.17});
         fx.scatter(enemy.root.position,0xff8b42,15,1.67);
@@ -694,7 +695,7 @@ export function createEncounters(
     transition(){comboUntil=0;spawnClock=.6;arts.clear();
       for(let i=enemies.length-1;i>=0;i--) if(enemies[i].summonedBy) removeRoamer(i);
       for(const enemy of enemies) if(isAdvancedBoss(enemy.kind)||isRegional(enemy.kind)){
-        enemy.regionalCast=undefined;enemy.bossCast=undefined;enemy.windup=0;enemy.charge=0;enemy.cooldown=.62;
+        enemy.regionalCast=undefined;enemy.bossCast=undefined;enemy.windup=0;enemy.charge=0;enemy.cooldown=.62;enemy.dragonRoarUntil=0;
         enemy.root.position.y=surface(enemy.root.position.x,enemy.root.position.z);
       }
       shadows.transition();slowUntil=0;poisonedUntil=0;venomBolts.length=venomPools.length=0;arcane.clear();combatUntil=0;knockback.set(0,0);magic.reset();fx.clear();queued=undefined;rangeTimer.cancel();echoLife=shake=0;echo.visible=false;},
@@ -954,6 +955,7 @@ export function createEncounters(
           continue;
         }
         if(enemy.hp>0) enemy.statuses.update(dt,amount=>hitEnemy(enemy,amount),(dx,dz)=>{
+          if(enemy.kind==='ancientDragon') return;
           if(canWalk(p.x+dx,p.z)) p.x+=dx;
           if(canWalk(p.x,p.z+dz)) p.z+=dz;
         });
@@ -1009,7 +1011,8 @@ export function createEncounters(
         }
         if(dying){
           enemy.collapse=Math.min(1,enemy.collapse+dt*1.15);
-          enemy.animate({time,phase:enemy.posePhase,gait:0,windup:0,recovery:0,hit:0,leap:0,dead:enemy.collapse,frozen:false,distance:gap});
+          enemy.animate({time,phase:enemy.posePhase,gait:0,windup:0,recovery:0,hit:0,leap:0,dead:enemy.collapse,frozen:false,distance:gap,
+            stage:enemy.kind==='ancientDragon'?3:undefined});
         }
         if(!active) continue;
         const homeGap=Math.hypot(p.x-enemy.home.x,p.z-enemy.home.z);
@@ -1030,7 +1033,11 @@ export function createEncounters(
         const shadow=enemy.cooldown===0&&!isAdvancedBoss(enemy.kind)&&!enemy.wizard&&!enemy.windup&&!enemy.charge&&gap>spec.reach
           ? shadows.guardTarget(enemy,spec.reach+.27):undefined;
         const dragon=enemy.kind==='ancientDragon', stage=dragon?dragonPhase(enemy.hp/spec.health):1;
-        const roaring=dragon&&time<(enemy.dragonRoarUntil??0)&&!enemy.bossCast&&!arts.flying(enemy)&&!arts.breathing(enemy);
+        if(dragon&&enemy.pendingDragonRoar&&!enemy.bossCast&&!arts.flying(enemy)&&!arts.breathing(enemy)){
+          enemy.pendingDragonRoar=false;enemy.dragonRoarUntil=time+1.15;enemy.cooldown=Math.max(enemy.cooldown,1.52);
+          dragonCue('roar',Math.max(.35,1-gap/41));
+        }
+        const roaring=dragon&&time<(enemy.dragonRoarUntil??0);
         const approachDragon=dragon&&arts.wantsToClose(enemy,enemy.strikes,gap);
         if(enemy.statuses.halted&&!dragon){
           enemy.windup=0; enemy.charge=0; enemy.chargeWindup=false;enemy.slam=undefined;enemy.spell=undefined;enemy.spellTarget=undefined;enemy.sentinelMove=undefined;enemy.shadowTarget=undefined;enemy.bossCast=undefined;enemy.regionalCast=undefined;
@@ -1283,7 +1290,10 @@ export function createEncounters(
           const foot={x:p.x+Math.cos(enemy.heading)*side*1.14,z:p.z-Math.sin(enemy.heading)*side*1.14};
           fx.emit(foot,0xb58c77,'mist',.76,.49,{grow:2.3,y:.15,opacity:.73});
           fx.scatter(foot,0xba8260,4,.23);
-          if(gap<15) shake=Math.max(shake,.29*(1-gap/19));
+          if(gap<21){
+            shake=Math.max(shake,.26*(1-gap/23));
+            dragonCue('step',1-gap/23);
+          }
         }
         const leapDuration=enemy.kind==='infernalGolem'?.62:(enemy.kind==='sentinel'||enemy.kind==='warlord')?(enemy.enraged?.55:.48):enemy.kind==='guardian'?.65:.43;
         const sentinelWindup=enemy.sentinelMove

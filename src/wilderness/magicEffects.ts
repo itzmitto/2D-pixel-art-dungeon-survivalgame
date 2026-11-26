@@ -213,7 +213,7 @@ export function createMagicEffects(group:T.Group) {
   }
   function lightning(from:Point,to:Point,strike=false,small=false,ground=false,color?:number){
     const bolt=bolts[boltCursor++%bolts.length];
-    bolt.line.material.color.setHex(color??0xc1dbff);
+    bolt.line.material.color.setHex(color??0xc9e8ff);
     bolt.life=bolt.max=small?.12:.31;
     bolt.line.visible=true;
     bolt.x=from.x;bolt.z=from.z;bolt.y=surface(from.x,from.z)+(strike?10:ground?.19:small?1.65:.9);

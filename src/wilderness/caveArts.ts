@@ -142,22 +142,22 @@ export function caveArts<Enemy extends Actor>(
         show('Boss technique · '+labels[move]);
         return {move,duration,yaw,marks};
       }
-      const duration=(move==='meteor'||move==='air'?1.36:move==='death'||move==='magma'?1.19:1.01)*(enemy.enraged?.79:1);
+      const duration=(move==='meteor'?1.36:move==='death'||move==='magma'?1.19:1.01)*(enemy.enraged?.79:1);
       const marks:Point[]=[];
       const target={x:q.x,z:q.z};
-      if(move==='meteor'||move==='air'){
+      if(move==='meteor'){
         marks.push(target,along(target,yaw+.98,3.4),along(target,yaw-.98,3.4));
-        for(const point of marks) if(walk(point.x,point.z)) mark(point,move==='air'?2.48:2.70,color,duration+(move==='air'?1.05:.49));
+        for(const point of marks) if(walk(point.x,point.z)) mark(point,2.70,color,duration+.49);
       }else if(move==='burn'||move==='explode'||move==='prison'){
         marks.push(target);
         mark(target,move==='prison'?3.38:4.35,color,duration);
       }else if(move==='magma'){
         marks.push(along(p,yaw,3));mark(marks[0],4.65,color,duration);
-      }else if(move==='death'||move==='firewave'||move==='tail'||move==='barrier'||move==='summon'){
-        mark(p,move==='barrier'?1.63:move==='summon'?3.1:move==='tail'?7.4:9.4,color,duration);
+      }else if(move==='death'||move==='firewave'||move==='barrier'||move==='summon'){
+        mark(p,move==='barrier'?1.63:move==='summon'?3.1:9.4,color,duration);
       }else{
-        const distance=move==='breath'?16:move==='rush'?12:move==='barrage'?13:6;
-        const width=move==='barrage'?.24:move==='breath'?.34:move==='rush'?.12:.56;
+        const distance=move==='rush'?12:move==='barrage'?13:6;
+        const width=move==='barrage'?.24:move==='rush'?.12:.56;
         for(const spread of [-width,0,width]) for(let i=1;i<=3;i++){
           const point=along(p,yaw+spread,distance*i/3);
           if(walk(point.x,point.z)) fx.emit(point,color,'ring',move==='rush'?.92:.76,duration,{y:.1,opacity:.60});
@@ -211,15 +211,10 @@ export function caveArts<Enemy extends Actor>(
         }
       }
       switch(move){
-        case 'royal':case 'claw':case 'tail': {
-          const range=move==='tail'?7.4:move==='claw'?5.25:6;
-          const facing=yaw;
-          if(move==='tail') pulse(p,color,range);
-          fx.emit(p,color,'arc',range*.68,.47,{yaw:facing,y:move==='tail'?.74:1.19,aspect:1.25,grow:2.1});
-          if((move==='tail'?gap(p,q)<range:cone(p,q,facing,range,1.12))&&clear(p.x,p.z,q.x,q.z))
-            damage(enemy,blocking,move==='tail',move==='claw'?.86:1);
+        case 'royal':
+          fx.emit(p,color,'arc',4.08,.47,{yaw,y:1.19,aspect:1.25,grow:2.1});
+          if(cone(p,q,yaw,6,1.12)&&clear(p.x,p.z,q.x,q.z)) damage(enemy,blocking,false,1);
           break;
-        }
         case 'prison': {
           for(let i=0;i<8;i++){
             if(i===0||i===4) continue;
@@ -235,8 +230,8 @@ export function caveArts<Enemy extends Actor>(
           break;
         }
         case 'summon':summon(enemy);pulse(p,color,4.2);break;
-        case 'death':case 'firewave':case 'land': {
-          const radius=move==='land'?8.7:9.4;
+        case 'death':case 'firewave': {
+          const radius=9.4;
           pulse(p,color,radius);
           waves.push({owner:enemy,point:{x:p.x,z:p.z},radius,front:0,strength:move==='death'?.83:.91});
           break;
@@ -259,10 +254,6 @@ export function caveArts<Enemy extends Actor>(
         case 'burn':
           pulse(target,color,4.35);hazard(enemy,target,4.35,0,'burn',.29);break;
         case 'rush':break; // Movement and collision use the regular charged-attack path.
-        case 'breath':
-          barrage(enemy,yaw,[-.30,-.18,-.06,.06,.18,.30],.64,17);
-          for(let i=1;i<=6;i++) fx.emit(along(p,yaw,i*1.85),color,'mist',1.8,.45,{grow:2.7,y:.91,opacity:.67});
-          break;
       }
     },
     update(dt:number,isBlocking:boolean){

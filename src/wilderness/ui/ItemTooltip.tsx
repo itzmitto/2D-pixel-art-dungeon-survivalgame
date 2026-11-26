@@ -10,6 +10,7 @@ export function weaponStats(weapon:Weapon,stats:Exploration['stats']){
     ['Damage',weaponDamage({...weapon,damage:weapon.damage*(weapon.id==='staff'?elemental(stats):physical(stats))})],
     ['Attack interval',(weapon.cooldown/attackSpeed(stats)).toFixed(2)+' s'],
     ['Range',weapon.range],
+    ...(weapon.id==='scythe'?[['Soul Harvest','5% of actual damage, capped']]:[]),
     ...(weapon.ability?[[weapon.abilityName,weapon.abilityCooldown+' s']]:[]),
   ] as const;
 }

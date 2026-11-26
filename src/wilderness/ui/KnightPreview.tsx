@@ -27,6 +27,7 @@ export function KnightPreview({weapon,tier,armor}:{weapon:WeaponId;tier:Rarity;a
     const rim=new T.DirectionalLight(0x8ddaff,3.2);
     rim.position.set(-3,4,1);scene.add(rim);
     draw.current=(id,tier,armor)=>{
+      camera.zoom=id==='scythe'?.74:1;camera.updateProjectionMatrix();
       knight.equipArmor(armor);
       knight.equip(id,tier);
       knight.update(.016,{speed:0,sprinting:false});

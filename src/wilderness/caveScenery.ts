@@ -1,3 +1,4 @@
+import { dragonHollow } from './dragonHollow.ts';
 import * as T from 'three';
 import { bossCaves, caveAt, caveExit, caveLootLabel, caveWalkable } from './bossCaves.ts';
 import { height, randomSequence } from './layout.ts';
@@ -122,7 +123,7 @@ export function caveScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number}
       tiles.setColorAt(i,tint);
     });
     tiles.receiveShadow=true;tiles.computeBoundingSphere();arena.add(tiles);
-    for(let i=0;i<52;i++){
+    for(let i=0;i<(dragon?0:52);i++){
       const angle=i*Math.PI*2/52,r=1+(i%3)*.014;
       const x=Math.sin(angle)*cave.width*r,z=cave.arena+Math.cos(angle)*cave.depth*r;
       const rock=meshPart(arena,slab,ground,x,.79+random()*.8,z);
@@ -147,7 +148,7 @@ export function caveScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number}
         }
       }
     }
-    for(const r of ice?[3.62,6.42,10.1]:[4.2,9.9]){
+    for(const r of dragon?[]:ice?[3.62,6.42,10.1]:[4.2,9.9]){
       meshPart(arena,ring,light,0,.044,cave.arena-1).scale.setScalar(r);
     }
     for(const side of [-1,1]){
@@ -174,7 +175,7 @@ export function caveScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number}
           const gem=meshPart(arena,crystalForm,crystal,x,1.57,z);gem.scale.setScalar(1.1+(i%3)*.25);
           floats.push(gem);
           meshPart(arena,floorSeal,light,x,.029,z).scale.setScalar(1.34);
-        }else if(cave.kind==='warlord'||dragon||troll){
+        }else if(cave.kind==='warlord'||troll){
           for(let k=0;k<4;k++){
             const fragment=meshPart(arena,bones,bone,x+(k%2)*.73,.076,z+k*.26);
             fragment.rotation.y=i+k*2.399;
@@ -189,12 +190,10 @@ export function caveScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number}
               const stake=meshPart(arena,pillar,timber,x+(k-1.6)*.49,.014,z-.62);
               stake.rotation.set(.34,0,k*.037);stake.scale.set(.25,.42+(k%2)*.11,.29);
             }
-          }else for(let k=0;k<8;k++){
-            meshPart(arena,coin,brass,x+(k%3-1)*.27,.051+(k%4)*.038,z+(k%4)*.24).rotation.set(k*.12,0,-k*.10);
           }
         }
       }
-      if(volcanic){
+      if(volcanic&&!dragon){
         const liquid=meshPart(arena,mistGeo,lavaMat,side*cave.width*.79,.023,cave.arena+3.7);
         liquid.scale.set(cave.width*.18,1,cave.depth*.48);liquid.castShadow=false;
       }
@@ -218,7 +217,9 @@ export function caveScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number}
     const motes=new T.InstancedMesh(dust,light,26);
     motes.instanceMatrix.setUsage(T.DynamicDrawUsage);motes.frustumCulled=false;
     arena.remove(...floats);batch.bake(arena);arena.add(motes,...floats);arena.visible=false;scene.add(arena);
-    return {cave,entry,arena,motes,entryMotes,floats,sign};
+    const hollow=dragon?dragonHollow(cave.arena,cave.width,cave.depth):undefined;
+    if(hollow) scene.add(hollow.root);
+    return {cave,entry,arena,motes,entryMotes,floats,sign,hollow};
   });
   const roomLight=new T.PointLight(0x9ad6ff,36,35,2);
   roomLight.visible=false;scene.add(roomLight);
@@ -233,11 +234,11 @@ export function caveScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number}
         roomLight.intensity=37+Math.sin(time*2.3)*3.0+Math.cos(time*4.05)*1.4;
         roomLight.position.set(0,6,inside.arena+3);
       }
-      for(const {cave,entry,arena,motes,entryMotes,floats,sign} of views){
+      for(const {cave,entry,arena,motes,entryMotes,floats,sign,hollow} of views){
         const proximity=Math.hypot(p.x-cave.x,p.z-cave.z);
         entry.visible=!inside&&proximity<98;
         if(sign) sign.visible=proximity<32;
-        arena.visible=inside===cave;
+        arena.visible=inside===cave;hollow?.update(time,arena.visible);
         if(entry.visible){
           entryMotes.visible=Math.hypot(p.x-cave.x,p.z-cave.z)<36;
           if(entryMotes.visible) for(let i=0;i<entryMotes.count;i++){
@@ -250,6 +251,8 @@ export function caveScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number}
         }
         if(!arena.visible) continue;
         for(const [i,gem] of floats.entries()){gem.position.y=1.61+.32*Math.sin(time*1.61+i*.93);gem.rotation.y=time*.55+i;}
+        motes.visible=!hollow;
+        if(hollow) continue;
         for(let i=0;i<motes.count;i++){
           const phase=(time*.28+i*.379)%1,angle=i*2.399+time*.22;
           const radius=2+i%11;
@@ -260,6 +263,6 @@ export function caveScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number}
         motes.instanceMatrix.needsUpdate=true;
       }
     },
-    dispose(){batch.dispose();labelTextures.forEach(texture=>texture.dispose());labelMaterials.forEach(material=>material.dispose());},
+    dispose(){views.forEach(view=>view.hollow?.dispose());batch.dispose();labelTextures.forEach(texture=>texture.dispose());labelMaterials.forEach(material=>material.dispose());},
   };
 }

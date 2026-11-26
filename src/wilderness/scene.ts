@@ -1,3 +1,4 @@
+import { dragonSound } from './dragonSound';
 import { frontierScenery } from './frontierScenery';
 import { fortress, frontierAt } from './frontier';
 import { shadowKeys } from './shadowData';
@@ -73,7 +74,8 @@ export function startWilderness(
   onPosition(start);
   const grass=meadow(scene,body.position,rocks,save.seed);
   const animateNight=atmosphere(scene,fireY);
-  const encounters=createEncounters(scene,camera,body,save,canWalk,onSaveChange);
+  const dragonAudio=dragonSound();
+  const encounters=createEncounters(scene,camera,body,save,canWalk,onSaveChange,dragonAudio.cue);
   bossObstacle=encounters.blockedByBoss;
   const loadedCave=caveAt(start.z);
   if(loadedCave) encounters.prepareCave(loadedCave,false);
@@ -217,7 +219,10 @@ export function startWilderness(
     focus.set(p.x,p.y+.75,p.z);camera.position.copy(focus).addScaledVector(offset,distance);camera.lookAt(focus);
     encounters.transition();
     const cave=caveAt(target.z);
-    if(cave) encounters.prepareCave(cave);
+    if(cave){
+      if(cave.kind==='ancientDragon') dragonAudio.unlock();
+      encounters.prepareCave(cave);
+    }
     encounters.waystoneEffect(p,cave?.color??0xa298ff);
     keys.clear();blocking=false;
     onPosition({x:p.x,z:p.z,yaw:body.rotation.y});
@@ -233,6 +238,7 @@ export function startWilderness(
   resize();
   window.addEventListener('keydown',e=>{
     if(e.ctrlKey||e.altKey||e.metaKey||travel) return;
+    if(!e.repeat&&caveAt(body.position.z)?.kind==='ancientDragon') dragonAudio.unlock();
     if(e.code!=='Escape'&&(e.target instanceof HTMLInputElement||e.target instanceof HTMLTextAreaElement)) return;
     if(e.code==='KeyM'||e.code==='Tab'||e.code==='KeyP'||e.code===shadowKeys.panel||(e.code==='Escape'&&uiOpen())){
       e.preventDefault();
@@ -299,6 +305,7 @@ export function startWilderness(
   canvas.addEventListener('contextmenu',e=>e.preventDefault(),{signal});
   canvas.addEventListener('pointerdown',e=>{
     if(!e.isPrimary||uiOpen()||travel) return;
+    if(caveAt(body.position.z)?.kind==='ancientDragon') dragonAudio.unlock();
     if(e.button===0){
       const door=nearbyDoor(e);
       if(door){enterDoor(door);return;}
@@ -489,7 +496,7 @@ export function startWilderness(
       onSaveChange();
     },
     dispose(){
-    loop.stop(); controller.abort(); observer.disconnect(); encounters.dispose();stones.dispose();grass.dispose();tower.dispose();caves.dispose();expedition.dispose();capital.dispose();frontier.dispose();horse.dispose();knight.disposeArmor();
+    loop.stop(); controller.abort(); observer.disconnect();dragonAudio.dispose(); encounters.dispose();stones.dispose();grass.dispose();tower.dispose();caves.dispose();expedition.dispose();capital.dispose();frontier.dispose();horse.dispose();knight.disposeArmor();
     const geometries=new Set<T.BufferGeometry>(),materials=new Set<T.Material>();
     scene.traverse(object=>{
       if(object instanceof T.InstancedMesh) object.dispose();
