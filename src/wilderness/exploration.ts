@@ -1,3 +1,4 @@
+import { outdoorBounds } from './frontier.ts';
 import { readEssences, readShadows, readShadowCommand, type ShadowCommand, type ShadowEssence, type ShadowSoldier } from './shadowData.ts';
 import { bossCaves, caveWalkable, type CaveRuns } from './bossCaves.ts';
 import { towerWalkable } from './briarWatch.ts';
@@ -52,7 +53,7 @@ export function readExploration(raw: string | null): Exploration | null {
       !('discovered' in value) || !Array.isArray(value.discovered)) return null;
     const {position,seed,discovered}=value;
     if (!('x' in position) || typeof position.x!=='number' || !Number.isFinite(position.x) || Math.abs(position.x)>=extent ||
-      !('z' in position) || typeof position.z!=='number' || !Number.isFinite(position.z) || (Math.abs(position.z)>=extent&&!denWalkable(position.x,position.z)&&!towerWalkable(position.x,position.z)&&!caveWalkable(position.x,position.z)) ||
+      !('z' in position) || typeof position.z!=='number' || !Number.isFinite(position.z) || (!outdoorBounds(position.x,position.z)&&!denWalkable(position.x,position.z)&&!towerWalkable(position.x,position.z)&&!caveWalkable(position.x,position.z)) ||
       !('yaw' in position) || typeof position.yaw!=='number' || !Number.isFinite(position.yaw)) return null;
     const known=discovered.filter((id: unknown): id is number =>
       typeof id==='number' && Number.isInteger(id) && id>=0 && id<cellsPerSide**2);
@@ -69,7 +70,7 @@ export function readExploration(raw: string | null): Exploration | null {
     const savedPending:unknown=Object.getOwnPropertyDescriptor(value,'pending')?.value;
     if(savedPending&&typeof savedPending==='object') for(const [id,point] of Object.entries(savedPending)){
       if(/^(wolf|dire|den|skeleton|goblin|elite|orc|ritual|roam|tower|cave)-[a-z0-9-]+$/.test(id) && point && typeof point.x==='number' && Math.abs(point.x)<extent &&
-        typeof point.z==='number' && (Math.abs(point.z)<extent||denWalkable(point.x,point.z)||towerWalkable(point.x,point.z)||caveWalkable(point.x,point.z))) pending[id]={x:point.x,z:point.z};
+        typeof point.z==='number' && (outdoorBounds(point.x,point.z)||denWalkable(point.x,point.z)||towerWalkable(point.x,point.z)||caveWalkable(point.x,point.z))) pending[id]={x:point.x,z:point.z};
     }
     const storedArsenal:unknown=Object.getOwnPropertyDescriptor(value,'arsenal')?.value;
     const arsenal:WeaponId[]=[...new Set<WeaponId>(['longsword',...(Array.isArray(storedArsenal)?storedArsenal.filter(isWeaponId):[])])];

@@ -1,3 +1,4 @@
+import { fortress } from './frontier.ts';
 import type { MonsterKind } from './huntData.ts';
 
 type Room={x:number;z:number;w:number;d:number};
@@ -19,15 +20,36 @@ const baselines=[
 export const towerFloors=baselines.map((floor,index)=>{
   const z=447+index*91,number=index+1;
   return {
-    number,title:floor.title,z,rooms:floor.rooms.map(room=>({...room,z:room.z+z})),
+    number,dungeon:briarWatch,final:number===5,z,title:floor.title,rooms:floor.rooms.map(room=>({...room,z:room.z+z})),
     entry:{x:0,z:z+11.6},exit:{x:0,z:z+13.8},stairs:{x:0,z:z-12.3},
     guards:floor.guards.map(([kind,x,dz,elite],i):Guard=>({
       id:kind==='sentinel'?briarWatch.boss:'tower-'+number+'-'+i,kind,x,z:z+dz,elite,
     })),
   };
 });
-export const towerFloorAt=(z:number)=>towerFloors.find(floor=>Math.abs(z-floor.z)<21);
+const chamberPlans=[
+  ['Gatehouse',18,['mountainTroll','cursedKnight']],
+  ['Broken Armory',22,['cursedKnight','stoneGolem','cursedKnight']],
+  ['The Watch Hall',26,['stoneGolem','mountainTroll','cursedKnight']],
+  ['Moonlit Cloister',30,['cursedKnight','cursedKnight','stoneGolem']],
+  ['The Oath Chamber',35,['cursedKnight','stoneGolem','mountainTroll']],
+  ['The Rune Foundry',40,['stoneGolem','stoneGolem','cursedKnight']],
+  ['Titan’s Procession',46,['cursedKnight','mountainTroll','stoneGolem','cursedKnight']],
+  ['Throne of Stone',55,['ancientTitan']],
+] as const satisfies readonly (readonly [string,number,readonly MonsterKind[]])[];
+export const fortressFloors=chamberPlans.map(([title,level,kinds],index)=>{
+  const number=index+1, z=-815-index*71, final=number===8;
+  const positions=final?[[0,-6]]:[[-6,-4],[6,-5],[0,3],[0,-9]];
+  return {
+    number,z,title,level,final,dungeon:fortress,
+    rooms:[{x:0,z,w:final?36:22+(index%3)*4,d:30}],
+    entry:{x:0,z:z+11.6},exit:{x:0,z:z+13.8},stairs:{x:0,z:z-12.3},
+    guards:kinds.map((kind,i)=>({id:final?fortress.boss:'tower-forsaken-'+number+'-'+i,kind,x:positions[i][0],z:z+positions[i][1]})),
+  };
+});
+export const dungeonFloors=[...towerFloors,...fortressFloors];
+export const towerFloorAt=(z:number)=>dungeonFloors.find(floor=>Math.abs(z-floor.z)<21);
 export const towerWalkable=(x:number,z:number)=>Boolean(towerFloorAt(z)?.rooms.some(room=>
   Math.abs(x-room.x)<room.w/2&&Math.abs(z-room.z)<room.d/2));
-export const floorRemaining=(floor:typeof towerFloors[number],defeated:readonly string[])=>
+export const floorRemaining=(floor:typeof dungeonFloors[number],defeated:readonly string[])=>
   floor.guards.reduce((count,guard)=>count+Number(!defeated.includes(guard.id)),0);

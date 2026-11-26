@@ -1,3 +1,4 @@
+import { frontierAt, frontierBlocked, frontierBounds, frontierCrossing, frontierHeight, frontierLandmarks, highlands, outdoorBounds } from './frontier.ts';
 import { aurelia, aureliaPlaces, aureliaReserved, aureliaRoad } from './aurelia.ts';
 import { bossCaves, caveAt } from './bossCaves.ts';
 import { briarWatch, towerFloorAt } from './briarWatch.ts';
@@ -8,6 +9,7 @@ export const spawn = { x: -43, z: 4 };
 export const landmarks = [
   aurelia,
   ...aureliaPlaces,
+  ...frontierLandmarks,
   { name: 'Ember Clearing', x: -45, z: 0, kind: 'campfire' },
   { name: 'Blackwater Crossing', x: 32, z: 0, kind: 'bridge' },
   { name: 'Moonwatch Ruin', x: 112, z: -96, kind: 'ruin' },
@@ -32,7 +34,7 @@ export const hills = [
   { x: 185,z:165, radius:70, rise:20 },
   { x: -171,z:165, radius:55, rise:12 },
 ];
-export const bridges = landmarks.filter(location => location.kind === 'bridge');
+export const bridges = landmarks.filter(location => location.z>=-extent && location.kind === 'bridge');
 export const forests = [
   { x: -100, z: -89, rx: 70, rz: 53 },
   { x: -103, z: 108, rx: 63, rz: 52 },
@@ -52,6 +54,7 @@ export const branchTrails = [
   [[154,99],[154,107]],
   orcApproach,
   aureliaRoad,
+  highlands.road,
   ...explorationTrails,
 ] as const;
 export function trailDistance(x: number,z: number,trails:readonly (readonly (readonly [number,number])[])[]=branchTrails) {
@@ -72,6 +75,7 @@ export const inForest = (x: number, z: number) => forests.some(f => ((x-f.x)/f.r
 export const bank = (x: number, z: number) => Math.abs(x - river(z));
 export const clearing = (x: number, z: number) => Math.hypot((x+45)*0.85, z);
 export const height = (x: number, z: number) => {
+  if(frontierAt(z)||z===highlands.north) return frontierHeight(x,z,height(x,-extent));
   if(inDen(z)||towerFloorAt(z)||caveAt(z)) return 0;
   const base = 1.7 + 1.3*Math.sin(x*.048)*Math.cos(z*.04) + .65*Math.sin((x+z)*.09);
   const ridge = hills.reduce((sum,h)=>sum+h.rise*Math.max(0,1-((x-h.x)**2+(z-h.z)**2)/h.radius**2)**2,0);
@@ -82,9 +86,13 @@ export const height = (x: number, z: number) => {
   const t=Math.min(1,margin/7), blend=t*t*(3-2*t);
   return aurelia.elevation+(terrain-aurelia.elevation)*blend;
 };
-export const onBridge = (x: number,z: number) => bridges.some(b=>Math.abs(z-b.z)<2.03 && Math.abs(x-b.x)<13);
+export const onBridge = (x: number,z: number) => frontierCrossing(x,z) || bridges.some(b=>Math.abs(z-b.z)<2.03 && Math.abs(x-b.x)<13);
 export const surface = (x: number,z: number) => onBridge(x,z) ? Math.max(height(x,z),1.6) : height(x,z);
 export function walkable(x: number,z: number, obstacles: readonly {x:number;z:number;r:number}[]) {
+  if(frontierBounds(x,z)||z<=-extent+1&&z>=-extent&&outdoorBounds(x,z)&&Math.abs(x)<109){
+    return !frontierBlocked(x,z)&&!obstacles.some(o=>Math.hypot(x-o.x,z-o.z)<o.r+.45) &&
+      Math.abs(height(x+.5,z)-height(x-.5,z))<1 && Math.abs(height(x,z+.5)-height(x,z-.5))<1;
+  }
   return Math.abs(x)<extent-1 && Math.abs(z)<extent-1 &&
     (bank(x,z)>7.8 || onBridge(x,z)) &&
     !bridges.some(b=>Math.abs(x-b.x)<12.6 && Math.abs(Math.abs(z-b.z)-2.45)<.42) && !obstacles.some(o=>Math.hypot(x-o.x,z-o.z)<o.r+.45);

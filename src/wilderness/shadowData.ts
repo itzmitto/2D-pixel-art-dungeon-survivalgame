@@ -1,6 +1,6 @@
 import { rank } from './progression.ts';
 
-export const shadowKinds=['wild','dire','skeleton','goblin','brute','assassin','wizard','elite','ritualElite','guardian','warlord','frostGuardian','sentinel','skeletonKing','darkArchmage','infernalGolem','ancientDragon'] as const;
+export const shadowKinds=['wild','dire','skeleton','goblin','brute','assassin','wizard','elite','ritualElite','guardian','warlord','frostGuardian','sentinel','skeletonKing','darkArchmage','infernalGolem','ancientDragon','mountainTroll','stoneGolem','cursedKnight','trollKing','cursedWarlord','ancientTitan'] as const;
 export type ShadowKind=typeof shadowKinds[number];
 export type ShadowGrade='ordinary'|'elite'|'boss';
 export const shadowCommands=['Defensive','Aggressive','Follow'] as const;
@@ -22,6 +22,12 @@ export const shadowRankIndex=(level:number)=>shadowTuning.ranks.reduce((best,[re
 export const shadowRank=(level:number)=>shadowTuning.ranks[shadowRankIndex(level)][1];
 
 export const shadowProfiles={
+  mountainTroll:{name:'Shadow Mountain Troll',category:'Giant',range:3.1,cooldown:1.85,windup:.56,color:0x589cff,style:'slam'},
+  stoneGolem:{name:'Shadow Stone Golem',category:'Construct',range:3.4,cooldown:2,windup:.64,color:0x54c2ff,style:'slam'},
+  cursedKnight:{name:'Shadow Cursed Knight',category:'Undead',range:3.1,cooldown:1.4,windup:.41,color:0x779dff,style:'sword'},
+  trollKing:{name:'Shadow Mountain Troll King',category:'Boss',range:4.5,cooldown:2.15,windup:.62,color:0x5d9aff,style:'slam'},
+  cursedWarlord:{name:'Shadow Cursed Warlord',category:'Boss',range:4.1,cooldown:1.75,windup:.53,color:0x6198ff,style:'sword'},
+  ancientTitan:{name:'Shadow Ancient Titan',category:'Boss',range:5.5,cooldown:2.23,windup:.71,color:0x54d4ff,style:'slam'},
   wild:{name:'Shadow Wolf',category:'Beast',range:1.9,cooldown:.92,windup:.27,color:0x5297ff,style:'bite'},
   dire:{name:'Shadow Dire Wolf',category:'Beast',range:2.13,cooldown:1.02,windup:.28,color:0x6cd8ff,style:'bite'},
   skeleton:{name:'Shadow Skeleton',category:'Undead',range:2.27,cooldown:1.29,windup:.44,color:0x8edcff,style:'sword'},
@@ -100,7 +106,7 @@ export function readEssences(raw:unknown):ShadowEssence[]{
   const unique=new Map<string,ShadowEssence>();
   for(const value of raw.slice(-96)){
     if(!value||typeof value!=='object'||!validSource(value)||!Number.isFinite(value.x)||Math.abs(value.x)>=240||
-      !Number.isFinite(value.z)||Math.abs(value.z)>=1600||!Number.isSafeInteger(value.expiresAt)||value.expiresAt<=Date.now()) continue;
+      !Number.isFinite(value.z)||Math.abs(value.z)>=2000||!Number.isSafeInteger(value.expiresAt)||value.expiresAt<=Date.now()) continue;
     const grade=readGrade(value.kind,value.grade);
     const attempts=Number.isInteger(value.attempts)?Math.max(0,value.attempts):0;
     if(attempts>=shadowTuning.attempts[grade]) continue;

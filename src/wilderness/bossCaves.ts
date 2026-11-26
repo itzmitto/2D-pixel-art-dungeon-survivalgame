@@ -3,7 +3,7 @@ import type { Rarity, WeaponId } from './weapons.ts';
 
 type Cave = {
   id:string; name:string; x:number;z:number;arena:number; width:number;depth:number;
-  kind:'warlord'|'frostGuardian'|'skeletonKing'|'darkArchmage'|'infernalGolem'|'ancientDragon';
+  kind:'warlord'|'frostGuardian'|'skeletonKing'|'darkArchmage'|'infernalGolem'|'ancientDragon'|'trollKing'|'cursedWarlord';
   boss:string;level:number;recommended:number;rank:string;rarity:Rarity;upgrade?:'Legendary'|'Mythic';chance?:number;
   weapon:WeaponId;armor:ArmorId;gold:number;rating:number;crystals:number;potions:number;color:number;respawnMs:number;
 };
@@ -20,6 +20,10 @@ export const bossCaves=[
     recommended:80,rank:'SS',rarity:'Legendary',upgrade:'Mythic',chance:.55,weapon:'axe',armor:'abyssal-gauntlets',gold:1320,rating:21,crystals:27,potions:8,color:0xff7f46,respawnMs:300_000},
   {id:'dragons-hollow',name:"Dragon's Hollow",x:207,z:133,arena:1548,width:30,depth:28,kind:'ancientDragon',boss:'Ancient Dragon',level:100,
     recommended:100,rank:'SSS',rarity:'Mythic',weapon:'katana',armor:'abyssal-amulet',gold:1900,rating:25,crystals:40,potions:11,color:0xffa04e,respawnMs:300_000},
+  {id:'slatefang-hollow',name:'Slatefang Hollow',x:-43,z:-333,arena:1668,width:21,depth:23,kind:'trollKing',boss:'Mountain Troll King',level:25,
+    recommended:25,rank:'C',rarity:'Epic',upgrade:'Legendary',chance:.45,weapon:'axe',armor:'blacksteel-amulet',gold:375,rating:11,crystals:7,potions:3,color:0xc9e18d,respawnMs:300_000},
+  {id:'oathbreakers-vault',name:'Oathbreaker’s Vault',x:11,z:-433,arena:1788,width:22,depth:23,kind:'cursedWarlord',boss:'Cursed Warlord',level:40,
+    recommended:40,rank:'B',rarity:'Legendary',weapon:'greatsword',armor:'abyssal-cape',gold:575,rating:14,crystals:11,potions:4,color:0xc49aff,respawnMs:300_000},
 ] as const satisfies readonly Cave[];
 export type BossCave=typeof bossCaves[number];
 export type CaveRun={cycle:number;readyAt:number;rewardVersion?:2};

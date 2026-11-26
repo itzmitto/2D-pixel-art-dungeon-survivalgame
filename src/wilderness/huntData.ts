@@ -3,7 +3,20 @@ import { wolf } from './combatRules.ts';
 import { bossResistance, ordinaryResistance } from './statusEffects.ts';
 import { elementalIds, type Rarity, type WeaponId } from './weapons.ts';
 
+const regional = {...wolf,awareness:31,leash:47,recovery:1.45,windup:1.1,reach:4.3,respawn:0};
+export const regionalMonsters={
+  mountainTroll:{...regional,name:'Mountain Troll',level:17,levelRange:[15,23],scale:1.55,health:125,damage:12,speed:2.8,xp:365,gold:58,material:'Troll Fang',resistance:{control:.62,damageOverTime:.94}},
+  stoneGolem:{...regional,name:'Stone Golem',level:22,levelRange:[20,28],scale:1.62,health:150,damage:14,speed:2.55,xp:470,gold:71,material:'Ancient Stone',resistance:{control:.38,damageOverTime:.8}},
+  cursedKnight:{...regional,name:'Cursed Knight',level:25,levelRange:[22,30],scale:1.26,health:142,damage:15,speed:4.1,xp:550,gold:89,material:'Cursed Steel',resistance:{control:.66,damageOverTime:.9}},
+  trollKing:{...regional,name:'Mountain Troll King',level:25,levelRange:[25,25],scale:2.22,health:433,damage:20,speed:3.4,xp:1340,gold:375,material:'Troll Fang',resistance:bossResistance},
+  cursedWarlord:{...regional,name:'Cursed Warlord',level:40,levelRange:[40,40],scale:1.88,health:637,damage:29,speed:4.3,xp:2420,gold:575,material:'Cursed Steel',resistance:bossResistance},
+  ancientTitan:{...regional,name:'Ancient Titan',level:55,levelRange:[55,55],scale:2.46,health:885,damage:40,speed:3.4,xp:3730,gold:850,material:'Titan Core',resistance:bossResistance},
+} as const;
+export type RegionalKind=keyof typeof regionalMonsters;
+export const isRegional=(kind:string):kind is RegionalKind=>Object.hasOwn(regionalMonsters,kind);
+
 export const monsters={
+  ...regionalMonsters,
   wild:{...wolf,name:'Wild Wolf',scale:1,levelRange:[1,2],resistance:ordinaryResistance,gold:4,material:'Wolf Hide',respawn:95},
   dire:{...wolf,name:'Dire Wolf',scale:1.35,level:4,levelRange:[3,5],health:19,damage:4,speed:5.6,
     awareness:24,recovery:.83,windup:.68,reach:2.35,xp:60,resistance:{control:.85,damageOverTime:1},gold:11,material:'Dire Fang',respawn:140},
