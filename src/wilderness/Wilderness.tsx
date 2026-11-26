@@ -2,14 +2,14 @@ import { caveAt } from './bossCaves';
 import { ShadowArmyPanel } from './ui/ShadowArmyPanel';
 import { briarWatch, towerFloorAt, floorRemaining } from './briarWatch';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { den } from './denLayout';
+import { den, inDen } from './denLayout';
 import { monsters } from './huntData';
 import { legacyItem } from './itemInstances';
 import { clearing } from './layout';
 import { newExploration, readExploration, reveal, saveKey, type Position } from './exploration';
 import { CharacterStatus } from './CharacterStatus';
 import { startWilderness } from './scene';
-import { WorldMap } from './WorldMap';
+import { WorldMap, type AtlasWaypoint } from './WorldMap';
 import { regionLabel } from './regions';
 import { elementalIds, type WeaponId } from './weapons';
 import { HunterHUD, HunterHotbar } from './ui/HunterHUD';
@@ -31,6 +31,7 @@ export default function Wilderness() {
   const [notices,setNotices]=useState<Notice[]>([]);
   const [closing,setClosing]=useState(false);
   const closeTimer=useRef<number|null>(null);
+  const [waypoint,setWaypoint]=useState<AtlasWaypoint|null>(null);
   const [position,setPosition]=useState<Position>(newExploration().position);
   const [discovered,setDiscovered]=useState<number[]>([]);
   const [error,setError]=useState('');
@@ -135,6 +136,7 @@ export default function Wilderness() {
 
   const equip=useCallback((type:WeaponId,id:string)=>controller.current?.equip(type,id),[]);
   const floor=towerFloorAt(position.z);
+  const waypointDistance=waypoint?Math.hypot(waypoint.x-position.x,waypoint.z-position.z):0;
   const cave=caveAt(position.z);
   const boss=cave?monsters[cave.kind]:floor?.number===5?monsters.sentinel:monsters.guardian;
   const announcement=/^(Elite encountered|Boss encounter|Boss phase II|Cave victory|Cave reward|Shadow extracted|Shadow extraction failed|Army command|Briar Watch · Floor) · (.+)$/.exec(message.notification);
@@ -146,6 +148,12 @@ export default function Wilderness() {
     <canvas ref={canvas} aria-label="Blackwater Wilds"/>
     <HunterHUD hero={hero} region={regionLabel(position.z)}/>
     <SystemNotifications notices={visibleNotices}/>
+    {waypoint&&!panel&&!floor&&!cave&&!inDen(position.z)&&<aside className="hud-waypoint">
+      <svg viewBox="0 0 24 24" aria-hidden="true" style={{transform:'rotate('+Math.atan2(waypoint.x-position.x,position.z-waypoint.z)+'rad)'}}>
+        <path d="M12 2 20 19 12 15 4 19Z" fill="#9de5ff"/>
+      </svg>
+      <span>{waypoint.name} · {waypointDistance<4?'Arrived':Math.round(waypointDistance)+' m'}</span>
+    </aside>}
     {floor&&<aside className="tower-hud">
       <strong>Floor {floor.number} / 5 · {floor.title}</strong>
       <span>{floorRemaining(floor,hero.defeated)} remaining</span>
@@ -175,7 +183,7 @@ export default function Wilderness() {
       command={value=>controller.current?.shadowCommand(value)}/>}
     {panel==='status' && <CharacterStatus hero={hero} close={()=>showPanel(null)} spend={stat=>controller.current?.allocate(stat)}/>}
     {panel==='map' && <WorldMap position={position} discovered={discovered}
-      caveRuns={hero.caveRuns} opened={hero.opened} towerCleared={hero.completedDungeons.includes(briarWatch.id)} defeated={hero.defeated} waystonesActive={hero.waystones} seenChests={hero.seenChests} travel={id=>{
+      caveRuns={hero.caveRuns} opened={hero.opened} towerCleared={hero.completedDungeons.includes(briarWatch.id)} defeated={hero.defeated} waystonesActive={hero.waystones} waypoint={waypoint} onWaypoint={setWaypoint} getEncounters={()=>controller.current?.encounterMarkers()??[]} travel={id=>{
         const error=controller.current?.travelTo(id)??'Travel is unavailable.';
         if(!error) showPanel(null);
         return error;

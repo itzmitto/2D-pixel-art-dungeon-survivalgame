@@ -224,6 +224,7 @@ export function startWilderness(
   resize();
   window.addEventListener('keydown',e=>{
     if(e.ctrlKey||e.altKey||e.metaKey||travel) return;
+    if(e.code!=='Escape'&&(e.target instanceof HTMLInputElement||e.target instanceof HTMLTextAreaElement)) return;
     if(e.code==='KeyM'||e.code==='Tab'||e.code==='KeyP'||e.code===shadowKeys.panel||(e.code==='Escape'&&uiOpen())){
       e.preventDefault();
       keys.clear();

@@ -583,7 +583,13 @@ export function createEncounters(
         if(marker){marker.x+=x;marker.z+=z;marker.count++;marker.level=Math.max(marker.level,enemy.level);marker.elite||=enemy.elite;}
         else groups.set(id,{id,x,z,count:1,level:enemy.level,elite:enemy.elite});
       }
-      return [...groups.values()].map(marker=>({...marker,x:marker.x/marker.count,z:marker.z/marker.count}));
+      const markers=[...groups.values()].map(marker=>({...marker,x:marker.x/marker.count,z:marker.z/marker.count}));
+      const gravefang=enemies.find(enemy=>enemy.id==='elite-gravefang');
+      if(gravefang){
+        const {x,z}=gravefang.hp>0?gravefang.root.position:gravefang.home;
+        return [...markers,{id:'gravefang-marker',x,z,count:1,level:gravefang.level,elite:true,permanent:true,defeated:gravefang.hp<=0}];
+      }
+      return markers;
     },
     get movementFactor(){return time<slowUntil?.64:1;},
     get inCombat(){

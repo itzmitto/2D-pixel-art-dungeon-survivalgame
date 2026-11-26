@@ -36,3 +36,20 @@
 .atlas-travel-error { color:#ffd0a4!important; }
 .atlas-pin.bossCave circle { fill:#352540; stroke:#a9c2e6; }
 .atlas-pin.bossCave path { stroke:#e4c5ff; }
+.atlas-filters { display:flex; flex-wrap:wrap; gap:.29rem; margin:.54rem 0; }
+.wild .atlas-filters button { font-size:.72rem; padding:.26rem .42rem; }
+.wild .atlas-filters button[aria-pressed=false] { opacity:.54; }
+.atlas-pin.chest circle { stroke:var(--pin-color,#e4c48c); }
+.atlas-pin.chest path { stroke:var(--pin-color,#e4c48c); }
+.atlas-pin.chest.claimed circle { stroke:#8d9caa; fill:#222934; }
+.atlas-pin.chest.claimed path { stroke:#9caaba; opacity:.72; }
+.atlas-pin.encounter circle { stroke:#d08d82; fill:#3e292e; }
+.atlas-pin.encounter path { stroke:#ffada0; }
+.atlas-dungeon-loot { font-size:.76rem; padding-left:1.14rem; }
+.atlas-clear-waypoint { margin-left:.35rem; }
+.hud-waypoint {
+  position:absolute;top:1rem;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:.36rem;
+  background:#121529d9;border:1px solid #567489;color:#d0f1ff;padding:.34rem .61rem;font-size:.75rem;pointer-events:none;
+}
+.guardian-health+.hud-waypoint,.wild:has(.guardian-health) .hud-waypoint { top:4.5rem; }
+.hud-waypoint svg {width:1.22rem;height:1.22rem; filter:drop-shadow(0 0 5px #75c9ff87);}

@@ -1,3 +1,4 @@
+import { rarity, type Rarity } from './weapons';
 import { bossCaves, caveAt, caveExit, caveRewardId, caveStatus, type CaveRuns } from './bossCaves';
 import { briarWatch, floorRemaining, towerFloorAt } from './briarWatch';
 import { waystones } from './worldSites';
@@ -34,14 +35,15 @@ const symbols={
   gate:'M-4 5v-5a4 4 0 1 1 8 0v5M-6 5H6M0-1v4',
   chest:'M-5 5v-8l2-2h6l2 2v8z M-5 0H5 M0 0v2',
   bossCave:'M-7 5-4-2 0-6 4-2 7 5H3V2L0-1-3 2v3zM0 2v3',
+  encounter:'M0-6 6 0 0 6-6 0ZM-2 0h4M0-2v4',
   boss:'M-5-5-3 1 0 5 3 1 5-5M-4-2 0-4 4-2M-2 1l2 2 2-2',
 };
 const descriptions:Record<keyof typeof symbols,string>={
   ruin:'Ancient ruin',bridge:'River crossing',campfire:'Safe campfire',camp:'Abandoned camp',
   waystone:'Waystone',orcCamp:'Orc encampment',briar:'Tower dungeon',ritual:'Wizard encounter · Veil Hierophant',
-  chest:'Discovered treasure',cave:'Cave landmark',tower:'Tower landmark · interior closed',gate:'Dungeon gate',boss:'Boss arena',bossCave:'Boss cave',
+  chest:'Discovered treasure',cave:'Cave landmark',tower:'Tower landmark · interior closed',gate:'Dungeon gate',boss:'Boss arena',bossCave:'Boss cave',encounter:'Active encounter',
 };
-const AtlasTerrain=memo(function AtlasTerrain(){
+const AtlasTerrain=memo(function AtlasTerrain({roads}:{roads:boolean}){
   const texture=useMemo(terrainTexture,[]);
   const lines=cartography??=contours([2,4,6,8,10,13,16,19]);
   return <>
@@ -64,7 +66,7 @@ const AtlasTerrain=memo(function AtlasTerrain(){
       </g>)}
     </g>
     <g fill="none" strokeLinecap="round">
-      {trails.map((line,i)=><g key={i}>
+      {roads&&trails.map((line,i)=><g key={i}>
         <polyline points={line} stroke="#423a2e" strokeWidth={i<2?3.9:2.3} opacity=".67"/>
         <polyline points={line} stroke={i<2?'#e2c594':'#cda978'} strokeWidth={i<2?1.78:1.30} strokeDasharray={i<2?undefined:'2.2 1.75'}/>
       </g>)}
@@ -100,13 +102,38 @@ function PlayerMark({position,scale=1}:{position:Position;scale?:number}){
   </g>;
 }
 
-export function WorldMap({position,discovered,cleared,bossDefeated,opened,waystonesActive,seenChests,towerCleared,defeated,caveRuns,travel,close}:{
-  position:Position;discovered:number[];cleared:boolean;bossDefeated:boolean;opened:readonly string[];towerCleared:boolean;caveRuns:CaveRuns;defeated:readonly string[];waystonesActive:readonly string[];seenChests:readonly string[];travel:(id:string)=>string;close:()=>void;
+const filterOptions={
+  chest:'Treasure',boss:'Boss caves',tower:'Towers',waystone:'Waystones',camp:'Enemy camps',
+  ruin:'Ruins',safe:'Safe zones',encounter:'Enemy groups',roads:'Roads',player:'Player',
+} as const;
+type MapFilter=keyof typeof filterOptions;
+type MarkerKind=keyof typeof symbols;
+export type EnemyMarker={id:string;x:number;z:number;count:number;level:number;elite:boolean;permanent?:boolean;defeated?:boolean};
+export type AtlasWaypoint={x:number;z:number;name:string};
+type Pin=AtlasWaypoint&{id:string;kind:MarkerKind;tier?:Rarity;claimed?:boolean;group?:EnemyMarker};
+function filterFor(kind:MarkerKind):MapFilter|undefined{
+  switch(kind){
+    case 'chest':return 'chest';
+    case 'bossCave':case 'boss':case 'gate':return 'boss';
+    case 'briar':case 'tower':return 'tower';
+    case 'waystone':return 'waystone';
+    case 'orcCamp':case 'camp':case 'ritual':return 'camp';
+    case 'ruin':return 'ruin';
+    case 'campfire':return 'safe';
+    case 'encounter':return 'encounter';
+  }
+}
+
+export function WorldMap({position,discovered,cleared,bossDefeated,opened,waystonesActive,towerCleared,defeated,caveRuns,travel,close,getEncounters,waypoint,onWaypoint}:{
+  position:Position;discovered:number[];cleared:boolean;bossDefeated:boolean;opened:readonly string[];towerCleared:boolean;caveRuns:CaveRuns;defeated:readonly string[];waystonesActive:readonly string[];getEncounters:()=>EnemyMarker[];waypoint:AtlasWaypoint|null;onWaypoint:(waypoint:AtlasWaypoint|null)=>void;travel:(id:string)=>string;close:()=>void;
 }){
   const mask=useId();
   const [region,setRegion]=useState<RegionId>('velren');
   const [selection,setSelection]=useState<string>('');
   const [travelError,reportTravel]=useState('');
+  const [filters,setFilters]=useState<Record<MapFilter,boolean>>({
+    chest:true,boss:true,tower:true,waystone:true,camp:true,ruin:true,safe:true,encounter:false,roads:true,player:true,
+  });
   const select=(id:string)=>{setSelection(id);reportTravel('');};
   const seen=useMemo(()=>new Set(discovered),[discovered]);
   const [view,setView]=useState({x:0,z:0,size:span});
@@ -150,7 +177,7 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
       {floor.number===5&&<g transform={`translate(0 ${floor.z-5}) scale(.31)`} className="atlas-pin boss">
         <title>{towerCleared?'The Hollow Sentinel defeated':'The Hollow Sentinel'}</title><path d={symbols.boss}/>
       </g>}
-      {towerChests.filter(chest=>towerFloorAt(chest.z)===floor&&(seenChests.includes(chest.id)||opened.includes(chest.id))).map(chest=>
+      {towerChests.filter(chest=>towerFloorAt(chest.z)===floor).map(chest=>
         <g key={chest.id} className="atlas-pin chest" transform={`translate(${chest.x} ${chest.z}) scale(.24)`}>
           <title>{chest.rarity} chest · {opened.includes(chest.id)?'Claimed':'Unclaimed'}</title><path d={symbols.chest}/>
         </g>)}
@@ -162,13 +189,13 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
     <div className="atlas-den-meta">Rank {den.rank} · Recommended level {den.level} · {cleared?'Cleared':'Uncleared'}</div>
     <svg viewBox="-30 300 60 91" aria-label="Den map" role="img">
       <rect x="-30" y="300" width="60" height="91" fill="#10191e"/>
-      {den.chambers.filter(room=>room.x<18||position.z<356).map(room=><rect key={room.z+','+room.x}
+      {den.chambers.map(room=><rect key={room.z+','+room.x}
         x={room.x-room.w/2} y={room.z-room.d/2} width={room.w} height={room.d} fill="#665e55" stroke="#c3a574" strokeWidth=".27"/>)}
       <circle cx={den.exit.x} cy={den.exit.z} r="1.1" fill="#8faccc"/>
-      {(position.z<339||bossDefeated)&&<g transform="translate(0 315) scale(.26)" fill="none" stroke="#f0d5a1" strokeWidth="1.5">
+      {<g transform="translate(0 315) scale(.26)" fill="none" stroke="#f0d5a1" strokeWidth="1.5">
         <path d={symbols.boss}/><title>{bossDefeated?'Fang Guardian defeated':'Fang Guardian · Boss arena'}</title>
       </g>}
-      {denChests.filter(chest=>seenChests.includes(chest.id)||opened.includes(chest.id)).map(chest=>
+      {denChests.map(chest=>
         <g className="atlas-pin" key={chest.id} transform={`translate(${chest.x} ${chest.z}) scale(.21)`}>
           <title>{chest.rarity} Chest · {opened.includes(chest.id)?'Claimed':'Unclaimed'}</title><path d={symbols.chest}/>
         </g>)}
@@ -184,14 +211,18 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
   </SystemPanel>;
 
   const selectedRegion=regions.find(item=>item.id===region)??regions[0];
-  const pins=[
+  const pins:Pin[]=[
     ...landmarks.map(site=>({...site,id:site.name})),
     ...waystones.map(site=>({...site,kind:'waystone' as const})),
-    ...worldChests.filter(chest=>opened.includes(chest.id)||seenChests.includes(chest.id))
-      .map(chest=>({id:chest.id,name:chest.rarity+' Chest · '+(opened.includes(chest.id)?'Claimed':chest.id==='thornhide-war-chest'?'War Chest':chest.guardians?'Sealed':'Unclaimed'),x:chest.x,z:chest.z,kind:'chest' as const})),
+    ...worldChests.map(chest=>({id:chest.id,name:chest.rarity+' Treasure Chest',x:chest.x,z:chest.z,kind:'chest' as const,
+      tier:chest.rarity,claimed:opened.includes(chest.id)})),
+    ...getEncounters().map(marker=>({id:marker.id,name:marker.permanent?'Gravefang':marker.elite?'Elite encounter':'Enemy group',
+      x:marker.x,z:marker.z,kind:marker.permanent?'boss' as const:'encounter' as const,group:marker})),
   ];
-  const charted=pins.filter(item=>seen.has(cellAt(item.x,item.z))||
-    (item.kind==='waystone'&&waystonesActive.includes(item.id)));
+  const charted=pins.filter(item=>{
+    const filter=filterFor(item.kind);
+    return !filter||filters[filter];
+  });
   const selected=charted.find(item=>item.id===selection);
   const selectedCave=bossCaves.find(cave=>cave.name===selected?.name);
   const caveCaption=(name:string)=>{
@@ -201,7 +232,7 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
   };
   const caption=(kind:keyof typeof symbols)=>kind==='gate'
     ? 'Rank '+den.rank+' · Level '+den.level+' · '+(cleared?'Cleared':'Uncleared')+(bossDefeated?' · Fang Guardian defeated':'')
-    : kind==='briar'?'Five floors · '+(towerCleared?'Completed':'The Hollow Sentinel awaits'):descriptions[kind];
+    : kind==='briar'?'Rank D · Recommended level 12 · '+(towerCleared?'Completed':'The Hollow Sentinel awaits'):descriptions[kind];
   const activate=(event:KeyboardEvent<SVGGElement>,name:string)=>{
     if(event.key==='Enter'||event.key===' '){event.preventDefault();setRegion('velren');select(name);}
   };
@@ -225,21 +256,25 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
             onPointerUp={()=>{drag.current=null;}} onPointerCancel={()=>{drag.current=null;}}>
             <Discovery id={mask} cells={discovered}/>
             <rect x={-extent} y={-extent} width={span} height={span} fill="#172326"/>
-            <defs><g id={mask+'-terrain'}><AtlasTerrain/></g></defs>
+            <defs><g id={mask+'-terrain'}><AtlasTerrain roads={filters.roads}/></g></defs>
             <use href={`#${mask}-terrain`} opacity=".22" pointerEvents="none"/>
             <g clipPath={`url(#${mask})`}><use href={`#${mask}-terrain`} pointerEvents="none"/></g>
             <rect x={-extent+1.3} y={-extent+1.3} width={span-2.6} height={span-2.6}
               fill="none" stroke="#d6ae73" strokeWidth="2" strokeDasharray="5 3" pointerEvents="none"/>
             {charted.map(item=><g
-              key={item.id} className={'atlas-pin '+item.kind+(item.id===selection?' selected':'')+
+              key={item.id} className={'atlas-pin '+item.kind+(item.id===selection?' selected':'')+(item.claimed?' claimed':'')+
                 (item.kind==='waystone'&&waystonesActive.includes(item.id)?' unlocked':'')} role="button" tabIndex={0}
               aria-label={item.name+' · '+(item.kind==='bossCave'?caveCaption(item.name):caption(item.kind))} onClick={()=>{setRegion('velren');select(item.id);}} onKeyDown={event=>activate(event,item.id)}
+              style={item.tier?{'--pin-color':rarity[item.tier].color} as React.CSSProperties:undefined}
               transform={`translate(${item.x} ${item.z})`}>
-              <title>{item.name} · {(item.kind==='bossCave'?caveCaption(item.name):caption(item.kind))}</title><circle r={item.kind==='gate'?7:5.6} />
-              <path d={symbols[item.kind]} />
-              {(item.id===selection||item.kind!=='chest'&&item.kind!=='waystone')&&<text y={item.kind==='gate'?16:-9} textAnchor="middle">{item.name}{item.kind==='gate'&&cleared?' ✓':''}</text>}
+              <title>{item.name} · {(item.kind==='bossCave'?caveCaption(item.name):caption(item.kind))}</title><circle r={item.kind==='gate'?6.4:item.kind==='chest'?3.95:5.3} />
+              <path d={symbols[item.kind]} transform={item.kind==='chest'?'scale(.67)':undefined}/>
+              {(item.id===selection||view.size<210&&item.kind!=='chest'||item.kind==='campfire'||item.kind==='briar')&&<text y={item.kind==='gate'?16:-9} textAnchor="middle">{item.name}{item.kind==='gate'&&cleared?' ✓':''}</text>}
             </g>)}
-            <PlayerMark position={position}/>
+            {waypoint&&<g className="atlas-waypoint-mark" transform={`translate(${waypoint.x} ${waypoint.z})`} pointerEvents="none">
+              <path d="M0-7 5 0 0 7-5 0Z" fill="#68dfff" stroke="#eefcff" strokeWidth="1"/>
+            </g>}
+            {filters.player&&<PlayerMark position={position}/>}
           </svg>
           <Compass/>
           <div className="atlas-caption"><strong>Velren Forest</strong><span>Blackwater Wilds · Levels 1–15</span></div>
@@ -248,6 +283,12 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
           <button onClick={()=>zoom(1/1.27)} aria-label="Zoom in">+</button><button onClick={()=>zoom(1.27)} aria-label="Zoom out">−</button>
           <button onClick={()=>setView(v=>({...v,x:bound(position.x,v.size/2),z:bound(position.z,v.size/2)}))}>Center on hunter</button>
           <small>Wheel to zoom · Drag to chart</small>
+        </div>
+        <div className="atlas-filters" aria-label="Map layers" role="group">
+          {Object.entries(filterOptions).map(([id,label])=>{
+            const key=id as MapFilter;
+            return <button key={id} aria-pressed={filters[key]} onClick={()=>setFilters(previous=>({...previous,[key]:!previous[key]}))}>{label}</button>;
+          })}
         </div>
         <ul className="atlas-legend">{Object.entries(descriptions).map(([key,label])=><li key={key}>
           <svg viewBox="-7 -7 14 14" aria-hidden="true"><path d={symbols[key as keyof typeof symbols]}/></svg>
@@ -268,9 +309,26 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
           </button>)}
         </div>
         <div className="atlas-selection" aria-live="polite">
-          <span className="system-kicker">{selected?'Discovered location':selectedRegion.state==='Planned'?'Unsurveyed region':'Charted region'}</span>
+          <span className="system-kicker">{selected?(seen.has(cellAt(selected.x,selected.z))?'Visited area':'Charted location'):selectedRegion.state==='Planned'?'Unsurveyed region':'Charted region'}</span>
           <strong>{selected?.name??selectedRegion.name}</strong>
           <p>{selectedCave?caveCaption(selectedCave.name):selected?caption(selected.kind):selectedRegion.detail}</p>
+          {selected&&<>
+            <p>{Math.round(Math.hypot(position.x-selected.x,position.z-selected.z))} m away</p>
+            {selected.kind==='chest'&&<p>{selected.tier} equipment · {selected.claimed?'Opened':'Unopened'}</p>}
+            {selected.kind==='waystone'&&<p>{waystonesActive.includes(selected.id)?'Activated':'Inactive'}</p>}
+            {selected.group&&<p>{selected.group.permanent?(selected.group.defeated?'Defeated · Mythic cache':'Available · Recommended level 10'):
+              selected.group.count+' enemies · Up to Lv '+selected.group.level+(selected.group.elite?' · Elite present':'')}</p>}
+            {selected.kind==='gate'||selected.kind==='briar'?<details>
+              <summary>Dungeon treasure</summary>
+              <ul className="atlas-dungeon-loot">
+                {(selected.kind==='gate'?denChests:towerChests).map(chest=><li key={chest.id}>
+                  {chest.rarity} chest{towerFloorAt(chest.z)?' · Floor '+towerFloorAt(chest.z)?.number:''} · {opened.includes(chest.id)?'Opened':'Unopened'}
+                </li>)}
+              </ul>
+            </details>:null}
+            <button onClick={()=>onWaypoint({x:selected.x,z:selected.z,name:selected.name})}>Set Waypoint</button>
+          </>}
+          {waypoint&&<button className="atlas-clear-waypoint" onClick={()=>onWaypoint(null)}>Clear Waypoint</button>}
           {selectedCave&&<p>{selectedCave.rarity} rewards{caveRuns[selectedCave.id]?.readyAt||
             opened.some(id=>id.startsWith('reward-'+selectedCave.id+'-'))?' · Boss defeated before':''}</p>}
           {selected?.kind==='waystone'&&(waystonesActive.includes(selected.id)
