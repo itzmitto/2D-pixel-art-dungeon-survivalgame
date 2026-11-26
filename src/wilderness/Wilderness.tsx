@@ -182,7 +182,7 @@ export default function Wilderness() {
       dismissAll={()=>controller.current?.dismissAllShadows()} rename={(id,name)=>controller.current?.renameShadow(id,name)}
       command={value=>controller.current?.shadowCommand(value)}/>}
     {panel==='status' && <CharacterStatus hero={hero} close={()=>showPanel(null)} spend={stat=>controller.current?.allocate(stat)}/>}
-    {panel==='map' && <WorldMap position={position} discovered={discovered}
+    {panel==='map' && <WorldMap worldSeed={hero.seed} position={position} discovered={discovered}
       caveRuns={hero.caveRuns} opened={hero.opened} towerCleared={hero.completedDungeons.includes(briarWatch.id)} defeated={hero.defeated} waystonesActive={hero.waystones} waypoint={waypoint} onWaypoint={setWaypoint} getEncounters={()=>controller.current?.encounterMarkers()??[]} travel={id=>{
         const error=controller.current?.travelTo(id)??'Travel is unavailable.';
         if(!error) showPanel(null);

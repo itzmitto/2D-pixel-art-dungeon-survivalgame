@@ -1,5 +1,5 @@
 import { rarity, type Rarity } from './weapons';
-import { bossCaves, caveAt, caveBossPoint, caveExit, caveLootLabel, caveRewardId, caveStatus, caveTreasurePoint, type CaveRuns } from './bossCaves';
+import { bossCaves, caveAt, caveBossPoint, caveExit, caveLootLabel, caveRewardId, caveRewardTier, caveStatus, caveTreasurePoint, type CaveRuns } from './bossCaves';
 import { briarWatch, floorRemaining, towerFloorAt } from './briarWatch';
 import { waystones } from './worldSites';
 import { denChests, towerChests, worldChests } from './treasure';
@@ -126,8 +126,8 @@ function filterFor(kind:MarkerKind):MapFilter|undefined{
   }
 }
 
-export function WorldMap({position,discovered,cleared,bossDefeated,opened,waystonesActive,towerCleared,defeated,caveRuns,travel,close,getEncounters,waypoint,onWaypoint}:{
-  position:Position;discovered:number[];cleared:boolean;bossDefeated:boolean;opened:readonly string[];towerCleared:boolean;caveRuns:CaveRuns;defeated:readonly string[];waystonesActive:readonly string[];getEncounters:()=>EnemyMarker[];waypoint:AtlasWaypoint|null;onWaypoint:(waypoint:AtlasWaypoint|null)=>void;travel:(id:string)=>string;close:()=>void;
+export function WorldMap({position,discovered,cleared,bossDefeated,opened,waystonesActive,towerCleared,defeated,caveRuns,worldSeed,travel,close,getEncounters,waypoint,onWaypoint}:{
+  position:Position;discovered:number[];cleared:boolean;bossDefeated:boolean;opened:readonly string[];towerCleared:boolean;caveRuns:CaveRuns;worldSeed:number;defeated:readonly string[];waystonesActive:readonly string[];getEncounters:()=>EnemyMarker[];waypoint:AtlasWaypoint|null;onWaypoint:(waypoint:AtlasWaypoint|null)=>void;travel:(id:string)=>string;close:()=>void;
 }){
   const mask=useId();
   const [region,setRegion]=useState<RegionId>('velren');
@@ -178,7 +178,7 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
     const pins=[
       {pin:{...exit,id:'room-exit',name:'Exit to Velren Forest',kind:'gate' as const},detail:'Cave exit'},
       {pin:{id:'room-boss',...caveBossPoint(cave),name:cave.boss,kind:'boss' as const},detail:caveStatus(cave,caveRuns,opened,clock)},
-      {pin:{id:reward,...caveTreasurePoint(cave),name:'Boss Reward Chest',kind:'chest' as const,tier:cave.rarity,claimed:opened.includes(reward)},
+      {pin:{id:reward,...caveTreasurePoint(cave),name:'Boss Reward Chest',kind:'chest' as const,tier:run?caveRewardTier(cave,run,worldSeed):cave.rarity,claimed:opened.includes(reward)},
         detail:opened.includes(reward)?'Opened':run?.readyAt?'Reward chest available':'Unlocks on boss defeat'},
     ];
     return <SystemPanel title={cave.name} section={'Boss cave · Rank '+cave.rank} close={close} style="atlas-panel atlas-den">

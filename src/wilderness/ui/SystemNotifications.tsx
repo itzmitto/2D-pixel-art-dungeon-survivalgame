@@ -1,5 +1,5 @@
 import { shadowRank } from '../shadowData';
-import { bossCaves } from '../bossCaves';
+import { bossCaves, caveRewardTier } from '../bossCaves';
 import { briarWatch, floorRemaining, towerFloors } from '../briarWatch';
 import { armorPiece } from '../armor';
 import type { Exploration } from '../exploration';
@@ -74,9 +74,11 @@ export function noticesBetween(before:ReturnType<typeof observe>,hero:Exploratio
     const id='reward-'+cave.id+'-'+run.cycle;
     return hero.opened.includes(id)&&!before.opened.has(id);
   });
+  const caveRun=caveLoot?hero.caveRuns[caveLoot.id]:undefined;
+  const caveTier=caveLoot&&caveRun?caveRewardTier(caveLoot,caveRun,hero.seed):undefined;
   if(rewards.length) notices.push({kind:'item',
-    title:caveLoot?caveLoot.rarity+' Cave Reward':tier==='Legendary'||tier==='Mythic'?tier+' Loot Acquired':'Loot Acquired',
-    detail:caveLoot?caveLoot.boss+' · Cycle '+hero.caveRuns[caveLoot.id]?.cycle:'',tier:caveLoot?.rarity??tier,rewards});
+    title:caveTier?caveTier+' Cave Reward':tier==='Legendary'||tier==='Mythic'?tier+' Loot Acquired':'Loot Acquired',
+    detail:caveLoot?caveLoot.boss+' · Cycle '+hero.caveRuns[caveLoot.id]?.cycle:'',tier:caveTier??tier,rewards});
   return notices;
 }
 export function SystemNotifications({notices}:{notices:readonly Notice[]}){

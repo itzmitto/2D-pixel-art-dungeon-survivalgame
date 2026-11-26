@@ -154,7 +154,7 @@ export function createEncounters(
     affinity:T.Mesh<T.BufferGeometry,T.MeshBasicMaterial>;
     target:SpellTarget; roaming:boolean; roamGroup?:string; elite:boolean; level:number; announced:boolean; title?:T.Sprite; patrol:boolean;
     wolfRig:boolean; turn:number; wizard:boolean; barrier?:T.Mesh; ward:number;
-    spell?:'bolt'|'domain'|'shield'; wardCool:number; spellTarget?:{x:number;z:number}; slam?:{x:number;z:number}; sentinelMove?:'cleave'|'shock'|'shadow';bossCast?:BossCast;summonedBy?:string; shadowTarget?:string; enraged?:boolean;
+    spell?:'bolt'|'domain'|'shield'; wardCool:number; spellTarget?:{x:number;z:number}; slam?:{x:number;z:number}; sentinelMove?:'cleave'|'shock'|'shadow';bossCast?:BossCast;lastBossMove?:BossCast['move'];summonedBy?:string; shadowTarget?:string; enraged?:boolean;
     posePhase:number; gait:number; anticipation:number; collapse:number; impactAge:number; retreat:number; strikes:number;
 
     id:string; kind:MonsterKind; spec:EnemySpec; home:T.Vector3; hp:number; hpBar:T.Group; fill:T.Mesh;
@@ -847,6 +847,10 @@ export function createEncounters(
             notify('Elite encountered · '+spec.name+' · Lv '+enemy.level);
           }
         }
+        if(active&&enemy.kind==='infernalGolem'&&Math.floor(time*4.1)!==Math.floor((time-dt)*4.1)){
+          const point={x:p.x+Math.sin(time*13)*.81,z:p.z+Math.cos(time*9)*.59};
+          fx.emit(point,0xff9968,'spark',.56,.63,{y:2.42,lift:-2.4,opacity:.87});
+        }
         if(active&&enemy.kind==='frostGuardian'&&Math.floor(time*2.7)!==Math.floor((time-dt)*2.7)){
           fx.emit(p,0x87d9ff,'mist',1.07,.57,{y:.55,lift:.46,opacity:.29,grow:.87});
         }
@@ -939,7 +943,7 @@ export function createEncounters(
               shadows.hit(enemy.shadowTarget,enemy,spec.damage,spec.reach+.38);
               enemy.shadowTarget=undefined;
             }else if(enemy.bossCast){
-              const cast=enemy.bossCast;enemy.bossCast=undefined;
+              const cast=enemy.bossCast;enemy.bossCast=undefined;enemy.lastBossMove=cast.move;
               arts.resolve(enemy,cast);
               if(cast.move==='rush'){enemy.charge=.62;enemy.chargeHit=false;}
               if(cast.move==='air') enemy.cooldown=2.15;
@@ -1113,6 +1117,7 @@ export function createEncounters(
           windup:enemy.anticipation,
           recovery:Math.max(0,1-enemy.impactAge/.33),hit:enemy.hitFlash/.22,
           leap:arts.flying(enemy)?Math.max(.35,arts.altitude(enemy)/3.3):enemy.charge>0&&enemy.kind!=='guardian'?Math.sin(Math.PI*enemy.charge/leapDuration):0,
+          technique:enemy.bossCast?.move??(enemy.impactAge<.33?enemy.lastBossMove:undefined),
           dead:0,frozen:status==='frozen',turn:enemy.turn,alert:enemy.enraged?2:aggro?1:0,distance:gap});
 
       }

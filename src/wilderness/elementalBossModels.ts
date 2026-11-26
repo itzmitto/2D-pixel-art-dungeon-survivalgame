@@ -164,10 +164,12 @@ export function elementalBossModels(){
       body.rotation.set(.10*casting-.23*snap-.18*flight,Math.sin(p.phase)*p.gait*.06,fall*.78+p.hit*.12);
       neck.rotation.set(-.38*casting+.28*snap-.10*flight,(p.turn??0)*.36,0);
       head.rotation.set(-.23*casting+.19*snap,p.hit*.11,0);
-      jaw.rotation.x=.05+.63*casting+.31*snap+.18*flight;
+      const breath=p.technique==='breath';
+      jaw.rotation.x=.05+(breath?.77:.46)*casting+.31*snap+.18*flight;
+      if(breath) neck.rotation.x+=.23*snap;
       for(const [i,segment] of tail.entries()){
         segment.rotation.x=.06+Math.sin(t*1.92-i*.63)*(.06+.07*p.gait)+flight*.13-fall*.09;
-        segment.rotation.y=Math.sin(t*2.2-i*.73)*(.12+.10*p.gait)+(p.turn??0)*.25+(i<3?snap*.29:0);
+        segment.rotation.y=Math.sin(t*2.2-i*.73)*(.12+.10*p.gait)+(p.turn??0)*.25+(i<3?snap*(p.technique==='tail'?.75:.29):0);
       }
       for(const {hinge,elbow,side} of wings){
         const flap=Math.sin(t*(flight>.1?7.9:3.2));
@@ -177,7 +179,8 @@ export function elementalBossModels(){
       }
       legs.forEach(({upper,knee},i)=>{
         const step=Math.sin(p.phase+(i%2)*Math.PI+(i>1?.49:0));
-        upper.rotation.x=step*p.gait*.50-flight*.59+fall*.43;
+        const rake=p.technique==='claw'&&i===1?-.72*casting-.52*snap:0;
+        upper.rotation.x=step*p.gait*.50-flight*.59+fall*.43+rake;
         knee.rotation.x=-Math.max(0,-step)*p.gait*.51+flight*.76;
       });
     }};
