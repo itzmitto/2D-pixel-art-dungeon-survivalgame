@@ -967,7 +967,9 @@ export function createEncounters(
         enemy.fill.position.x=(enemy.fill.scale.x-1)*.6;
         const sameArea=towerFloorAt(player.position.z)===towerFloorAt(enemy.loot.position.z)&&
           inDen(player.position.z)===inDen(enemy.loot.position.z);
-        enemy.loot.traverse(object=>{object.layers.mask=sameArea?1:0;});
+        const lootMask=sameArea?1:0;
+        if(enemy.loot.layers.mask!==lootMask)
+          enemy.loot.traverse(object=>{object.layers.mask=lootMask;});
         enemy.beam.visible=sameArea&&enemy.loot.visible&&
           Math.hypot(player.position.x-enemy.loot.position.x,player.position.z-enemy.loot.position.z)<45;
         if(enemy.loot.visible){

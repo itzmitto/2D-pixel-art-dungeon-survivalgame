@@ -128,6 +128,16 @@ export function briarScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number
     const exit=portal(root,{x:floor.exit.x,z:floor.exit.z+.76},true);
     exit.rotation.y=Math.PI;
     const stair=floor.number<5?portal(root,{x:floor.stairs.x,z:floor.stairs.z-1.29}):undefined;
+    if(stair){
+      for(let step=0;step<3;step++){
+        const tread=meshPart(root,block,slate,0,.072+step*.065,floor.stairs.z-.42-step*.32);
+        tread.scale.set(2.56-step*.14,.14+step*.13,.39);
+      }
+      for(const side of [-1,1]){
+        const pillar=meshPart(root,block,bronze,side*1.39,.51,floor.stairs.z-.6);
+        pillar.scale.set(.24,1.01,.27);
+      }
+    }
     const ornaments=new T.Group();root.add(ornaments);
     for(let i=0;i<10;i++){
       const angle=i*2.399;
