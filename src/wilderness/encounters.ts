@@ -681,7 +681,7 @@ export function createEncounters(
         const p=enemy.root.position;
         if(i===actors.length-4) break;
         if(enemy.hp>0&&Math.hypot(p.x-player.position.x,p.z-player.position.z)<19)
-          actors[i++].set(p.x,p.z,Math.max(.84,enemy.spec.scale*(enemy.boss?1.54:1.22)),.15+enemy.gait*.72);
+          actors[i++].set(p.x,p.z,Math.max(.84,enemy.spec.scale*(enemy.spec.scale>1.4?1.54:1.22)),.15+enemy.gait*.72);
       }
       i=shadows.vegetation(actors,i);
       for(;i<actors.length;i++) actors[i].set(0,0,1,0);
