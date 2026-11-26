@@ -140,7 +140,7 @@ export default function Wilderness() {
   const canRedeem=clearing(position.x,position.z)<9.5&&hero.fangs>0;
   return <main className="wild" data-overlay-closing={closing} aria-label="Vonkje">
     <canvas ref={canvas} aria-label="Blackwater Wilds"/>
-    <HunterHUD hero={hero} region={floor?briarWatch.name:regionLabel(position.z)}/>
+    <HunterHUD hero={hero} region={regionLabel(position.z)}/>
     <SystemNotifications notices={visibleNotices}/>
     {floor&&<aside className="tower-hud">
       <strong>Floor {floor.number} / 5 · {floor.title}</strong>

@@ -4,7 +4,7 @@ import type { MonsterKind } from './huntData.ts';
 export const roaming={nearbyLimit:27,totalLimit:39,activeDistance:57,despawnDistance:79,minSpawnDistance:29} as const;
 const roamingKinds:MonsterKind[]=['wild','dire','skeleton','goblin','brute','assassin','wizard','elite','ritualElite'];
 export type EncounterMember={kind:MonsterKind;level:number;elite:boolean};
-export const encounterCell=(x:number,z:number)=>Math.floor(x/24)+':'+Math.floor(z/24);
+export const encounterCell=(x:number,z:number)=>'roam-cell-'+(Math.floor(x/24)+16)+'-'+(Math.floor(z/24)+16);
 export function roamingKind(id:string){
   if(!id.startsWith('roam-')) return undefined;
   return roamingKinds.find(kind=>kind.toLowerCase()===id.split('-')[1]);

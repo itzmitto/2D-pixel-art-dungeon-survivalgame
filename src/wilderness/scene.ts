@@ -105,6 +105,8 @@ export function startWilderness(
   const destination=body.position.clone();
   const focus=destination.clone();
   const offset=new T.Vector3(0,Math.sin(58*Math.PI/180),Math.cos(58*Math.PI/180));
+  camera.position.copy(focus).addScaledVector(offset,36);
+  camera.lookAt(focus);
   const controller=new AbortController();
   const {signal}=controller;
   const keys=new Set<string>();

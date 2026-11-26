@@ -18,7 +18,7 @@ import { attackSpeed, effectiveStats, earnXP, elemental, maxHunterHealth, mitiga
 import * as T from 'three';
 import { inArc, swingTimer, wolfLoot } from './combatRules.ts';
 import type { Exploration } from './exploration.ts';
-import { randomSequence, spawn, surface, trailDistance, landmarks } from './layout.ts';
+import { randomSequence, spawn, surface, trailDistance, landmarks, path, southPath } from './layout.ts';
 import { wolfModels } from './wolves.ts';
 import { abilityAnimationSeconds, elementalIds, weaponDamage, weapons, rarity, type Weapon, type WeaponId } from './weapons.ts';
 import { createMagicEffects } from './magicEffects.ts';
@@ -151,7 +151,8 @@ export function createEncounters(
   type SpellTarget=Parameters<typeof abilityCombat>[1][number];
   const targets:SpellTarget[]=[];
   const rigPool=new Map<MonsterKind,(CreatureRig&{barrier?:T.Mesh})[]>();
-  const spawnCooldown=new Map<string,number>();
+  const spawnCooldown=new Map(Object.entries(save.returns).filter(([key,until])=>key.startsWith('roam-cell-')&&until>Date.now()));
+  for(const key of Object.keys(save.returns)) if(key.startsWith('roam-cell-')&&!spawnCooldown.has(key)) delete save.returns[key];
   const pendingRoam=new Map(Object.entries(save.pending).filter(([id])=>roamingKind(id)));
   const frustum=new T.Frustum(), projection=new T.Matrix4(), sphere=new T.Sphere(new T.Vector3(),3.15);
   let spawnClock=0;
@@ -196,7 +197,7 @@ export function createEncounters(
   function createEnemy(id:string,kind:MonsterKind,spot:{x:number;z:number},member?:EncounterMember){
     const orc=kind==='brute'||kind==='assassin', wizard=kind==='wizard'||kind==='ritualElite';
     const base=monsters[kind], level=member?.level??base.level;
-    const elite=member?.elite??(kind==='elite'||kind==='ritualElite');
+    const elite=Boolean(member?.elite)||kind==='elite'||kind==='ritualElite';
     const threat=member?1+Math.max(0,level-base.level)*.115:1;
     const spec:EnemySpec={...base,
       name:member?.elite?eliteName(kind,base.name):base.name,
@@ -306,7 +307,9 @@ export function createEncounters(
     }
     if(inDen(p.z)||towerFloorAt(p.z)||!save.health) return;
     const now=Date.now();
-    for(const [cell,until] of spawnCooldown) if(now>=until) spawnCooldown.delete(cell);
+    for(const [cell,until] of spawnCooldown) if(now>=until){
+      spawnCooldown.delete(cell);delete save.returns[cell];
+    }
     for(const [id,spot] of pendingRoam){
       const kind=roamingKind(id);
       if(kind&&Math.hypot(p.x-spot.x,p.z-spot.z)<roaming.activeDistance){
@@ -316,7 +319,7 @@ export function createEncounters(
     const living=enemies.filter(enemy=>enemy.hp>0&&Math.hypot(enemy.home.x-p.x,enemy.home.z-p.z)<64);
     const total=enemies.filter(enemy=>enemy.roaming&&enemy.hp>0).length;
     const room=Math.min(roaming.nearbyLimit-living.length,roaming.totalLimit-total);
-    if(room<2) return;
+    if(room<1) return;
     const valid=(x:number,z:number)=>!safe(x,z)&&!visibleAt(x,z)&&canWalk(x,z)&&
       Math.hypot(x-p.x,z-p.z)>roaming.minSpawnDistance&&
       !waystones.some(site=>Math.hypot(x-site.x,z-site.z)<12)&&
@@ -422,9 +425,12 @@ export function createEncounters(
     enemy.loot.visible=true;
     save.pending[enemy.id]={x:enemy.loot.position.x,z:enemy.loot.position.z};
     const guaranteed=/^wolf-[0-4]$/.test(enemy.id)&&!collected.has(enemy.id)?elementalIds[Number(enemy.id.slice(-1))]:undefined;
-    if(enemy.roaming) spawnCooldown.set(encounterCell(enemy.home.x,enemy.home.z),Date.now()+30_000+Math.random()*30_000);
+    if(enemy.roaming){
+      const cell=encounterCell(enemy.home.x,enemy.home.z), until=Date.now()+30_000+Math.floor(Math.random()*30_000);
+      spawnCooldown.set(cell,until);save.returns[cell]=until;
+    }
     save.drops[enemy.id]=rollDrop(enemy.kind,rand,lootBonus(effectiveStats(save)),guaranteed&&!save.arsenal.includes(guaranteed)?guaranteed:undefined,enemy.roaming?{level:enemy.level,elite:enemy.elite,gold:enemy.spec.gold}:undefined);
-    const piece=enemyArmor(enemy.elite&&enemy.roaming?'elite':enemy.kind,enemy.id,save.seed,save.kills,save.level,save.armorItems);
+    const piece=enemyArmor(enemy.elite&&enemy.roaming?'elite':enemy.kind,enemy.id,save.seed,save.kills,enemy.roaming&&!enemy.elite?Math.min(save.level,enemy.level+3):save.level,save.armorItems);
     if(piece) save.drops[enemy.id].armorPiece=piece;
     enemy.loot.material.color.set(rarity[save.drops[enemy.id].rarity].color);
     if(!enemy.roaming&&enemy.spec.respawn&&!enemy.id.startsWith('den-')&&!enemy.id.startsWith('tower-')) save.returns[enemy.id]=Date.now()+30_000+Math.floor(rand()*30_000);
@@ -525,7 +531,7 @@ export function createEncounters(
       fx.emit(point,0x805eff,'ring',.43,.48,{grow:6.4,y:.19,delay:.07});
       fx.scatter(point,0x91e7ff,15,.98);
     },
-    transition(){spawnClock=0;arcane.clear();combatUntil=0;knockback.set(0,0);magic.reset();fx.clear();queued=undefined;rangeTimer.cancel();echoLife=shake=0;echo.visible=false;},
+    transition(){spawnClock=.6;arcane.clear();combatUntil=0;knockback.set(0,0);magic.reset();fx.clear();queued=undefined;rangeTimer.cancel();echoLife=shake=0;echo.visible=false;},
     get bossHealth(){
       const floor=towerFloorAt(player.position.z);
       const kind=floor?.number===5?'sentinel':inDen(player.position.z)?'guardian':undefined;
@@ -668,8 +674,16 @@ export function createEncounters(
       }
 
 
+      const currentFloor=towerFloorAt(player.position.z);
+      const playerInDen=inDen(player.position.z);
       for(const enemy of enemies){
         const root=enemy.root, p=root.position;
+        if(enemy.id.startsWith('tower-')&&towerFloorAt(enemy.home.z)!==currentFloor||
+          enemy.id.startsWith('den-')&&!playerInDen){
+          root.visible=false;enemy.hpBar.visible=false;enemy.affinity.visible=false;
+          if(enemy.title) enemy.title.visible=false;
+          continue;
+        }
         const {spec}=enemy;
         enemy.impactAge+=dt;
         enemy.retreat=Math.max(0,enemy.retreat-dt);
@@ -683,7 +697,7 @@ export function createEncounters(
         }
         const gap=Math.hypot(player.position.x-p.x,player.position.z-p.z);
         if(gap>roaming.activeDistance+3){
-          root.visible=false;enemy.hpBar.visible=false;enemy.affinity.visible=false;
+          root.visible=enemy.hp>0&&gap<roaming.despawnDistance&&visibleAt(p.x,p.z);enemy.hpBar.visible=false;enemy.affinity.visible=false;
           if(enemy.title) enemy.title.visible=false;
           continue;
         }
@@ -702,7 +716,7 @@ export function createEncounters(
         }
         const dying=!enemy.hp&&enemy.collapse<1&&gap<nearDistance;
         if(!enemy.hp&&!dying) enemy.collapse=1;
-        root.visible=active||dying;
+        root.visible=active||dying||enemy.hp>0&&visibleAt(p.x,p.z);
         enemy.hpBar.visible=active&&gap<23&&(['guardian','elite','ritualElite'].includes(enemy.kind)||enemy.hp<spec.health||enemy.windup>0);
         const status=enemy.statuses.visual;
         enemy.visualTick-=dt;
@@ -883,13 +897,17 @@ export function createEncounters(
           const strafe=enemy.kind==='assassin'&&aggro&&!enemy.retreat&&gap<5&&enemy.cooldown>0;
           const side=enemy.id.endsWith('north')||enemy.id.endsWith('west')?-1:1;
           const patrolPhase=time*.26+enemy.phase;
+          const patrolX=enemy.home.x+Math.sin(patrolPhase)*8.5;
+          const northRoad=path(enemy.home.x), southRoad=southPath(enemy.home.x);
+          const patrolZ=Math.abs(northRoad-enemy.home.z)<4.7?path(patrolX):
+            Math.abs(southRoad-enemy.home.z)<4.7?southPath(patrolX):enemy.home.z+Math.cos(patrolPhase)*3;
           const goal = strafe||circle ? {
             x:p.x+side*(p.z-player.position.z),z:p.z-side*(p.x-player.position.x),
           } : backAway||enemy.retreat && aggro ? {
             x:p.x+(p.x-player.position.x)*3,z:p.z+(p.z-player.position.z)*3,
           } : aggro ? packGoal(enemy,gap) : homeGap>8 ? enemy.home : {
-            x:enemy.home.x+Math.sin(patrolPhase)*(enemy.patrol?9.5:5),
-            z:enemy.home.z+Math.cos(patrolPhase)*(enemy.patrol?2.1:5),
+            x:enemy.patrol?patrolX:enemy.home.x+Math.sin(patrolPhase)*5,
+            z:enemy.patrol?patrolZ:enemy.home.z+Math.cos(patrolPhase)*5,
           };
           const dx=goal.x-p.x,dz=goal.z-p.z,remaining=Math.hypot(dx,dz);
           if(remaining>.35){
@@ -919,7 +937,7 @@ export function createEncounters(
             ? travelled*Math.PI*2/((.52+enemy.gait*1.60)*spec.scale)
             : dt*(3.1+enemy.gait*9.4);
         }
-        const leapDuration=enemy.kind==='guardian'?.65:.43;
+        const leapDuration=enemy.kind==='sentinel'?(enemy.enraged?.55:.48):enemy.kind==='guardian'?.65:.43;
         const sentinelWindup=enemy.sentinelMove
           ? (enemy.sentinelMove==='shock'?1.18:enemy.sentinelMove==='shadow'?.87:.98)*(enemy.enraged?.72:1) : 0;
         const currentWindup=sentinelWindup||(enemy.spell==='domain'?1.04:enemy.spell==='shield'?.63:enemy.slam?1.27:enemy.chargeWindup?(enemy.kind==='guardian'?1.15:enemy.kind==='assassin'?.51:.89):spec.windup);
@@ -947,7 +965,10 @@ export function createEncounters(
         enemy.fill.material=enemy.windup>0?alert:red;
         enemy.fill.scale.x=enemy.hp/enemy.spec.health;
         enemy.fill.position.x=(enemy.fill.scale.x-1)*.6;
-        enemy.beam.visible=enemy.loot.visible&&
+        const sameArea=towerFloorAt(player.position.z)===towerFloorAt(enemy.loot.position.z)&&
+          inDen(player.position.z)===inDen(enemy.loot.position.z);
+        enemy.loot.traverse(object=>{object.layers.mask=sameArea?1:0;});
+        enemy.beam.visible=sameArea&&enemy.loot.visible&&
           Math.hypot(player.position.x-enemy.loot.position.x,player.position.z-enemy.loot.position.z)<45;
         if(enemy.loot.visible){
           enemy.loot.position.y=surface(enemy.loot.position.x,enemy.loot.position.z)+.32+Math.sin(time*4+enemy.phase)*.12;
