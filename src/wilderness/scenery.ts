@@ -11,6 +11,7 @@ import { buildOrcCamp } from './orcCamp';
 import { addedChestSites, cacheBoulders } from './treasure';
 import { huntScenery } from './huntScenery';
 import * as T from 'three';
+import { fracturedRock, weatherStone } from './rockDetail';
 import { bank, branchTrails, bridges, clearing, extent, height, inForest, landmarks, randomSequence, trailDistance } from './layout';
 
 export function scenery(scene:T.Scene, seed:number) {
@@ -21,7 +22,9 @@ export function scenery(scene:T.Scene, seed:number) {
   const stone=new T.MeshStandardMaterial({color:'#73766e',roughness:.93});
   const treeGeo=new T.ConeGeometry(1,1,7);
   const trunkGeo=new T.CylinderGeometry(.21,.42,1,6);
-  const rockGeo=new T.DodecahedronGeometry(1,0);
+  const rockForms=[fracturedRock(411),fracturedRock(275),fracturedRock(719,'slab')];
+  const rockGeo=rockForms[0], outcrop=fracturedRock(819,'pillar');
+  const naturalStone=weatherStone(new T.MeshStandardMaterial({color:'#787971',roughness:.88}));
   const form=new T.Object3D();
   const batches = new Map<string, {geometry:T.BufferGeometry; material:T.Material; entries:{matrix:T.Matrix4;color?:T.Color}[]}>();
   function write(geo:T.BufferGeometry, mat:T.Material,x:number,y:number,z:number,sx:number,sy:number,sz:number,rot:number,color?:T.Color) {
@@ -63,12 +66,21 @@ export function scenery(scene:T.Scene, seed:number) {
     if(trailDistance(x,z,oldTrails)<4||clearing(x,z)<12||bank(x,z)<8||landmarkDistance(x,z)<12) continue;
     const rotation=rand()*6;
     if(nearCache(x,z,r)||reservedSite(x,z,r)) continue;
-    write(rockGeo,stone,x,height(x,z)+r*.36,z,r,r*.76,r*.86,rotation);
+    write(rockForms[i%rockForms.length],naturalStone,x,height(x,z)+r*.31,z,r,r*.81,r*.92,rotation);
     rocks.push({x,z,r:r*.88});
   }
   for(const {x,z,r} of cacheBoulders){
-    write(rockGeo,stone,x,height(x,z)+r*.44,z,r*1.26,r,r,.8);
+    write(rockGeo,naturalStone,x,height(x,z)+r*.35,z,r*1.26,r,r,.8);
     rocks.push({x,z,r});
+  }
+  const debris=randomSequence(seed^0x533ffa);
+  for(let i=0;i<1670;i++){
+    const x=(debris()*2-1)*extent,z=(debris()*2-1)*extent,shore=bank(x,z);
+    const r=.085+debris()**2*(shore<13?.66:.41);
+    if(shore<6.7||reservedSite(x,z,r)||nearCache(x,z,r)||landmarkDistance(x,z)<3.9) continue;
+    if(shore>14&&trailDistance(x,z,oldTrails)<2.8&&r>.21) continue;
+    const tint=new T.Color().setScalar(.64+debris()*.45);
+    write(rockForms[i%3],naturalStone,x,height(x,z)+r*.12,z,r,r*.55,r*.77,debris()*6.28,tint);
   }
   for(const {geometry,material,entries} of batches.values()){
     const mesh=new T.InstancedMesh(geometry,material,entries.length);
@@ -76,7 +88,7 @@ export function scenery(scene:T.Scene, seed:number) {
       mesh.setMatrixAt(i,matrix);
       if(color) mesh.setColorAt(i,color);
     });
-    mesh.castShadow=true;
+    mesh.castShadow=geometry!==rockForms[1]||entries.length<8;
     mesh.receiveShadow=true;
     mesh.computeBoundingSphere();
     scene.add(mesh);
@@ -123,11 +135,11 @@ export function scenery(scene:T.Scene, seed:number) {
   const dark=new T.MeshStandardMaterial({color:'#101619',roughness:1});
   place(dark,caveX,caveY+1.7,caveZ-.3,4,3.5,.4);
   for(const [dx,dy,width] of [[-3,1.4,3],[3,1.4,3],[-1.8,3.8,2.7],[1.2,4.3,3.4]]){
-    const rock=new T.Mesh(rockGeo,stone);
+    const rock=new T.Mesh(outcrop,naturalStone);
     rock.position.set(caveX+dx,caveY+dy,caveZ-1);
     rock.scale.set(width,2.35,3.4);
     rock.rotation.y=dx;
-    rock.castShadow=true; scene.add(rock);
+    rock.castShadow=rock.receiveShadow=true; scene.add(rock);
   }
   obstacles.push({x:caveX,z:caveZ-2,r:4});
 
@@ -155,7 +167,7 @@ export function scenery(scene:T.Scene, seed:number) {
   const fireY=height(-45,0);
   for(let i=0;i<9;i++){
     const a=i*Math.PI*2/9;
-    const rock=new T.Mesh(rockGeo,stone);
+    const rock=new T.Mesh(rockGeo,naturalStone);
     rock.position.set(-45+Math.cos(a)*1.12,fireY+.25,Math.sin(a)*1.12);
     rock.scale.setScalar(.39); scene.add(rock);
   }

@@ -59,8 +59,9 @@ export function startWilderness(
   function dismissHorse(){
     mounted=false;summoning=0;horse.root.visible=false;
   }
+  let grassSpeed=0;
   const water=terrain(scene);
-  const {obstacles,rocks,fireY,animateCamp,animateRitual,tower,caves,expedition,capital}=scenery(scene,save.seed);
+  const {obstacles,fireY,animateCamp,animateRitual,tower,caves,expedition,capital}=scenery(scene,save.seed);
   const frontier=frontierScenery(scene,obstacles,save.seed);
   const stones=waystoneModels(scene);
   obstacles.push(...waystones.map(({x,z})=>({x,z,r:.95})));
@@ -72,7 +73,7 @@ export function startWilderness(
   body.position.set(start.x,surface(start.x,start.z),start.z);
   body.rotation.y=start.yaw;
   onPosition(start);
-  const grass=meadow(scene,body.position,rocks,save.seed);
+  const grass=meadow(scene,body.position,obstacles,save.seed);
   const animateNight=atmosphere(scene,fireY);
   const dragonAudio=dragonSound();
   const encounters=createEncounters(scene,camera,body,save,canWalk,onSaveChange,dragonAudio.cue);
@@ -376,6 +377,7 @@ export function startWilderness(
         }
       }
       const travelled=Math.hypot(p.x-beforeX,p.z-beforeZ);
+      grassSpeed=travelled/Math.max(dt,.001);
       if(mounted){
         body.rotation.y=heading;
         horse.root.position.set(p.x,surface(p.x,p.z),p.z);horse.root.rotation.y=heading;
@@ -433,7 +435,7 @@ export function startWilderness(
       tower.update(time,body.position,save.defeated);
       water.update(time,body.position);
       capital.update(time,body.position);
-      grass.update(time,encounters.dashing,encounters.grassInfluences);
+      grass.update(time,grassSpeed,mounted,encounters.dashing,encounters.grassInfluences);
       stones.update(time,body.position,save.waystones);
       animateCamp(time,body.position);
       animateRitual(time,body.position);

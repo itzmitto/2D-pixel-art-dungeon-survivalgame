@@ -1,4 +1,6 @@
 import * as T from 'three';
+import { fracturedRock, weatherStone } from './rockDetail';
+import { fieldNoise, groundMaterial as detailedGround } from './surfaceDetail';
 import { fallsX, fortress, frontierAt, frontierCamps, frontierLandmarks, frontierRegions, frontierStones, highlandRiver, highlands, marshBridge, marshes, marshWaterLevel, routeDistance, waterfall } from './frontier.ts';
 import { bossCaves } from './bossCaves.ts';
 import { height, randomSequence, surface } from './layout.ts';
@@ -13,7 +15,9 @@ export function frontierScenery(scene:T.Scene, obstacles:{x:number;z:number;r:nu
   const needles=new T.MeshStandardMaterial({color:0x30483f,roughness:.96,flatShading:true});
   const torch=new T.MeshBasicMaterial({color:0xffaa5e,toneMapped:false});
   const crystal=new T.MeshStandardMaterial({color:0x73bdd3,emissive:0x256a9d,emissiveIntensity:.67,roughness:.3});
-  const groundMaterial=new T.MeshStandardMaterial({vertexColors:true,roughness:1});
+  const naturalStone=weatherStone(new T.MeshStandardMaterial({color:0x79818b,roughness:.84}),.55);
+  const cliffStone=weatherStone(new T.MeshStandardMaterial({color:0x707480,roughness:.9}),.36);
+  const groundMaterial=detailedGround();
   const waterMaterial=new T.MeshStandardMaterial({color:0x406d8a,roughness:.23,metalness:.38,transparent:true,opacity:.78,side:T.DoubleSide});
   const bogWater=waterMaterial.clone();
   bogWater.color.set(0x244b42);bogWater.opacity=.9;
@@ -37,13 +41,13 @@ export function frontierScenery(scene:T.Scene, obstacles:{x:number;z:number;r:nu
       diffuseColor.rgb+=vec3(.18,.29,.36)*streak;`);
   };
   bogWater.onBeforeCompile=waterMaterial.onBeforeCompile;
-  const rock=new T.DodecahedronGeometry(1,0), box=new T.BoxGeometry(), cone=new T.ConeGeometry(1,1,7);
+  const rock=fracturedRock(559,'slab'), shardRock=fracturedRock(317,'pillar'), blockRock=fracturedRock(101), box=new T.BoxGeometry(), cone=new T.ConeGeometry(1,1,7);
   const log=new T.CylinderGeometry(.65,1,1,7), shard=new T.OctahedronGeometry(1);
   const cap=new T.SphereGeometry(1,8,4,0,Math.PI*2,0,Math.PI/2);
   const mistPlane=new T.PlaneGeometry(34,21).rotateX(-Math.PI/2);
   const reed=new T.ConeGeometry(1,1,4);
   const arch=shapedPlate([[-1,0],[1,0],[1,1.85],[.72,2.64],[0,3.46],[-.72,2.64],[-1,1.85]],.19,.041);
-  const geometries:T.BufferGeometry[]=[rock,box,cone,log,shard,arch,cap,mistPlane,reed];
+  const geometries:T.BufferGeometry[]=[rock,shardRock,blockRock,box,cone,log,shard,arch,cap,mistPlane,reed];
   const batch=rigidBatcher();
   const chunks:{root:T.Group;x:number;z:number;swamp:boolean}[]=[];
   function block(parent:T.Group,m:T.Material,x:number,y:number,z:number,sx:number,sy:number,sz:number,geo:T.BufferGeometry=box){
@@ -59,22 +63,31 @@ export function frontierScenery(scene:T.Scene, obstacles:{x:number;z:number;r:nu
     });
     mesh.castShadow=shadows;mesh.receiveShadow=true;mesh.computeBoundingSphere();root.add(mesh);
   }
+  const fractureRandom=randomSequence(seed^0x37f1b9);
   const protectedSpots=[...frontierLandmarks,...frontierStones,...frontierCamps,...bossCaves,...worldChests];
   const shale=new T.Color(0x566176), gravel=new T.Color(0x8a8073), tundra=new T.Color(0x414f4d), frost=new T.Color(0x9aacba);
   const silt=new T.Color(0x343f37), moss=new T.Color(0x4e6452), wet=new T.Color(0x233d38);
   for(const region of frontierRegions) for(let startZ=region.north;startZ<region.south;startZ+=44) for(let startX=-110;startX<110;startX+=44){
     const swamp=region.id==='mournshade';
     const root=new T.Group(), geo=new T.PlaneGeometry(44,44,32,32).rotateX(-Math.PI/2).translate(startX+22,0,startZ+22);
-    const pos=geo.attributes.position, colors=[];
+    const pos=geo.attributes.position, colors:number[]=[], masks:number[]=[];
     for(let i=0;i<pos.count;i++){
       const x=pos.getX(i),z=pos.getZ(i), y=height(x,z);
-      pos.setY(i,y);
+      const road=routeDistance(x,z,region.road);
+      const nearRoad=1-T.MathUtils.smoothstep(road,1.8,5.4);
+      const incline=Math.hypot(height(x+.56,z)-height(x-.56,z),height(x,z+.56)-height(x,z-.56));
+      const cliff=swamp?0:T.MathUtils.smoothstep(incline,.40,1.3)*T.MathUtils.smoothstep(y,8,19)*(1-nearRoad);
+      const rough=fieldNoise(x*.33,z*.31);
+      pos.setY(i,y+cliff*(rough-.5)*.70);
+      const floorMoisture=swamp?1-T.MathUtils.smoothstep(y,marshWaterLevel-.24,1.6):0;
       if(swamp){
-        tint.copy(silt).lerp(moss,.46+.32*Math.sin((x+z)*.38)).lerp(wet,1-T.MathUtils.smoothstep(y,.14,1.15));
-      }else tint.copy(tundra).lerp(shale,.4+.3*Math.sin(x*.26+z*.21)).lerp(frost,T.MathUtils.smoothstep(y,23,43))
-        .lerp(gravel,1-T.MathUtils.smoothstep(routeDistance(x,z,highlands.road),1.9,5.2));
+        tint.copy(silt).lerp(moss,.29+rough*.68).lerp(wet,floorMoisture*.86);
+      }else tint.copy(tundra).lerp(shale,Math.max(cliff,.21+rough*.42)).lerp(frost,T.MathUtils.smoothstep(y,24,48)*(.34+rough*.62))
+        .lerp(gravel,nearRoad);
       colors.push(tint.r,tint.g,tint.b);
+      masks.push(nearRoad,floorMoisture,cliff);
     }
+    geo.setAttribute('terrainMask',new T.Float32BufferAttribute(masks,3));
     geo.setAttribute('color',new T.Float32BufferAttribute(colors,3));geo.computeVertexNormals();geometries.push(geo);
     const mesh=new T.Mesh(geo,groundMaterial);mesh.receiveShadow=true;root.add(mesh);
     const trunks:Prop[]=[], pines:Prop[]=[], rocks:Prop[]=[], crystals:Prop[]=[], mushrooms:Prop[]=[], stalks:Prop[]=[], grasses:Prop[]=[];
@@ -122,7 +135,29 @@ export function frontierScenery(scene:T.Scene, obstacles:{x:number;z:number;r:nu
         if(random()<.16) crystals.push([x+.33,y+.37,z,.22,.57,.21,a]);
       }
     }
-    instances(root,trunks,log,wood);instances(root,pines,cone,needles);instances(root,rocks,rock,stone);
+    const shelves:Prop[]=[], ribs:Prop[]=[], chips:Prop[]=[];
+    for(let i=0;i<(swamp?32:148);i++){
+      const x=startX+fractureRandom()*44,z=startZ+fractureRandom()*44,y=height(x,z);
+      if(z>-262||routeDistance(x,z,region.road)<9||highlandRiver(x,z)||
+        protectedSpots.some(p=>Math.hypot(x-p.x,z-p.z)<(p===fortress?29:11))) continue;
+      const dx=height(x+1.3,z)-height(x-1.3,z),dz=height(x,z+1.3)-height(x,z-1.3);
+      const slope=Math.hypot(dx,dz);
+      if(swamp&&y<.32||!swamp&&y<7.4) continue;
+      const size=.16+fractureRandom()**2*.54;
+      chips.push([x,y-.035,z,size,size*.53,size*.86,fractureRandom()*6.28]);
+      if(swamp||slope<2.25||y<13) continue;
+      const scale=1.55+fractureRandom()*4.4,a=Math.atan2(dx,dz);
+      if(i%4) shelves.push([x,y-scale*.44,z,scale*1.35,scale*.68,scale,a+.13]);
+      else ribs.push([x,y-scale*.48,z,scale*.81,scale*1.65,scale*.79,a]);
+      for(let j=0;j<3;j++){
+        const d=(j+1)*.56, xx=x-Math.sin(a)*d,zz=z-Math.cos(a)*d,s=size*(1.58-j*.3);
+        chips.push([xx,height(xx,zz)-.05,zz,s,s*.83,s*.86,a+j]);
+      }
+    }
+    instances(root,shelves,rock,cliffStone);
+    instances(root,ribs,shardRock,cliffStone);
+    instances(root,chips,blockRock,naturalStone,false);
+    instances(root,trunks,log,wood);instances(root,pines,cone,needles);instances(root,rocks,rock,naturalStone);
     instances(root,crystals,shard,crystal,false);
     if(swamp){
       instances(root,stalks,log,stem,false);instances(root,mushrooms,cap,caps,false);instances(root,grasses,reed,needles,false);batch.bake(branches);
@@ -148,7 +183,7 @@ export function frontierScenery(scene:T.Scene, obstacles:{x:number;z:number;r:nu
   const fallY=height(waterfall.x,waterfall.z);
   for(let i=0;i<7;i++){
     const x=waterfall.x+(i-3)*1.18;
-    block(aqueduct,stone,x,fallY+1.6,waterfall.z-2.5,1.45,4.2,2.1,rock);
+    block(aqueduct,cliffStone,x,fallY+1.6,waterfall.z-2.5,1.45,4.2,2.1,rock);
     block(aqueduct,waterMaterial,x,fallY+1.95,waterfall.z-.85,1.32,4.11,.13);
     block(aqueduct,waterMaterial,x,fallY-.29,waterfall.z+.2,1.78,.1,2.71);
   }
@@ -212,7 +247,7 @@ export function frontierScenery(scene:T.Scene, obstacles:{x:number;z:number;r:nu
       const y=height(site.x,site.z);
       for(let i=0;i<4;i++){
         const x=site.x+(i-1.5)*2.4;
-        block(root,stone,x,y+.93,site.z-2.6,1.14,2.1+i*.17,1.02,rock);
+        block(root,naturalStone,x,y+.93,site.z-2.6,1.14,2.1+i*.17,1.02,rock);
         block(root,slate,x,y-.15,site.z-1.4,2.15,.55,2.15);
       }
       block(root,slate,site.x,y+1.65,site.z-3,1.65,1.25,.77,arch).rotation.z=.21;
@@ -223,7 +258,7 @@ export function frontierScenery(scene:T.Scene, obstacles:{x:number;z:number;r:nu
       if(site.kind==='camp'){
         block(root,wood,x,y+.95,z,.16,2.2+random(),.19).rotation.z=.16*Math.sin(i);
         if(i%4===0) block(root,torch,x,y+2.4,z,.24,.48,.24,shard);
-      }else block(root,stone,x,y+.5,z,.88,1.5+random()*1.8,1.08,rock);
+      }else block(root,naturalStone,x,y+.5,z,.88,1.5+random()*1.8,1.08,rock);
     }
   }
   for(const root of [aqueduct,keep,camps,boardwalk,bogRuins]){batch.bake(root);scene.add(root);}
@@ -239,7 +274,7 @@ export function frontierScenery(scene:T.Scene, obstacles:{x:number;z:number;r:nu
     },
     dispose(){
       batch.dispose();
-      for(const resource of [...geometries,stone,slate,wood,needles,torch,crystal,groundMaterial,waterMaterial,bogWater,stem,caps,mist]) resource.dispose();
+      for(const resource of [...geometries,stone,slate,naturalStone,cliffStone,wood,needles,torch,crystal,groundMaterial,waterMaterial,bogWater,stem,caps,mist]) resource.dispose();
     },
   };
 }

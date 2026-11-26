@@ -1,11 +1,12 @@
 import { dragonHollow } from './dragonHollow.ts';
 import * as T from 'three';
+import { fracturedRock, weatherStone } from './rockDetail.ts';
 import { bossCaves, caveAt, caveExit, caveLootLabel, caveWalkable } from './bossCaves.ts';
 import { height, randomSequence } from './layout.ts';
 import { loft, meshPart, rigidBatcher, shapedPlate } from './creatureGeometry.ts';
 
 export function caveScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number}[]){
-  const slab=new T.DodecahedronGeometry(1,0).scale(1,.72,1);
+  const slab=fracturedRock(396,'pillar').scale(1,.84,1);
   const stone=new T.MeshStandardMaterial({color:0x5f5b61,roughness:.94,flatShading:true});
   const bog=new T.MeshStandardMaterial({color:0x3c6356,roughness:.84,metalness:.14});
   const mushroom=new T.SphereGeometry(1,8,4,0,Math.PI*2,0,Math.PI/2);
@@ -24,6 +25,7 @@ export function caveScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number}
   const bone=new T.MeshStandardMaterial({color:0xc0b196,roughness:.88});
   const brass=new T.MeshStandardMaterial({color:0xbd9655,metalness:.53,roughness:.52});
   const rockGlow=new T.MeshStandardMaterial({color:0x352636,emissive:0x5b2818,emissiveIntensity:.23,roughness:.78});
+  for(const material of [stone,basalt,rockGlow,bog,frozen]) weatherStone(material,material===bog?.86:material===stone?.38:.14);
   const pillar=loft([[-.08,.63,-.61,.62],[.36,.62,-.61,.62],[.48,.47,-.47,.48],[3.15,.45,-.47,.45],[3.32,.66,-.61,.62],[3.67,.67,-.62,.63]],8).rotateX(-Math.PI/2);
   const bones=loft([[-.48,.11,-.10,.13],[-.33,.09,-.081,.085],[-.20,.046,-.055,.051],[.27,.047,-.051,.052],[.43,.12,-.09,.12],[.54,.093,-.08,.094]],7);
   const sword=shapedPlate([[-.055,0],[.065,0],[.071,.57],[.021,.75],[-.081,.55]],.044,.015);
