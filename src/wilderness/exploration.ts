@@ -1,3 +1,4 @@
+import { bossCaves, caveWalkable, type CaveRuns } from './bossCaves.ts';
 import { towerWalkable } from './briarWatch.ts';
 import { armorPiece, armorSlots, isArmorId, type ArmorId, type EquippedArmor } from './armor.ts';
 import { waystones } from './worldSites.ts';
@@ -14,6 +15,7 @@ export const defaultSeed = 294;
 export const saveKey = 'vonkje-wilderness-v1';
 export type Position = { x: number; z: number; yaw: number };
 export type Exploration = Hunter & { version: 1; seed: number; position: Position; discovered: number[]; waystones: string[]; seenChests: string[];
+  caveRuns:CaveRuns;
   armorItems:ArmorId[]; equippedArmor:EquippedArmor;
   gold: number; fangs: number; armor: number;
   items: WeaponItem[]; selectedItem: string; slotItems: (string|null)[]; materials: Record<string,number>; potions:number; drops:Record<string,Drop>; returns:Record<string,number>; opened:string[];
@@ -49,7 +51,7 @@ export function readExploration(raw: string | null): Exploration | null {
       !('discovered' in value) || !Array.isArray(value.discovered)) return null;
     const {position,seed,discovered}=value;
     if (!('x' in position) || typeof position.x!=='number' || !Number.isFinite(position.x) || Math.abs(position.x)>=extent ||
-      !('z' in position) || typeof position.z!=='number' || !Number.isFinite(position.z) || (Math.abs(position.z)>=extent&&!denWalkable(position.x,position.z)&&!towerWalkable(position.x,position.z)) ||
+      !('z' in position) || typeof position.z!=='number' || !Number.isFinite(position.z) || (Math.abs(position.z)>=extent&&!denWalkable(position.x,position.z)&&!towerWalkable(position.x,position.z)&&!caveWalkable(position.x,position.z)) ||
       !('yaw' in position) || typeof position.yaw!=='number' || !Number.isFinite(position.yaw)) return null;
     const known=discovered.filter((id: unknown): id is number =>
       typeof id==='number' && Number.isInteger(id) && id>=0 && id<cellsPerSide**2);
@@ -60,13 +62,13 @@ export function readExploration(raw: string | null): Exploration | null {
     const ids=(key:string)=>{
       const list:unknown=Object.getOwnPropertyDescriptor(value,key)?.value;
       return Array.isArray(list) ? [...new Set(list.filter((id:unknown): id is string =>
-        typeof id==='string' && /^(wolf|dire|den|skeleton|goblin|elite|orc|ritual|roam|tower)-[a-z0-9-]+$/.test(id)))] : [];
+        typeof id==='string' && /^(wolf|dire|den|skeleton|goblin|elite|orc|ritual|roam|tower|cave)-[a-z0-9-]+$/.test(id)))] : [];
     };
     const pending: Exploration['pending']={};
     const savedPending:unknown=Object.getOwnPropertyDescriptor(value,'pending')?.value;
     if(savedPending&&typeof savedPending==='object') for(const [id,point] of Object.entries(savedPending)){
-      if(/^(wolf|dire|den|skeleton|goblin|elite|orc|ritual|roam|tower)-[a-z0-9-]+$/.test(id) && point && typeof point.x==='number' && Math.abs(point.x)<extent &&
-        typeof point.z==='number' && (Math.abs(point.z)<extent||denWalkable(point.x,point.z)||towerWalkable(point.x,point.z))) pending[id]={x:point.x,z:point.z};
+      if(/^(wolf|dire|den|skeleton|goblin|elite|orc|ritual|roam|tower|cave)-[a-z0-9-]+$/.test(id) && point && typeof point.x==='number' && Math.abs(point.x)<extent &&
+        typeof point.z==='number' && (Math.abs(point.z)<extent||denWalkable(point.x,point.z)||towerWalkable(point.x,point.z)||caveWalkable(point.x,point.z))) pending[id]={x:point.x,z:point.z};
     }
     const storedArsenal:unknown=Object.getOwnPropertyDescriptor(value,'arsenal')?.value;
     const arsenal:WeaponId[]=[...new Set<WeaponId>(['longsword',...(Array.isArray(storedArsenal)?storedArsenal.filter(isWeaponId):[])])];
@@ -135,9 +137,16 @@ export function readExploration(raw: string | null): Exploration | null {
       const id:unknown=Object.getOwnPropertyDescriptor(savedEquipment,slot)?.value;
       if(isArmorId(id)&&armorItems.includes(id)&&armorPiece(id).slot===slot) equippedArmor[slot]=id;
     }
+    const caveRuns:CaveRuns={};
+    const savedCaves:unknown=Object.getOwnPropertyDescriptor(value,'caveRuns')?.value;
+    if(savedCaves&&typeof savedCaves==='object') for(const {id} of bossCaves){
+      const state=Object.getOwnPropertyDescriptor(savedCaves,id)?.value;
+      if(state&&Number.isSafeInteger(state.cycle)&&state.cycle>=1&&state.cycle<=1e8&&
+        Number.isSafeInteger(state.readyAt)&&state.readyAt>=0) caveRuns[id]={cycle:state.cycle,readyAt:state.readyAt};
+    }
     const savedHealth:unknown=Object.getOwnPropertyDescriptor(value,'health')?.value;
     const boundHealth=maxHunterHealth({level,stats,equippedArmor});
-    return {version:1,seed,armorItems,equippedArmor,arsenal,equipped,hotbar,items,selectedItem,slotItems,drops,opened:namedIds('opened'),seenChests:namedIds('seenChests'),
+    return {version:1,seed,caveRuns,armorItems,equippedArmor,arsenal,equipped,hotbar,items,selectedItem,slotItems,drops,opened:namedIds('opened'),seenChests:namedIds('seenChests'),
       waystones:namedIds('waystones').filter(id=>waystones.some(stone=>stone.id===id)),
       returns:counts('returns'),materials:counts('materials'),potions:integer('potions',0,0,100000),position:{x:position.x,z:position.z,yaw:position.yaw},discovered:[...new Set(known)],
       health:typeof savedHealth==='number'&&Number.isFinite(savedHealth)&&savedHealth>=0?Math.min(boundHealth,savedHealth):boundHealth,level,stats,
@@ -150,5 +159,5 @@ export function readExploration(raw: string | null): Exploration | null {
 }
 
 export function newExploration(): Exploration {
-  return {version:1,seed:defaultSeed,armorItems:[],equippedArmor:{},arsenal:['longsword'],items:[legacyItem('longsword')],selectedItem:'longsword',slotItems:['longsword',null,null,null,null,null,null,null,null],materials:{},potions:0,drops:{},returns:{},opened:[],equipped:'longsword',hotbar:['longsword',null,null,null,null,null,null,null,null],position:{...spawn,yaw:0},discovered:[],waystones:[],seenChests:[],health:progression.baseHealth,level:1,stats:freshStats(),statPoints:0,kills:0,armor:0,completedDungeons:[],defeatedBosses:[],xp:0,gold:0,fangs:0,defeated:[],collected:[],pending:{}};
+  return {version:1,seed:defaultSeed,caveRuns:{},armorItems:[],equippedArmor:{},arsenal:['longsword'],items:[legacyItem('longsword')],selectedItem:'longsword',slotItems:['longsword',null,null,null,null,null,null,null,null],materials:{},potions:0,drops:{},returns:{},opened:[],equipped:'longsword',hotbar:['longsword',null,null,null,null,null,null,null,null],position:{...spawn,yaw:0},discovered:[],waystones:[],seenChests:[],health:progression.baseHealth,level:1,stats:freshStats(),statPoints:0,kills:0,armor:0,completedDungeons:[],defeatedBosses:[],xp:0,gold:0,fangs:0,defeated:[],collected:[],pending:{}};
 }

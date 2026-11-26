@@ -1,3 +1,4 @@
+import { bossCaves, caveAt } from './bossCaves.ts';
 import { briarWatch, towerFloorAt } from './briarWatch.ts';
 import { orcApproach, orcCamp, ritualGrounds } from './worldSites.ts';
 import { inDen } from './denLayout.ts';
@@ -18,6 +19,7 @@ export const landmarks = [
   orcCamp,
   ritualGrounds,
   briarWatch,
+  ...bossCaves.map(cave=>({...cave,kind:'bossCave' as const})),
   { name: 'Southwater Crossing', x: 32, z: 107, kind: 'bridge' },
 ] as const;
 export const hills = [
@@ -64,7 +66,7 @@ export const inForest = (x: number, z: number) => forests.some(f => ((x-f.x)/f.r
 export const bank = (x: number, z: number) => Math.abs(x - river(z));
 export const clearing = (x: number, z: number) => Math.hypot((x+45)*0.85, z);
 export const height = (x: number, z: number) => {
-  if(inDen(z)||towerFloorAt(z)) return 0;
+  if(inDen(z)||towerFloorAt(z)||caveAt(z)) return 0;
   const base = 1.7 + 1.3*Math.sin(x*.048)*Math.cos(z*.04) + .65*Math.sin((x+z)*.09);
   const ridge = hills.reduce((sum,h)=>sum+h.rise*Math.max(0,1-((x-h.x)**2+(z-h.z)**2)/h.radius**2)**2,0);
   const edge = Math.min(1, Math.max(0, (bank(x,z)-4)/8));

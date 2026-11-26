@@ -1,3 +1,4 @@
+import { caveAt, caveBossId, caveRewardId, type BossCave } from './bossCaves.ts';
 import { briarWatch, floorRemaining, towerFloorAt, towerFloors } from './briarWatch.ts';
 import { hollowSentinel } from './sentinel.ts';
 import { encounterCell, eliteName, roaming, roamingEncounter, roamingKind, type EncounterMember } from './roaming.ts';
@@ -68,7 +69,7 @@ export function createEncounters(
       attackDuration:weapon.attackDuration/speed, impactTime:weapon.impactTime/speed,cooldown:weapon.cooldown/speed};
   }
   const models=wolfModels(), skeletons=skeletonModels(), goblins=goblinModels(), orcs=orcModels(), wizards=wizardModels();
-  const sentinel=hollowSentinel();
+  const sentinel=hollowSentinel(), frostGuardian=hollowSentinel(true);
   const group=new T.Group();
   scene.add(group);
   const rangeTimer=swingTimer();
@@ -89,7 +90,7 @@ export function createEncounters(
     echo.add(mesh);echoParts.push({source,mesh});
   });
   echo.visible=false;group.add(echo);
-  let echoLife=0,shake=0,waterTime=0,combatUntil=0;
+  let echoLife=0,shake=0,waterTime=0,combatUntil=0,slowUntil=0;
   const arcane=arcaneCombat<Enemy>(player.position,fx,canWalk,(enemy,guarded)=>{hitPlayer(enemy,guarded);});
   const knockback=new T.Vector2();
   function leaveEcho(){
@@ -106,6 +107,7 @@ export function createEncounters(
     fx.emit(player.position,0xd1f9ff,'arc',1.08,.29,{y:.91,yaw:player.rotation.y,aspect:1.8});
   }
   const chests=[...worldChests,...denChests,...towerChests];
+  const caveRewards=new Map<BossCave['id'],{chest:Chest;group:T.Group;view:ReturnType<typeof chestModels>}>();
   const chestViews=chestModels(group,chests,save.opened);
   const cooldowns=new Map<WeaponId,number>();
   let attackWeapon=weapons.longsword, queued:{weapon:Weapon;delay:number;yaw:number}|undefined;
@@ -195,7 +197,7 @@ export function createEncounters(
     createEnemy(guard.id,guard.kind,guard,guard.elite?{kind:guard.kind,level:10,elite:true}:undefined);
   }
   function createEnemy(id:string,kind:MonsterKind,spot:{x:number;z:number},member?:EncounterMember){
-    const orc=kind==='brute'||kind==='assassin', wizard=kind==='wizard'||kind==='ritualElite';
+    const orc=kind==='brute'||kind==='assassin'||kind==='warlord', wizard=kind==='wizard'||kind==='ritualElite'||kind==='frostGuardian';
     const base=monsters[kind], level=member?.level??base.level;
     const elite=Boolean(member?.elite)||kind==='elite'||kind==='ritualElite';
     const threat=member?1+Math.max(0,level-base.level)*.115:1;
@@ -207,9 +209,9 @@ export function createEncounters(
       xp:Math.round(base.xp*threat*(member?.elite?2.17:1)),
       gold:Math.round(base.gold*threat*(member?.elite?1.85:1)),
     };
-    const actor:CreatureRig&{barrier?:T.Mesh}=kind==='sentinel'?sentinel:rigPool.get(kind)?.pop()??(
+    const actor:CreatureRig&{barrier?:T.Mesh}=kind==='sentinel'?sentinel:kind==='frostGuardian'?frostGuardian:rigPool.get(kind)?.pop()??(
       wizard?wizards.make(kind==='ritualElite'):kind==='skeleton'?skeletons.make():kind==='goblin'?goblins.make():
-      orc?orcs.make(kind==='brute'):models.make(kind));
+      orc?orcs.make(kind!=='assassin',kind==='warlord'):models.make(kind));
     if(actor.barrier) actor.barrier.visible=false;
     actor.root.visible=false;
     actor.root.scale.setScalar(spec.scale);
@@ -289,7 +291,7 @@ export function createEncounters(
     if(enemy.title){group.remove(enemy.title);enemy.title.material.dispose();}
     enemy.loot.material.dispose();enemy.beam.material.dispose();
     const pool=rigPool.get(enemy.kind)??[];
-    if(pool.length<4){pool.push({root:enemy.root,animate:enemy.animate,barrier:enemy.barrier});rigPool.set(enemy.kind,pool);}
+    if(enemy.roaming&&pool.length<4){pool.push({root:enemy.root,animate:enemy.animate,barrier:enemy.barrier});rigPool.set(enemy.kind,pool);}
     enemy.hp=0;
     targets.splice(targets.indexOf(enemy.target),1);
     enemies.splice(index,1);
@@ -305,7 +307,7 @@ export function createEncounters(
       if(!enemy.hp&&!enemy.loot.visible&&enemy.collapse>=1||distance>roaming.despawnDistance||
          distance>roaming.activeDistance+11&&!visibleAt(spot.x,spot.z)) removeRoamer(i);
     }
-    if(inDen(p.z)||towerFloorAt(p.z)||!save.health) return;
+    if(inDen(p.z)||towerFloorAt(p.z)||caveAt(p.z)||!save.health) return;
     const now=Date.now();
     for(const [cell,until] of spawnCooldown) if(now>=until){
       spawnCooldown.delete(cell);delete save.returns[cell];
@@ -410,17 +412,32 @@ export function createEncounters(
     enemy.hitFlash=.22;
     impact(enemy.root.position,damage,element,heavy);
     if(enemy.hp){
-      if(enemy.kind==='sentinel'&&!enemy.enraged&&enemy.hp<=enemy.spec.health*.5){
+      if((enemy.kind==='sentinel'||enemy.kind==='warlord'||enemy.kind==='frostGuardian')&&!enemy.enraged&&enemy.hp<=enemy.spec.health*.5){
         enemy.enraged=true;
         fx.emit(enemy.root.position,0xcf66ff,'ring',1.3,.72,{grow:8.5,opacity:.92});
         fx.emit(enemy.root.position,0x9e55ef,'ray',1.33,.49,{y:2.1,aspect:3.7});
         fx.scatter(enemy.root.position,0xb359ff,14,1.25);
-        notify('Boss phase II · The Hollow Sentinel');
+        notify('Boss phase II · '+enemy.spec.name);
       }
       return;
     }
     enemy.collapse=0;
     if(enemy.barrier) enemy.barrier.visible=false;
+    const cave=caveAt(enemy.home.z);
+    if(cave&&enemy.id.startsWith('cave-')){
+      const run=save.caveRuns[cave.id];
+      if(!run||run.readyAt||enemy.id!==caveBossId(cave,run.cycle)) return;
+      run.readyAt=Date.now()+cave.respawnMs;
+      if(!save.defeatedBosses.includes(cave.id)) save.defeatedBosses.push(cave.id);
+      if(!save.completedDungeons.includes(cave.id)) save.completedDungeons.push(cave.id);
+      save.kills++;
+      const reward=enemyXpReward(enemy.kind,enemy.spec.xp);
+      earnXP(save,reward);
+      fx.emit(enemy.root.position,0xffd080,'ray',1.6,.70,{y:2.3,aspect:4.2});
+      fx.scatter(enemy.root.position,0xffd389,17,1.2);
+      notify('Cave victory · '+cave.boss+' · +'+reward+' XP');
+      return;
+    }
     enemy.loot.position.copy(enemy.root.position);
     enemy.loot.visible=true;
     save.pending[enemy.id]={x:enemy.loot.position.x,z:enemy.loot.position.z};
@@ -468,6 +485,7 @@ export function createEncounters(
     if(barrierActive) splash();
     if(damage===0){notify('Water barrier absorbed the attack.');return false;}
     save.health=Math.max(0,Math.round((save.health-damage)*100)/100);
+    if(enemy.kind==='frostGuardian') slowUntil=time+1.48;
     if(!save.health) knockback.set(0,0);
     impact(player.position);
     if(!save.health){rangeTimer.cancel();queued=undefined;magic.reset();}
@@ -495,16 +513,46 @@ export function createEncounters(
     save.items.push({id,type,rarity:tier});
     if(!save.arsenal.includes(type)) save.arsenal.push(type);
   }
-  const visibleChest=(chest:Chest)=>(!chest.boss||save.defeatedBosses.includes(chest.boss))&&(!chest.guardian||oldDefeats.has(chest.guardian));
+  const allChests=()=>[...chests,...Array.from(caveRewards.values(),value=>value.chest)];
+  function prepareCave(cave:BossCave,advance=true){
+    let run=save.caveRuns[cave.id];
+    if(!run){
+      run={cycle:1,readyAt:0};save.caveRuns[cave.id]=run;
+    }
+    if(advance&&run.readyAt&&Date.now()>=run.readyAt&&save.opened.includes(caveRewardId(cave,run.cycle))){
+      run={cycle:run.cycle+1,readyAt:0};save.caveRuns[cave.id]=run;
+    }
+    const id=caveBossId(cave,run.cycle), rewardId=caveRewardId(cave,run.cycle);
+    for(let i=enemies.length-1;i>=0;i--){
+      const enemy=enemies[i];
+      if(enemy.id.startsWith('cave-'+cave.id+'-')&&enemy.id!==id) removeRoamer(i);
+    }
+    if(!run.readyAt&&!enemies.some(enemy=>enemy.id===id)) createEnemy(id,cave.kind,{x:0,z:cave.arena-7});
+    const previous=caveRewards.get(cave.id);
+    if(previous?.chest.id!==rewardId){
+      if(previous){previous.view.dispose();group.remove(previous.group);}
+      const chest:Chest={id:rewardId,x:0,z:cave.arena-10,rarity:cave.rarity,weapon:cave.weapon,armorPiece:cave.armor,
+        gold:cave.gold,armor:cave.kind==='warlord'?10:13};
+      const holder=new T.Group();group.add(holder);
+      caveRewards.set(cave.id,{chest,group:holder,view:chestModels(holder,[chest],save.opened)});
+    }
+    changed();
+  }
+  const visibleChest=(chest:Chest)=>{
+    const cave=caveAt(chest.z);
+    if(cave&&!save.caveRuns[cave.id]?.readyAt) return false;
+    return (!chest.boss||save.defeatedBosses.includes(chest.boss))&&(!chest.guardian||oldDefeats.has(chest.guardian));
+  };
   function unopenedChest(){
-    return chests.find(chest=>!save.opened.includes(chest.id)&&visibleChest(chest)&&
+    return allChests().find(chest=>!save.opened.includes(chest.id)&&visibleChest(chest)&&
       Math.hypot(player.position.x-chest.x,player.position.z-chest.z)<2.9 &&
       clearLine(player.position.x,player.position.z,chest.x,chest.z));
   }
   const atCamp=()=> Math.hypot(player.position.x+45,player.position.z)<4 ||
     Math.hypot(player.position.x-154,player.position.z-103)<4;
   return {
-    feedback:notify,
+    feedback:notify,prepareCave,
+    get movementFactor(){return time<slowUntil?.64:1;},
     get inCombat(){
       return time<combatUntil||arcane.active||rangeTimer.busy||!!queued||magic.dashing||
         (!safe(player.position.x,player.position.z)&&enemies.some(enemy=>enemy.hp>0&&
@@ -531,10 +579,10 @@ export function createEncounters(
       fx.emit(point,0x805eff,'ring',.43,.48,{grow:6.4,y:.19,delay:.07});
       fx.scatter(point,0x91e7ff,15,.98);
     },
-    transition(){spawnClock=.6;arcane.clear();combatUntil=0;knockback.set(0,0);magic.reset();fx.clear();queued=undefined;rangeTimer.cancel();echoLife=shake=0;echo.visible=false;},
+    transition(){spawnClock=.6;slowUntil=0;arcane.clear();combatUntil=0;knockback.set(0,0);magic.reset();fx.clear();queued=undefined;rangeTimer.cancel();echoLife=shake=0;echo.visible=false;},
     get bossHealth(){
       const floor=towerFloorAt(player.position.z);
-      const kind=floor?.number===5?'sentinel':inDen(player.position.z)?'guardian':undefined;
+      const kind=caveAt(player.position.z)?.kind??(floor?.number===5?'sentinel':inDen(player.position.z)?'guardian':undefined);
       const boss=enemies.find(enemy=>enemy.kind===kind);
       return boss&&boss.hp>0&&Math.hypot(player.position.x-boss.root.position.x,player.position.z-boss.root.position.z)<34
         ? boss.hp : 0;
@@ -595,11 +643,15 @@ export function createEncounters(
           save.armor=Math.max(save.armor,chest.armor);
           const bonus=chestBonus(chest,save.seed);
           save.potions+=bonus.potions;
-          save.materials[bonus.material]=(save.materials[bonus.material]??0)+bonus.count;
+          const cave=caveAt(chest.z);
+          const material=cave?'Magic Crystal':bonus.material;
+          const count=cave?(cave.kind==='frostGuardian'?9:5):bonus.count;
+          save.materials[material]=(save.materials[material]??0)+count;
+          if(cave) save.potions+=cave.kind==='frostGuardian'?4:2;
           fx.treasure(chest,Number.parseInt(rarity[chest.rarity].color.slice(1),16),rarityOrder.indexOf(chest.rarity));
           grantWeapon('chest-'+chest.id,chest.weapon,chest.rarity);
           const equipment=grantArmor(bonus.armorPiece);
-          notify('Opened '+chest.rarity+' Chest · '+weapons[chest.weapon].name+' · Armor '+save.armor+' · '+bonus.material+' × '+bonus.count+equipment);
+          notify('Opened '+chest.rarity+' Chest · '+weapons[chest.weapon].name+' · Armor '+save.armor+' · '+material+' × '+count+equipment);
           return;
         }
         if(atCamp()&&save.health<maxHealth()){
@@ -633,7 +685,7 @@ export function createEncounters(
         knockback.multiplyScalar(Math.exp(-8.5*dt));
       }
       let discovered=false;
-      for(const chest of chests){
+      for(const chest of allChests()){
         if(save.seenChests.includes(chest.id)||!visibleChest(chest)||Math.hypot(player.position.x-chest.x,player.position.z-chest.z)>13||
           !clearLine(player.position.x,player.position.z,chest.x,chest.z)) continue;
         save.seenChests.push(chest.id);discovered=true;
@@ -675,10 +727,10 @@ export function createEncounters(
 
 
       const currentFloor=towerFloorAt(player.position.z);
-      const playerInDen=inDen(player.position.z);
+      const playerInDen=inDen(player.position.z), currentCave=caveAt(player.position.z);
       for(const enemy of enemies){
         const root=enemy.root, p=root.position;
-        if(enemy.id.startsWith('tower-')&&towerFloorAt(enemy.home.z)!==currentFloor||
+        if(enemy.id.startsWith('cave-')&&caveAt(enemy.home.z)!==currentCave||enemy.id.startsWith('tower-')&&towerFloorAt(enemy.home.z)!==currentFloor||
           enemy.id.startsWith('den-')&&!playerInDen){
           root.visible=false;enemy.hpBar.visible=false;enemy.affinity.visible=false;
           if(enemy.title) enemy.title.visible=false;
@@ -771,7 +823,7 @@ export function createEncounters(
           enemy.windup=0; enemy.charge=0; enemy.chargeWindup=false;enemy.slam=undefined;enemy.spell=undefined;enemy.spellTarget=undefined;enemy.sentinelMove=undefined;
         } else if(enemy.charge>0){
           enemy.charge=Math.max(0,enemy.charge-dt);
-          const speed=enemy.kind==='sentinel'?(enemy.enraged?23:19):enemy.kind==='assassin'?19:16;
+          const speed=(enemy.kind==='sentinel'||enemy.kind==='warlord')?(enemy.enraged?23:19):enemy.kind==='assassin'?19:16;
           const x=p.x+Math.sin(enemy.heading)*dt*speed,z=p.z+Math.cos(enemy.heading)*dt*speed;
           if(canWalk(x,z)&&spaceAround(enemy,x,z)){p.x=x;p.z=z;gait=1;}
           else enemy.charge=0;
@@ -780,11 +832,11 @@ export function createEncounters(
             hitPlayer(enemy,blocking,true);
             if(enemy.kind==='assassin'){fx.slash(p,null,enemy.heading,1.48);enemy.impactAge=0;}
           }
-          if(enemy.kind==='sentinel'&&enemy.charge>0&&enemy.impactAge>.08){
+          if((enemy.kind==='sentinel'||enemy.kind==='warlord')&&enemy.charge>0&&enemy.impactAge>.08){
             enemy.impactAge=0;fx.emit(p,0x8840e5,'arc',1.42,.19,{yaw:enemy.heading,y:1.03,opacity:.74});
           }
           if(!enemy.charge){
-            enemy.cooldown=enemy.kind==='sentinel'?(enemy.enraged?.87:1.32):enemy.kind==='guardian'?1.8:1.45;
+            enemy.cooldown=(enemy.kind==='sentinel'||enemy.kind==='warlord')?(enemy.enraged?.87:1.32):enemy.kind==='guardian'?1.8:1.45;
             if(enemy.kind==='assassin') enemy.retreat=.70;
           }
         } else if(enemy.windup>0){
@@ -797,7 +849,7 @@ export function createEncounters(
               const move=enemy.sentinelMove;
               enemy.sentinelMove=undefined;
               enemy.cooldown=enemy.enraged?1.03:1.52;
-              const color=enemy.enraged?0xd988ff:0xa86de7;
+              const color=enemy.kind==='frostGuardian'?0x99efff:enemy.kind==='warlord'?0xf5a164:enemy.enraged?0xd988ff:0xa86de7;
               if(move==='shadow'){
                 enemy.charge=enemy.enraged?.55:.48;enemy.chargeHit=false;
                 fx.scatter(p,color,9,1.1);
@@ -818,13 +870,13 @@ export function createEncounters(
               enemy.spell=undefined;
               if(spell==='shield'){
                 enemy.ward=elite?5.3:4.1;enemy.wardCool=elite?13:16;
-                fx.emit(p,0xc2a1ff,'ring',.72,.46,{grow:2.8,y:.16});
-                fx.scatter(p,0xa98cff,7,1.06);
+                fx.emit(p,cold?0xc0f0ff:0xc2a1ff,'ring',.72,.46,{grow:2.8,y:.16});
+                fx.scatter(p,cold?0xa4dcff:0xa98cff,7,1.06);
               }else if(spell==='domain'&&enemy.spellTarget){
-                arcane.domain(enemy,enemy.spellTarget,elite);
+                arcane.domain(enemy,enemy.spellTarget,elite,cold);
                 enemy.cooldown=elite?2.34:2.05;
               }else if(aggro&&gap<spec.reach+2&&clearLine(p.x,p.z,player.position.x,player.position.z)){
-                arcane.bolt(enemy,p,elite);
+                arcane.bolt(enemy,p,elite,cold);
               }
               enemy.spellTarget=undefined;
             } else if(enemy.slam){
@@ -845,7 +897,7 @@ export function createEncounters(
             } else if(aggro && gap<spec.reach+.35 && Math.abs(player.position.y-p.y)<1.9 &&
               clearLine(p.x,p.z,player.position.x,player.position.z)) hitPlayer(enemy,blocking);
           }
-        } else if(enemy.kind==='sentinel'&&aggro&&enemy.cooldown===0&&gap<13&&
+        } else if((enemy.kind==='sentinel'||enemy.kind==='warlord')&&aggro&&enemy.cooldown===0&&gap<13&&
           clearLine(p.x,p.z,player.position.x,player.position.z)){
           enemy.heading=Math.atan2(player.position.x-p.x,player.position.z-p.z);
           const cycle=enemy.strikes++%3;
@@ -853,7 +905,7 @@ export function createEncounters(
           enemy.sentinelMove=move;
           const duration=move==='shock'?1.18:move==='shadow'?.87:.98;
           enemy.windup=duration*(enemy.enraged?.72:1);
-          const color=enemy.enraged?0xf184cb:0xc37cff;
+          const color=enemy.kind==='warlord'?0xf9b165:enemy.enraged?0xf184cb:0xc37cff;
           if(move==='shock') fx.emit(p,color,'ring',(enemy.enraged?7:6)/.88,enemy.windup,{opacity:.87,y:.11});
           else if(move==='cleave') fx.emit(p,color,'arc',3.8,enemy.windup,{yaw:enemy.heading,y:.25,opacity:.65});
           else for(let i=1;i<9;i++){
@@ -863,15 +915,21 @@ export function createEncounters(
           }
         } else if(enemy.wizard&&aggro&&enemy.cooldown===0&&gap<spec.reach&&
           clearLine(p.x,p.z,player.position.x,player.position.z)){
-          const elite=enemy.kind==='ritualElite';
+          const cold=enemy.kind==='frostGuardian', elite=cold||enemy.kind==='ritualElite';
           enemy.strikes++;
+          if(cold&&enemy.strikes%4===0&&gap<8.2){
+            enemy.sentinelMove='shock';
+            enemy.windup=1.18*(enemy.enraged?.72:1);
+            fx.emit(p,0x9ceaff,'ring',(enemy.enraged?7:6)/.88,enemy.windup,{opacity:.92,y:.11});
+          }else{
           enemy.spell=enemy.wardCool===0&&(gap<6.8||enemy.hp<spec.health*.69)?'shield':
             enemy.strikes%(elite?2:3)===0?'domain':'bolt';
           enemy.windup=enemy.spell==='domain'?1.04:enemy.spell==='shield'?.63:spec.windup;
           if(enemy.spell==='domain'){
             enemy.spellTarget={x:player.position.x,z:player.position.z};
-            fx.emit(enemy.spellTarget,0xaf63f1,'ring',elite?4.65:3.65,enemy.windup,{opacity:.60});
-          }else fx.emit(p,0x9957f4,'ring',.96,.57,{grow:1.3,y:.2});
+            fx.emit(enemy.spellTarget,cold?0xafecff:0xaf63f1,'ring',elite?4.65:3.65,enemy.windup,{opacity:.60});
+          }else fx.emit(p,cold?0x8cd4ff:0x9957f4,'ring',.96,.57,{grow:1.3,y:.2});
+          }
         } else if(enemy.kind==='brute'&&aggro&&gap>2.25&&gap<5.2&&enemy.cooldown===0&&
           clearLine(p.x,p.z,player.position.x,player.position.z)){
           enemy.heading=Math.atan2(player.position.x-p.x,player.position.z-p.z);
@@ -889,7 +947,7 @@ export function createEncounters(
             if(!canWalk(point.x,point.z)) break;
             fx.emit(point,0xe69c51,'ring',1.15,enemy.windup,{opacity:.55});
           }
-        } else if(!enemy.wizard&&enemy.kind!=='sentinel'&&aggro&&!enemy.retreat&&gap<spec.reach&&enemy.cooldown===0&&clearLine(p.x,p.z,player.position.x,player.position.z)){
+        } else if(!enemy.wizard&&enemy.kind!=='sentinel'&&enemy.kind!=='warlord'&&aggro&&!enemy.retreat&&gap<spec.reach&&enemy.cooldown===0&&clearLine(p.x,p.z,player.position.x,player.position.z)){
           enemy.windup=spec.windup;
         } else if(!aggro||gap>spec.reach-.18||enemy.retreat||enemy.kind==='assassin'||enemy.wizard){
           const backAway=enemy.wizard&&aggro&&gap<7.5;
@@ -937,7 +995,7 @@ export function createEncounters(
             ? travelled*Math.PI*2/((.52+enemy.gait*1.60)*spec.scale)
             : dt*(3.1+enemy.gait*9.4);
         }
-        const leapDuration=enemy.kind==='sentinel'?(enemy.enraged?.55:.48):enemy.kind==='guardian'?.65:.43;
+        const leapDuration=(enemy.kind==='sentinel'||enemy.kind==='warlord')?(enemy.enraged?.55:.48):enemy.kind==='guardian'?.65:.43;
         const sentinelWindup=enemy.sentinelMove
           ? (enemy.sentinelMove==='shock'?1.18:enemy.sentinelMove==='shadow'?.87:.98)*(enemy.enraged?.72:1) : 0;
         const currentWindup=sentinelWindup||(enemy.spell==='domain'?1.04:enemy.spell==='shield'?.63:enemy.slam?1.27:enemy.chargeWindup?(enemy.kind==='guardian'?1.15:enemy.kind==='assassin'?.51:.89):spec.windup);
@@ -953,6 +1011,10 @@ export function createEncounters(
     },
     render(dt:number){
       chestViews.update(dt,save.defeatedBosses,save.opened,save.defeated);
+      for(const [id,reward] of caveRewards){
+        reward.group.visible=caveAt(player.position.z)?.id===id&&!!save.caveRuns[id]?.readyAt;
+        if(reward.group.visible) reward.view.update(dt,save.defeatedBosses,save.opened,save.defeated);
+      }
       fx.update(dt);
       fx.barrier(player.position,magic.shield.active);
       echoLife=Math.max(0,echoLife-dt);
@@ -966,7 +1028,7 @@ export function createEncounters(
         enemy.fill.scale.x=enemy.hp/enemy.spec.health;
         enemy.fill.position.x=(enemy.fill.scale.x-1)*.6;
         const sameArea=towerFloorAt(player.position.z)===towerFloorAt(enemy.loot.position.z)&&
-          inDen(player.position.z)===inDen(enemy.loot.position.z);
+          inDen(player.position.z)===inDen(enemy.loot.position.z)&&caveAt(player.position.z)===caveAt(enemy.loot.position.z);
         const lootMask=sameArea?1:0;
         if(enemy.loot.layers.mask!==lootMask)
           enemy.loot.traverse(object=>{object.layers.mask=lootMask;});
@@ -1011,7 +1073,8 @@ export function createEncounters(
       chestViews.dispose();
       for(const enemy of enemies){enemy.loot.material.dispose();enemy.beam.material.dispose();enemy.title?.material.dispose();}
       for(const texture of labels.values()) texture.dispose();
-      levelNotice.dispose();eliteAura.dispose();sentinel.dispose();
+      levelNotice.dispose();eliteAura.dispose();sentinel.dispose();frostGuardian.dispose();
+      for(const reward of caveRewards.values()) reward.view.dispose();
       for(const texture of numberTextures.values()) texture.dispose();
       for(const {sprite} of numbers) sprite.material.dispose();
     },

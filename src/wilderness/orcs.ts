@@ -49,7 +49,7 @@ export function orcModels(){
   const batch=rigidBatcher();
 
   return {
-    make(brute:boolean):CreatureRig{
+    make(brute:boolean,warlord=false):CreatureRig{
       const root=new T.Group(), hips=joint(root,0,.99), torso=joint(hips);
       meshPart(hips,belt,leather);meshPart(hips,buckle,trim,0,.019,.211);
       meshPart(hips,skirt,cloth,0,-.20,.157);
@@ -82,8 +82,23 @@ export function orcModels(){
         point.rotation.set(-.18,side*.52,-side*.68);point.scale.x=side;
         const inner=meshPart(skull,earInner,darkSkin,side*.227,.056,.025);
         inner.rotation.copy(point.rotation);inner.scale.x=side;
-        meshPart(skull,tusk,fang,side*.122,-.188,.17).rotation.z=-side*.26;
+        const tuskMesh=meshPart(skull,tusk,fang,side*.122,-.188,.17);
+        tuskMesh.rotation.z=-side*.26;
+        if(warlord){
+          tuskMesh.scale.set(1.35,1.64,1.21);
+          const scar=meshPart(skull,cut,scars,side*.061,.047,.218);
+          scar.rotation.z=side*.28;scar.scale.set(1.33,1.13,.72);
+          meshPart(skull,patch,iron,side*.139,.245,.019).scale.set(.59,.79,1.12);
+        }
         meshPart(skull,cut,side===1?scars:wound,side*.134,-.018,.202).rotation.z=side*.51;
+      }
+      if(warlord){
+        meshPart(torso,patch,iron,-.03,.455,.283).scale.set(1.82,1.27,.92);
+        for(const side of [-1,1]){
+          const collar=meshPart(torso,spike,trim,side*.53,.69,.109);
+          collar.rotation.z=-side*.63;collar.scale.set(1.4,2,1.28);
+          meshPart(torso,cut,scars,side*.207,.307,.365).rotation.z=side*.57;
+        }
       }
       const arms=[-1,1].map(side=>{
         const shoulder=joint(torso,side*(brute?.51:.47),.655,0);
@@ -102,6 +117,7 @@ export function orcModels(){
         if(brute){
           if(side===1){
             meshPart(weapon,club,wood);
+            if(warlord) weapon.scale.set(1.53,1.39,1.43);
             for(const y of [.68,.89,1.10]) meshPart(weapon,collar,iron,0,y).rotation.z=.06;
             for(let i=0;i<8;i++){
               const a=i*2.399;
