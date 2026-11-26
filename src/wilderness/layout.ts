@@ -1,4 +1,4 @@
-import { orcApproach, orcCamp } from './worldSites.ts';
+import { orcApproach, orcCamp, ritualGrounds } from './worldSites.ts';
 import { inDen } from './denLayout.ts';
 export const extent = 240;
 export const spawn = { x: -43, z: 4 };
@@ -15,6 +15,7 @@ export const landmarks = [
   { name: 'Greyfen Tower', x: 169, z: -168, kind: 'tower' },
   { name: 'Lantern Rest', x: 154, z: 103, kind: 'campfire' },
   orcCamp,
+  ritualGrounds,
   { name: 'Southwater Crossing', x: 32, z: 107, kind: 'bridge' },
 ] as const;
 export const hills = [

@@ -8,7 +8,7 @@ export function armorModels(model:ReturnType<typeof createKnightModel>){
   const trim=new T.MeshStandardMaterial({metalness:.63,roughness:.36});
   const rune=new T.MeshStandardMaterial({color:0xaa83e6,emissive:0xac45ff,emissiveIntensity:.48});
   const colored:Record<ArmorSet,readonly [number,number,number]>={iron:[0x726c65,0xb39a76,0x543325],blacksteel:[0x293249,0x8ea6bd,0x25334a],abyssal:[0x222134,0xa78bbc,0x371744]};
-  const materials=Object.fromEntries(Object.entries(colored).map(([key,colors])=>[key,{
+  const materials=Object.fromEntries(Object.entries(colored).map(([key])=>[key,{
     plate:metal.clone(),edge:trim.clone(),
   }])) as Record<ArmorSet,{plate:T.MeshStandardMaterial;edge:T.MeshStandardMaterial}>;
   for(const set of Object.keys(colored) as ArmorSet[]){

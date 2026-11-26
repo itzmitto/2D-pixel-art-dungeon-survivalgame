@@ -22,6 +22,7 @@ const symbols={
   ruin:'M-4 5v-9h2v3h4v-5h2V5z M-1 5v-3h2v3',
   bridge:'M-5 -3H5M-5 3H5M-3 -3v6m3-6v6m3-6v6',
   campfire:'M0 -6C5-1 4 3 0 4c-5-2-5-5 0-10zM-4 6l8-2m-8 0 8 2',
+  ritual:'M-6 5H6M-5 5v-8l2-2 2 2v8m2 0v-8l2-2 2 2v8M-3 1 0-2 3 1',
   orcCamp:'M-5 5 0-5 5 5zM-5-5l9 8m1-8-9 8M-5-5h2m8 0H3',
   waystone:'M-5 5H5M-3 3l1-8 2-2 2 2 1 8zM0-3l1.3 2L0 1l-1.3-2Z',
   camp:'M-5 5 0-5 5 5zM0-4v9',
@@ -33,7 +34,7 @@ const symbols={
 };
 const descriptions:Record<keyof typeof symbols,string>={
   ruin:'Ancient ruin',bridge:'River crossing',campfire:'Safe campfire',camp:'Abandoned camp',
-  waystone:'Waystone',orcCamp:'Orc encampment',
+  waystone:'Waystone',orcCamp:'Orc encampment',ritual:'Wizard encounter · Veil Hierophant',
   chest:'Discovered treasure',cave:'Cave landmark',tower:'Tower landmark · interior closed',gate:'Dungeon gate',boss:'Boss arena',
 };
 const AtlasTerrain=memo(function AtlasTerrain(){

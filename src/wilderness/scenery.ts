@@ -1,4 +1,5 @@
-import { waystones, orcCamp, orcApproach } from './worldSites';
+import { buildRitualGrounds } from './ritualGrounds';
+import { waystones, orcCamp, orcApproach, ritualGrounds } from './worldSites';
 import { buildOrcCamp } from './orcCamp';
 import { addedChestSites, cacheBoulders } from './treasure';
 import { huntScenery } from './huntScenery';
@@ -28,10 +29,10 @@ export function scenery(scene:T.Scene, seed:number) {
     batch.entries.push({matrix:form.matrix.clone(),color:color?.clone()});
   }
   const tint=new T.Color();
-  const fixedLandmarks=landmarks.filter(location=>location!==orcCamp);
+  const fixedLandmarks=landmarks.filter(location=>location!==orcCamp&&location!==ritualGrounds);
   const oldTrails=branchTrails.filter(trail=>trail!==orcApproach);
   const landmarkDistance=(x:number,z:number)=>Math.min(...fixedLandmarks.map(location=>Math.hypot(x-location.x,z-location.z)));
-  const reservedSite=(x:number,z:number,r:number)=>Math.hypot(x-orcCamp.x,z-orcCamp.z)<13+r||
+  const reservedSite=(x:number,z:number,r:number)=>Math.hypot(x-orcCamp.x,z-orcCamp.z)<13+r||Math.hypot(x-ritualGrounds.x,z-ritualGrounds.z)<13+r||
     waystones.some(stone=>Math.hypot(x-stone.x,z-stone.z)<r+3.1)||
     (x>106&&x<129&&z>64&&z<110&&trailDistance(x,z)<r+3.2);
   const nearCache=(x:number,z:number,r:number)=>addedChestSites.some(chest=>Math.hypot(x-chest.x,z-chest.z)<r+1.35);
@@ -154,5 +155,6 @@ export function scenery(scene:T.Scene, seed:number) {
   obstacles.push({x:-45,z:0,r:1.04});
   huntScenery(scene,obstacles);
   const animateCamp=buildOrcCamp(scene,obstacles);
-  return {obstacles,rocks,fireY,animateCamp};
+  const animateRitual=buildRitualGrounds(scene,obstacles);
+  return {obstacles,rocks,fireY,animateCamp,animateRitual};
 }

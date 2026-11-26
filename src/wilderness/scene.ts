@@ -53,7 +53,7 @@ export function startWilderness(
     mounted=false;horse.root.visible=false;
   }
   const water=terrain(scene);
-  const {obstacles,rocks,fireY,animateCamp}=scenery(scene,save.seed);
+  const {obstacles,rocks,fireY,animateCamp,animateRitual}=scenery(scene,save.seed);
   const stones=waystoneModels(scene);
   obstacles.push(...waystones.map(({x,z})=>({x,z,r:.95})));
   const nearby = obstacleGrid(obstacles);
@@ -307,6 +307,7 @@ export function startWilderness(
       grass.update(time,encounters.dashing,encounters.grassInfluences);
       stones.update(time,body.position,save.waystones);
       animateCamp(time,body.position);
+      animateRitual(time,body.position);
       animateNight(time,body.position);
       updateDen(time);
       encounters.render(frameDelta);

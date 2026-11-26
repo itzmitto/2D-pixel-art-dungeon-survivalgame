@@ -1,12 +1,13 @@
+import { armorSlots, type ArmorId } from './armor.ts';
 import { den } from './denLayout.ts';
-import { orcCamp } from './worldSites.ts';
+import { orcCamp, ritualGrounds } from './worldSites.ts';
 import * as T from 'three';
 import { surface, randomSequence } from './layout.ts';
 import { loft, shapedPlate, joint, meshPart, rigidBatcher } from './creatureGeometry.ts';
 import { rarity, type Rarity, type WeaponId } from './weapons.ts';
 import { rarityOrder } from './huntData.ts';
 
-export type Chest={id:string;x:number;z:number;rarity:Rarity;weapon:WeaponId;gold:number;armor:number;boss?:string;guardian?:string;guardians?:readonly string[]};
+export type Chest={id:string;x:number;z:number;rarity:Rarity;weapon:WeaponId;gold:number;armor:number;boss?:string;guardian?:string;guardians?:readonly string[];armorPiece?:ArmorId};
 export const worldChests:Chest[]=[
   {id:'ember-cache',x:-52,z:3,rarity:'Common',weapon:'shield',gold:8,armor:1},
   {id:'raven-cache',x:-189,z:62,rarity:'Uncommon',weapon:'axe',gold:14,armor:2},
@@ -32,7 +33,9 @@ export const addedChestSites:Chest[]=[
   {id:'moonwatch-deep-woods',x:106,z:-116,rarity:'Epic',weapon:'katana',gold:36,armor:4},
 ];
 worldChests.push(...addedChestSites,{id:'thornhide-war-chest',...orcCamp.chest,rarity:'Epic',weapon:'axe',gold:87,armor:6,
-  guardians:orcCamp.guards.map(guard=>guard.id)});
+  guardians:orcCamp.guards.map(guard=>guard.id),armorPiece:'blacksteel-gauntlets'},
+  {id:'veil-reliquary',...ritualGrounds.chest,rarity:'Epic',weapon:'staff',gold:126,armor:7,
+    guardians:ritualGrounds.guards.map(guard=>guard.id),armorPiece:'blacksteel-amulet'});
 export const cacheBoulders=[{x:-94,z:129,r:1.65},{x:-195,z:-115,r:1.25}];
 export function chestBonus(chest:Chest,seed:number){
   let key=seed;
@@ -40,7 +43,8 @@ export function chestBonus(chest:Chest,seed:number){
   const random=randomSequence(key),tier=rarityOrder.indexOf(chest.rarity);
   const extras=['Iron','Bones','Goblin Hide','Magic Crystal'];
   return {material:extras[Math.floor(random()*(tier<2?2:extras.length))],
-    count:1+Math.floor(random()*(tier+1)),potions:1+Math.floor(tier/2)};
+    count:1+Math.floor(random()*(tier+1)),potions:1+Math.floor(tier/2),
+    armorPiece:chest.armorPiece??(`${tier<2?'iron':tier<4?'blacksteel':'abyssal'}-${armorSlots[(key>>>0)%armorSlots.length]}` as ArmorId)};
 }
 
 // Sample the front-to-back lid profile. Bands share the same arc and pivot.
@@ -127,7 +131,7 @@ export function chestModels(group:T.Group,chests:readonly Chest[],opened:readonl
         meshPart(root,rune,style.magic,x,.32,side*.561).scale.setScalar(tier===5?.92:.66);
       }
     }
-    if(chest.guardians){
+    if(chest.guardians&&chest.id!=='veil-reliquary'){
       for(const face of [-1,1]){
         meshPart(root,wall,style.trim,0,.166,face*.54).scale.set(1.36,.084,.115);
         for(const x of [-.40,-.19,.19,.40]) meshPart(root,rivet,style.trim,x,.166,face*.61);
