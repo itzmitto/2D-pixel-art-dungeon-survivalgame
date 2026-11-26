@@ -57,7 +57,7 @@ export function meadow(scene:T.Scene,camera:T.PerspectiveCamera,player:T.Vector3
   const scratch=new Float32Array(capacity*8);
   const projection=new T.Matrix4(), frustum=new T.Frustum();
 
-  const clock={value:0}, center={value:new T.Vector2()}, drawDistance={value:0};
+  const clock={value:0}, center={value:new T.Vector2()}, drawDistance={value:0}, interactionDistance={value:0};
   const walker={value:new T.Vector4()};
   const bodies=Array.from({length:maxActors},()=>new T.Vector4());
   const spells=Array.from({length:maxSpells},()=>new T.Vector4());
@@ -73,7 +73,7 @@ export function meadow(scene:T.Scene,camera:T.PerspectiveCamera,player:T.Vector3
       defines:interactive?{NEAR_GRASS:1}:{},
       uniforms:{
         ...T.UniformsUtils.clone(T.UniformsLib.fog),
-        windTime:clock,fieldCenter:center,drawDistance,walker,
+        windTime:clock,fieldCenter:center,drawDistance,interactionDistance,walker,
         bodies:{value:bodies},spells:{value:spells},spellAspect:{value:aspects},bodyCount,spellCount,
       },
       vertexShader:`
@@ -83,6 +83,7 @@ export function meadow(scene:T.Scene,camera:T.PerspectiveCamera,player:T.Vector3
         uniform vec2 fieldCenter;
         varying vec3 bladeColor;
         #ifdef NEAR_GRASS
+          uniform float interactionDistance;
           uniform vec4 walker, bodies[${maxActors}], spells[${maxSpells}];
           uniform vec2 spellAspect[${maxSpells}];
           uniform int bodyCount, spellCount;
@@ -101,8 +102,9 @@ export function meadow(scene:T.Scene,camera:T.PerspectiveCamera,player:T.Vector3
           float biome=floor(bladeStyle.w);
           vec2 axis=bladeStyle.xy;
           vec2 field=root.xz-fieldCenter;
+          float distance2=dot(field,field);
           float range=1.-smoothstep((drawDistance-${edgeFade}.0)*(drawDistance-${edgeFade}.0),
-            drawDistance*drawDistance,dot(field,field));
+            drawDistance*drawDistance,distance2);
           float bladeHeight=bladeRoot.w*range;
           float wave=sin(dot(root.xz,vec2(.19,.126))-windTime*1.66+appearance*1.8);
           vec2 wind=vec2(.84,.53)*(.052+.101*wave);
@@ -111,26 +113,31 @@ export function meadow(scene:T.Scene,camera:T.PerspectiveCamera,player:T.Vector3
           #ifdef NEAR_GRASS
             float gust=sin(dot(root.xz,vec2(.063,.041))-windTime*.92);
             gust=max(0.,gust);gust*=gust*gust;
-            wind+=vec2(.17,.095)*gust+vec2(.035,-.031)*sin(windTime*3.5+appearance*12.5);
-            wind+=pushBlades(root.xz,walker);
-            for(int i=0;i<bodyCount;i++) wind+=pushBlades(root.xz,bodies[i]);
-            for(int i=0;i<spellCount;i++){
-              vec4 spell=spells[i];
-              vec2 delta=root.xz-spell.xy;
-              float d2=dot(delta,delta);
-              float influence=1.-d2*spell.z;
-              if(influence<=0.) continue;
-              float element=spellAspect[i].x;
-              float power=influence*influence*spellAspect[i].y;
-              float ripple=element>=4.? .71+.29*sin(d2*.53-windTime*11.):1.;
-              wind+=delta*inversesqrt(max(.08,d2))*(influence*influence*spell.w*ripple);
-              if(element==1.){
-                charred=max(charred,power*.86);
-                enchantment+=vec3(.041,.010,.002)*power;
-              } else if(element==2.) enchantment+=vec3(.14,.25,.33)*power;
-              else if(element==3.) enchantment+=vec3(.23,.39,.70)*power;
-              else if(element==4.) enchantment+=vec3(.027,.068,.079)*power*ripple;
-              else if(element==6.) enchantment+=vec3(.069,.026,.114)*power;
+            float detail=1.-smoothstep(interactionDistance*.69,interactionDistance,distance2);
+            wind+=(vec2(.17,.095)*gust+vec2(.035,-.031)*sin(windTime*3.5+appearance*12.5))*detail;
+            if(detail>0.){
+              wind+=pushBlades(root.xz,walker)*detail;
+              for(int i=0;i<bodyCount;i++) wind+=pushBlades(root.xz,bodies[i])*detail;
+              for(int i=0;i<spellCount;i++){
+                vec4 spell=spells[i];
+                vec2 delta=root.xz-spell.xy;
+                float d2=dot(delta,delta);
+                float influence=1.-d2*spell.z;
+                if(influence<=0.) continue;
+                float element=spellAspect[i].x;
+                float power=influence*influence*spellAspect[i].y;
+                float ripple=element>=4.? .71+.29*sin(d2*.53-windTime*11.):1.;
+                wind+=delta*inversesqrt(max(.08,d2))*(influence*influence*spell.w*ripple*detail);
+                if(element==1.){
+                  charred=max(charred,power*.86);
+                  enchantment+=vec3(.041,.010,.002)*power;
+                } else if(element==2.) enchantment+=vec3(.14,.25,.33)*power;
+                else if(element==3.) enchantment+=vec3(.23,.39,.70)*power;
+                else if(element==4.) enchantment+=vec3(.027,.068,.079)*power*ripple;
+                else if(element==6.) enchantment+=vec3(.069,.026,.114)*power;
+              }
+              charred*=detail;
+              enchantment*=detail;
             }
             wind=clamp(wind,vec2(-.65),vec2(.65));
           #endif
@@ -369,7 +376,8 @@ export function meadow(scene:T.Scene,camera:T.PerspectiveCamera,player:T.Vector3
         const lod=preset.near>0&&detail<preset.near?0:middle<preset.mid?1:2;
         if(lod!==chunk.lod){
           chunk.lod=lod;
-          chunk.mesh.geometry.setDrawRange(...lodRanges[lod]);
+          const [firstIndex,indexCount]=lodRanges[lod];
+          chunk.mesh.geometry.setDrawRange(firstIndex,indexCount);
         }
         const interactive=lod<2&&distanceToBounds<interactiveReach;
         if(interactive!==chunk.interactive){
@@ -402,6 +410,7 @@ export function meadow(scene:T.Scene,camera:T.PerspectiveCamera,player:T.Vector3
       clock.value=time;
       center.value.set(x,z);drawDistance.value=preset.distance;
       if(wantInteraction){
+        interactionDistance.value=interactiveReach;
         const moving=Math.min(1.32,speed*.077)+(dashing?.72:0);
         const radius=(mounted?2.3:1.3)+moving*.70;
         walker.value.set(x,z,1/(radius*radius),T.MathUtils.damp(walker.value.w,moving*(mounted?.84:.71),16,dt));
