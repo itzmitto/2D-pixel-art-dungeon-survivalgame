@@ -1,7 +1,7 @@
 import { rank } from './progression.ts';
 
 export type ShadowKind='wild'|'dire';
-export type ShadowSoldier={id:string;kind:ShadowKind;level:number;xp:number;baseHealth:number;baseDamage:number;
+export type ShadowSoldier={id:string;kind:ShadowKind;level:number;originLevel:number;xp:number;baseHealth:number;baseDamage:number;
   active:boolean;health:number;readyAt:number};
 export type ShadowEssence={id:string;kind:ShadowKind;level:number;baseHealth:number;baseDamage:number;x:number;z:number;expiresAt:number};
 export const shadowTuning={
@@ -10,11 +10,14 @@ export const shadowTuning={
 };
 export const shadowCapacity=(level:number)=>shadowTuning.limits[rank(level)];
 export const shadowName=(kind:ShadowKind)=>kind==='dire'?'Shadow Dire Wolf':'Shadow Wolf';
-export const shadowStats=(shadow:Pick<ShadowSoldier,'level'|'baseHealth'|'baseDamage'>)=>({
-  health:Math.max(2,Math.round(shadow.baseHealth*shadowTuning.fraction+shadow.level*.78)),
-  damage:Math.max(.6,Math.round((shadow.baseDamage*shadowTuning.fraction+shadow.level*.105)*10)/10),
-  xpNeeded:32+shadow.level*13,
-});
+export function shadowStats(shadow:Pick<ShadowSoldier,'level'|'baseHealth'|'baseDamage'>&{originLevel?:number}){
+  const growth=Math.max(0,shadow.level-(shadow.originLevel??shadow.level));
+  return {
+    health:Math.max(2,Math.round(shadow.baseHealth*shadowTuning.fraction+growth*.94)),
+    damage:Math.max(.6,Math.round((shadow.baseDamage*shadowTuning.fraction+growth*.16)*10)/10),
+    xpNeeded:32+shadow.level*13,
+  };
+}
 export function grantShadowXp(shadow:ShadowSoldier,reward:number){
   shadow.xp+=reward;
   while(shadow.level<shadowTuning.maxLevel&&shadow.xp>=shadowStats(shadow).xpNeeded){
@@ -36,7 +39,7 @@ export function readShadows(raw:unknown):ShadowSoldier[]{
   for(const value of raw){
     if(!value||typeof value!=='object'||!validSource(value)||unique.has(value.id)) continue;
     if(!Number.isFinite(value.health)||!Number.isFinite(value.xp)||!Number.isSafeInteger(value.readyAt)) continue;
-    unique.set(value.id,{id:value.id,kind:value.kind,level:value.level,baseHealth:value.baseHealth,baseDamage:value.baseDamage,
+    unique.set(value.id,{id:value.id,kind:value.kind,level:value.level,originLevel:Number.isInteger(value.originLevel)?Math.max(1,Math.min(value.level,value.originLevel)):value.level,baseHealth:value.baseHealth,baseDamage:value.baseDamage,
       health:Math.max(0,Math.min(shadowStats(value).health,value.health)),xp:Math.max(0,Math.min(3000,value.xp)),
       readyAt:Math.max(0,value.readyAt),active:value.active===true&&value.health>0});
   }

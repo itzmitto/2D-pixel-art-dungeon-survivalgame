@@ -25,7 +25,7 @@ import { wolfModels } from './wolves.ts';
 import { abilityAnimationSeconds, elementalIds, weaponDamage, weapons, rarity, type Weapon, type WeaponId } from './weapons.ts';
 import { createMagicEffects } from './magicEffects.ts';
 import { abilityCombat } from './abilities.ts';
-import { statuses } from './statusEffects.ts';
+import { statuses, statusTuning } from './statusEffects.ts';
 
 const territories = [
   { x:-66,z:-20 }, { x:-97,z:-68 }, { x:-162,z:67 }, { x:-170,z:-111 },
@@ -493,7 +493,7 @@ export function createEncounters(
     if(barrierActive) splash();
     if(damage===0){notify('Water barrier absorbed the attack.');return false;}
     save.health=Math.max(0,Math.round((save.health-damage)*100)/100);
-    if(enemy.kind==='frostGuardian') slowUntil=time+1.48;
+    if(enemy.kind==='frostGuardian') slowUntil=time+Math.min(1.75,statusTuning.slow);
     if(!save.health) knockback.set(0,0);
     impact(player.position);
     if(!save.health){rangeTimer.cancel();queued=undefined;magic.reset();}
@@ -656,7 +656,10 @@ export function createEncounters(
           const material=cave?'Magic Crystal':bonus.material;
           const count=cave?(cave.kind==='frostGuardian'?9:5):bonus.count;
           save.materials[material]=(save.materials[material]??0)+count;
-          if(cave) save.potions+=cave.kind==='frostGuardian'?4:2;
+          if(cave){
+            save.potions+=cave.kind==='frostGuardian'?4:2;
+            fx.emit(chest,0xffc779,'ray',1.14,.92,{y:1.48,aspect:3.6,opacity:.59});
+          }
           fx.treasure(chest,Number.parseInt(rarity[chest.rarity].color.slice(1),16),rarityOrder.indexOf(chest.rarity));
           grantWeapon('chest-'+chest.id,chest.weapon,chest.rarity);
           const equipment=grantArmor(bonus.armorPiece);
@@ -775,6 +778,9 @@ export function createEncounters(
             enemy.announced=true;
             notify('Elite encountered · '+spec.name+' · Lv '+enemy.level);
           }
+        }
+        if(active&&enemy.kind==='frostGuardian'&&Math.floor(time*2.7)!==Math.floor((time-dt)*2.7)){
+          fx.emit(p,0x87d9ff,'mist',1.07,.57,{y:.55,lift:.46,opacity:.29,grow:.87});
         }
         const dying=!enemy.hp&&enemy.collapse<1&&gap<nearDistance;
         if(!enemy.hp&&!dying) enemy.collapse=1;
@@ -941,13 +947,13 @@ export function createEncounters(
             enemy.windup=1.18*(enemy.enraged?.72:1);
             fx.emit(p,0x9ceaff,'ring',(enemy.enraged?7:6)/.88,enemy.windup,{opacity:.92,y:.11});
           }else{
-          enemy.spell=enemy.wardCool===0&&(gap<6.8||enemy.hp<spec.health*.69)?'shield':
-            enemy.strikes%(elite?2:3)===0?'domain':'bolt';
-          enemy.windup=enemy.spell==='domain'?1.04:enemy.spell==='shield'?.63:spec.windup;
-          if(enemy.spell==='domain'){
-            enemy.spellTarget={x:player.position.x,z:player.position.z};
-            fx.emit(enemy.spellTarget,cold?0xafecff:0xaf63f1,'ring',elite?4.65:3.65,enemy.windup,{opacity:.60});
-          }else fx.emit(p,cold?0x8cd4ff:0x9957f4,'ring',.96,.57,{grow:1.3,y:.2});
+            enemy.spell=enemy.wardCool===0&&(gap<6.8||enemy.hp<spec.health*.69)?'shield':
+              enemy.strikes%(elite?2:3)===0?'domain':'bolt';
+            enemy.windup=enemy.spell==='domain'?1.04:enemy.spell==='shield'?.63:spec.windup;
+            if(enemy.spell==='domain'){
+              enemy.spellTarget={x:player.position.x,z:player.position.z};
+              fx.emit(enemy.spellTarget,cold?0xafecff:0xaf63f1,'ring',cold?5.10:elite?4.65:3.65,enemy.windup,{opacity:.60});
+            }else fx.emit(p,cold?0x8cd4ff:0x9957f4,'ring',.96,.57,{grow:1.3,y:.2});
           }
         } else if(enemy.kind==='brute'&&aggro&&gap>2.25&&gap<5.2&&enemy.cooldown===0&&
           clearLine(p.x,p.z,player.position.x,player.position.z)){

@@ -110,7 +110,7 @@ export function shadowArmy(
       if(active.size>=shadowCapacity(save.level)){notify('Shadow capacity reached · Dismiss a shadow with K');return;}
       if(save.shadows.some(record=>record.id===essence.id)) return;
       save.shadowEssences=save.shadowEssences.filter(item=>item.id!==essence.id);
-      const record:ShadowSoldier={id:essence.id,kind:essence.kind,level:essence.level,xp:0,
+      const record:ShadowSoldier={id:essence.id,kind:essence.kind,level:essence.level,originLevel:essence.level,xp:0,
         baseHealth:essence.baseHealth,baseDamage:essence.baseDamage,active:true,health:shadowStats(essence).health,readyAt:0};
       save.shadows=[...save.shadows,record];
       raise(record,essence);
@@ -187,7 +187,7 @@ export function shadowArmy(
         state.hurt=Math.max(0,state.hurt-dt);state.recovery=Math.max(0,state.recovery-dt);
         const distance=Math.hypot(p.x-leader.x,p.z-leader.z);
         if(distance>31) setDown(state,spot(n));
-        if(state.seek<=0){
+        if(state.seek<=0&&!state.windup){
           state.seek=.31+(n%7)*.035;
           let best=17;
           state.target=undefined;

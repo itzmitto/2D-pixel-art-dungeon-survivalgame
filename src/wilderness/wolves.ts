@@ -112,6 +112,8 @@ export function wolfModels(){
       float spectralRim=pow(1.-max(0.,dot(normalize(vViewPosition),normal)),3.7);
       totalEmissiveRadiance+=vec3(.019,.11,.31)*spectralRim*.66;`);
   };
+  const spectralDetail=own(spectralCoat.clone());
+  spectralDetail.onBeforeCompile=spectralCoat.onBeforeCompile;
   const spectralBlue=own(new T.MeshBasicMaterial({color:0x62caff,toneMapped:false}));
   const spectralLines=[-1,1].map(side=>({
     muzzle:own(pathRidge([[side*.143,.089,.29],[side*.154,.020,.43],[side*.121,-.018,.61],[side*.089,-.04,.76]],.010)),
@@ -258,14 +260,14 @@ export function wolfModels(){
       });
       if(spectral){
         root.traverse(node=>{
-          if(node instanceof T.Mesh) node.material=node.material===g.irisMaterial?spectralBlue:spectralCoat;
+          if(node instanceof T.Mesh) node.material=node.material===g.irisMaterial?spectralBlue:node.geometry.hasAttribute('color')?spectralCoat:spectralDetail;
         });
         for(const [index,marks] of spectralLines.entries()){
           meshPart(skull,marks.muzzle,spectralBlue);
           meshPart(frame,marks.ribs,spectralBlue);
           for(let i=0;i<4;i++){
             const side=index===0?-1:1;
-            const wisp=meshPart(frame,crown,spectralCoat,side*(.11+i*.035),1.76-i*.039,.38-i*.26);
+            const wisp=meshPart(frame,crown,spectralDetail,side*(.11+i*.035),1.76-i*.039,.38-i*.26);
             wisp.rotation.set(-.81,side*.19,-side*.41);wisp.scale.set(.72,.85-i*.10,.88);
           }
         }
