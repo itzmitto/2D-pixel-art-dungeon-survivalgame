@@ -138,15 +138,15 @@ export default function Wilderness() {
   const floor=towerFloorAt(position.z);
   const waypointDistance=waypoint?Math.hypot(waypoint.x-position.x,waypoint.z-position.z):0;
   const cave=caveAt(position.z);
-  const boss=cave?monsters[cave.kind]:floor?.number===5?monsters.sentinel:monsters.guardian;
-  const announcement=/^(Elite encountered|Boss encounter|Boss phase II|Boss technique|Cave victory|Cave reward|Shadow extracted|Shadow extraction failed|Army command|Briar Watch · Floor) · (.+)$/.exec(message.notification);
+  const boss=cave?monsters[cave.kind]:floor?.final?monsters[floor.guards[0].kind]:monsters.guardian;
+  const announcement=/^(Elite encountered|Boss encounter|Boss phase II|Boss technique|New region discovered|Cave victory|Cave reward|Shadow extracted|Shadow extraction failed|Army command|Briar Watch · Floor) · (.+)$/.exec(message.notification);
   const visibleNotices=announcement
-    ? [...notices,{kind:announcement[1].startsWith('Boss')?'boss':'dungeon',title:announcement[1],detail:announcement[2]} as Notice]
+    ? [...notices,{kind:announcement[1]==='New region discovered'?'region':announcement[1].startsWith('Boss')?'boss':'dungeon',title:announcement[1],detail:announcement[2]} as Notice]
     : notices;
   const canRedeem=clearing(position.x,position.z)<9.5&&hero.fangs>0;
   return <main className="wild" data-overlay-closing={closing} aria-label="Vonkje">
     <canvas ref={canvas} aria-label="Blackwater Wilds"/>
-    <HunterHUD hero={hero} region={regionLabel(position.z)}/>
+    <HunterHUD hero={hero} region={regionLabel(position.z,position.x)}/>
     <SystemNotifications notices={visibleNotices}/>
     {waypoint&&!panel&&floor===towerFloorAt(waypoint.z)&&cave===caveAt(waypoint.z)&&inDen(position.z)===inDen(waypoint.z)&&<aside className="hud-waypoint">
       <svg viewBox="0 0 24 24" aria-hidden="true" style={{transform:'rotate('+Math.atan2(waypoint.x-position.x,position.z-waypoint.z)+'rad)'}}>
@@ -155,11 +155,11 @@ export default function Wilderness() {
       <span>{waypoint.name} · {waypointDistance<4?'Arrived':Math.round(waypointDistance)+' m'}</span>
     </aside>}
     {floor&&<aside className="tower-hud">
-      <strong>Floor {floor.number} / 5 · {floor.title}</strong>
+      <strong>Floor {floor.number} / {floor.dungeon.id===briarWatch.id?5:8} · {floor.title}</strong>
       <span>{floorRemaining(floor,hero.defeated)} remaining</span>
     </aside>}
     {!!message.bossHealth&&<div className="guardian-health">
-      <strong>{boss.name}{(cave||floor?.number===5)&&message.bossHealth<=boss.health*.5?' · Phase II':''}</strong>
+      <strong>{boss.name}{(cave||floor?.final)&&message.bossHealth<=boss.health*.5?' · Phase II':''}</strong>
       <progress className="system-meter health" aria-label={boss.name+' health'} value={message.bossHealth} max={boss.health}/>
     </div>}
     <nav className="system-nav"><button ref={mapButton} onClick={()=>showPanel(open.current==='map'?null:'map')} aria-expanded={panel==='map'}>Map · M</button>

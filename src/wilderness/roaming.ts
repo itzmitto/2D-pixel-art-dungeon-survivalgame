@@ -13,7 +13,7 @@ export function roamingKind(id:string){
 export function roamingEncounter(x:number,z:number,random:()=>number):EncounterMember[]{
   if(frontierAt(z)){
     const leader:MonsterKind=z>-315?'mountainTroll':z>-374?'stoneGolem':'cursedKnight';
-    return [leader,random()<.5?'mountainTroll':'cursedKnight'].map((kind,i)=>({kind,level:(z>-315?15:z>-374?21:26)+i+Math.floor(random()*4),elite:i===0&&random()<.12}));
+    return ([leader,random()<.5?'mountainTroll':'cursedKnight'] satisfies MonsterKind[]).map((kind,i)=>({kind,level:(z>-315?15:z>-374?21:26)+i+Math.floor(random()*4),elite:i===0&&random()<.12}));
   }
   const distance=clearing(x,z), forest=inForest(x,z), road=trailDistance(x,z)<4;
   const level=distance<45?1:distance<86?3:distance<135?5:distance<185?7:9;

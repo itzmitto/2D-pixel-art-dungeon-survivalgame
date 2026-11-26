@@ -5,10 +5,11 @@ import { towerWalkable } from './briarWatch.ts';
 import { armorPiece, armorSlots, isArmorId, type ArmorId, type EquippedArmor } from './armor.ts';
 import { waystones } from './worldSites.ts';
 import { denWalkable } from './denLayout.ts';
-import { legacyItem, type WeaponItem } from './itemInstances.ts';
+import { bossRelics, legacyItem, relicForReward, type RelicId, type WeaponItem } from './itemInstances.ts';
 import type { Drop } from './huntData.ts';
 import { isWeaponId, rarity, type Rarity, type WeaponId } from './weapons.ts';
 import { freshStats, maxHunterHealth, progression, statNames, type Hunter } from './progression.ts';
+import { enhancementLevel } from './materials.ts';
 import { extent, spawn } from './layout.ts';
 
 export const cellSize = 20;
@@ -102,7 +103,10 @@ export function readExploration(raw: string | null): Exploration | null {
     if(Array.isArray(storedItems)) for(const item of storedItems){
       if(item&&typeof item.id==='string'&&/^[a-z0-9-]{1,70}$/.test(item.id)&&isWeaponId(item.type)&&
         typeof item.rarity==='string'&&Object.hasOwn(rarity,item.rarity)&&!items.some(existing=>existing.id===item.id)){
-        items.push({id:item.id,type:item.type,rarity:item.rarity as Rarity});
+        const relic=typeof item.relic==='string'&&Object.hasOwn(bossRelics,item.relic)&&bossRelics[item.relic as RelicId].type===item.type
+          ? item.relic as RelicId:relicForReward(item.id,item.type);
+        const enhancement=enhancementLevel(item.enhancement);
+        items.push({id:item.id,type:item.type,rarity:item.rarity as Rarity,...(enhancement?{enhancement}:{}),...(relic?{relic}:{})});
         if(!arsenal.includes(item.type)) arsenal.push(item.type);
       }
     }

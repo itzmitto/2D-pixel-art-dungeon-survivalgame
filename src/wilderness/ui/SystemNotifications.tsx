@@ -1,23 +1,25 @@
+import { fortress } from '../frontier';
+import { instanceWeapon } from '../itemInstances';
 import { shadowRank } from '../shadowData';
 import { bossCaves, caveRewardTier } from '../bossCaves';
-import { briarWatch, floorRemaining, towerFloors } from '../briarWatch';
+import { briarWatch, floorRemaining, dungeonFloors } from '../briarWatch';
 import { armorPiece } from '../armor';
 import type { Exploration } from '../exploration';
 import { den } from '../denLayout';
 import { monsters } from '../huntData';
 import { progression, rank, xpNeeded } from '../progression';
-import { weapons, type Rarity } from '../weapons';
+import { type Rarity } from '../weapons';
 import { Glyph } from './Glyph';
 import { tint } from './HunterInventory';
 
 type Reward={icon:string;label:string;tier?:Rarity};
-export type Notice={kind:'level'|'item'|'boss'|'dungeon';title:string;detail:string;tier?:Rarity;rewards?:Reward[]};
+export type Notice={kind:'level'|'item'|'boss'|'dungeon'|'region';title:string;detail:string;tier?:Rarity;rewards?:Reward[]};
 export const observe=(hero:Exploration)=>({
   opened:new Set(hero.opened),
   shadows:new Map(hero.shadows.map(shadow=>[shadow.id,shadowRank(shadow.level)])),
   armorItems:new Set(hero.armorItems),level:hero.level,xp:hero.xp,items:new Set(hero.items.map(item=>item.id)),
   bosses:new Set(hero.defeatedBosses),dungeons:new Set(hero.completedDungeons),
-  floors:towerFloors.map(floor=>floorRemaining(floor,hero.defeated)),
+  floors:dungeonFloors.map(floor=>floorRemaining(floor,hero.defeated)),
   gold:hero.gold,potions:hero.potions,armor:hero.armor,fangs:hero.fangs,materials:{...hero.materials},
 });
 
@@ -33,15 +35,15 @@ export function noticesBetween(before:ReturnType<typeof observe>,hero:Exploratio
   }
   for(const boss of hero.defeatedBosses){
     if(before.bosses.has(boss)) continue;
-    notices.push({kind:'boss',title:'Boss Defeated',detail:bossCaves.find(cave=>cave.id===boss)?.boss??(boss===briarWatch.boss?monsters.sentinel.name:monsters.guardian.name)});
+    notices.push({kind:'boss',title:'Boss Defeated',detail:bossCaves.find(cave=>cave.id===boss)?.boss??(boss===fortress.boss?monsters.ancientTitan.name:boss===briarWatch.boss?monsters.sentinel.name:monsters.guardian.name)});
   }
   for(const dungeon of hero.completedDungeons){
     if(before.dungeons.has(dungeon)) continue;
     notices.push({kind:'dungeon',title:dungeon===briarWatch.id?'Tower Completed':'Dungeon Cleared',
-      detail:bossCaves.find(cave=>cave.id===dungeon)?.name??(dungeon===briarWatch.id?briarWatch.name:den.name)});
+      detail:bossCaves.find(cave=>cave.id===dungeon)?.name??(dungeon===fortress.id?fortress.name:dungeon===briarWatch.id?briarWatch.name:den.name)});
   }
-  for(const [i,floor] of towerFloors.slice(0,-1).entries()){
-    if(before.floors[i]>0&&floorRemaining(floor,hero.defeated)===0)
+  for(const [i,floor] of dungeonFloors.entries()){
+    if(!floor.final&&before.floors[i]>0&&floorRemaining(floor,hero.defeated)===0)
       notices.push({kind:'dungeon',title:'Floor '+floor.number+' Cleared',detail:'Floor '+(floor.number+1)+' unlocked'});
   }
   const promotions=hero.shadows.filter(shadow=>before.shadows.has(shadow.id)&&before.shadows.get(shadow.id)!==shadowRank(shadow.level));
@@ -52,7 +54,7 @@ export function noticesBetween(before:ReturnType<typeof observe>,hero:Exploratio
   for(const item of hero.items){
     if(before.items.has(item.id)) continue;
     tier=item.rarity;
-    rewards.push({icon:item.type,label:weapons[item.type].name,tier});
+    rewards.push({icon:item.type,label:instanceWeapon(item).name,tier});
   }
   for(const id of hero.armorItems){
     if(before.armorItems.has(id)) continue;
@@ -86,6 +88,7 @@ export function SystemNotifications({notices}:{notices:readonly Notice[]}){
   return <div className="system-notices" aria-live="polite" role="status">
     {notices.map((notice,index)=><div className={'system-toast '+notice.kind} key={notice.title+index}
       style={notice.tier?tint(notice.tier):undefined} data-rarity={notice.tier}>
+      {notice.kind==='region'&&<span className="system-kicker">System Notification</span>}
       {notice.kind==='level'&&<span className="system-kicker">Level Up</span>}
       <strong>{notice.title}</strong>
       {notice.detail&&<small>{notice.detail}</small>}

@@ -8,7 +8,7 @@ import { spectralModels } from './shadowModels.ts';
 import { defaultShadowGrade } from './shadowData.ts';
 import { shadowArmy } from './shadowArmy.ts';
 import { caveAt, caveBossId, caveBossPoint, caveRewardArmor, caveRewardId, caveRewardTier, caveTreasurePoint, type BossCave } from './bossCaves.ts';
-import { briarWatch, floorRemaining, towerFloorAt, dungeonFloors } from './briarWatch.ts';
+import { floorRemaining, towerFloorAt, dungeonFloors } from './briarWatch.ts';
 import { hollowSentinel } from './sentinel.ts';
 import { encounterCell, eliteName, roaming, roamingEncounter, roamingKind, type EncounterMember } from './roaming.ts';
 import { waystones } from './worldSites.ts';
@@ -22,7 +22,7 @@ import { loft, shapedPlate, type CreatureRig } from './creatureGeometry.ts';
 import { skeletonModels } from './skeletons.ts';
 import { den, inDen } from './denLayout.ts';
 import { enemyArmor, enemyXpReward, monsters, rarityOrder, rollDrop, type MonsterKind, type Drop } from './huntData.ts';
-import { elementalRarity, instanceWeapon } from './itemInstances.ts';
+import { elementalRarity, instanceWeapon, relicForReward } from './itemInstances.ts';
 import { chestBonus, chestModels, denChests, towerChests, worldChests, type Chest } from './treasure.ts';
 import { attackSpeed, effectiveStats, earnXP, elemental, maxHunterHealth, mitigation, physical, lootBonus } from './progression.ts';
 import * as T from 'three';
@@ -219,7 +219,7 @@ export function createEncounters(
   }
   for(const guard of frontierCamps) createEnemy(guard.id,guard.kind,guard);
   for(const floor of dungeonFloors) for(const guard of floor.guards){
-    createEnemy(guard.id,guard.kind,guard,guard.elite?{kind:guard.kind,level:10,elite:true}:undefined);
+    createEnemy(guard.id,guard.kind,guard,'level' in floor?{kind:guard.kind,level:floor.level,elite:false}:'elite' in guard&&guard.elite?{kind:guard.kind,level:10,elite:true}:undefined);
   }
   function createEnemy(id:string,kind:MonsterKind,spot:{x:number;z:number},member?:EncounterMember,roamGroup?:string){
     const orc=kind==='brute'||kind==='assassin'||kind==='warlord', wizard=kind==='wizard'||kind==='ritualElite'||kind==='frostGuardian'||kind==='darkArchmage';
@@ -562,7 +562,7 @@ export function createEncounters(
   }
   function grantWeapon(id:string,type:WeaponId,tier:Drop['rarity']){
     if(save.items.some(item=>item.id===id)) return;
-    save.items.push({id,type,rarity:tier});
+    save.items.push({id,type,rarity:tier,relic:relicForReward(id,type)});
     if(!save.arsenal.includes(type)) save.arsenal.push(type);
   }
   const allChests=()=>[...chests,...Array.from(caveRewards.values(),value=>value.chest)];
@@ -721,7 +721,7 @@ export function createEncounters(
           const bonus=chestBonus(chest,save.seed);
           save.potions+=bonus.potions;
           const cave=caveAt(chest.z);
-          const material=cave?'Magic Crystal':bonus.material;
+          const material=cave&&isRegional(cave.kind)?monsters[cave.kind].material:cave?'Magic Crystal':bonus.material;
           const count=cave?.crystals??bonus.count;
           save.materials[material]=(save.materials[material]??0)+count;
           if(cave){

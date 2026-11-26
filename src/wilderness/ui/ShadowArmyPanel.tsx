@@ -5,7 +5,7 @@ import { shadowCapacity, shadowName, shadowStats, shadowProfiles, shadowRank, sh
 import { SystemPanel } from './SystemPanel';
 
 const portraits={
-  Beast:'M6 28 8 8l10 10 11-2 7 6-3 6-10 2-4 7-8-3Z M23 22l6-2-3 4Zm8 5 3-2',
+  Giant:'axe',Construct:'Iron',Beast:'M6 28 8 8l10 10 11-2 7 6-3 6-10 2-4 7-8-3Z M23 22l6-2-3 4Zm8 5 3-2',
   Undead:'M9 18 11 9l9-4 10 4 3 9-4 6v7l-5 6h-9l-5-6v-7ZM14 20l4 2-4 2Zm9 2 5-2-2 4ZM16 29v4m4-4v5m4-5v4',
   Raider:'M4 23 7 12l5 4 2-8 6-4 8 6 1 7 6-4 2 10-9 5-3 8H15l-5-8ZM13 19l5 2m5 0 5-2M14 26l4 7m9-7-4 7',
   Caster:'M7 33l4-13 5-11 6-6 7 10 4 12 2 8-15 4ZM13 25l7-14 8 14-8 7Zm3 1 3-1m3 0 4 1M34 29V9m-3 5 3-5 3 5-3 4Z',

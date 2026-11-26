@@ -1,4 +1,5 @@
-import { briarWatch, towerFloors } from './briarWatch.ts';
+import { frontierCamps, fortress } from './frontier.ts';
+import { briarWatch, towerFloors, fortressFloors } from './briarWatch.ts';
 import { armorSlots, type ArmorId } from './armor.ts';
 import { den } from './denLayout.ts';
 import { explorationSites, orcCamp, ritualGrounds } from './worldSites.ts';
@@ -8,7 +9,7 @@ import { loft, shapedPlate, joint, meshPart, rigidBatcher } from './creatureGeom
 import { rarity, type Rarity, type WeaponId } from './weapons.ts';
 import { rarityOrder } from './huntData.ts';
 
-export type Chest={id:string;title?:string;x:number;z:number;rarity:Rarity;weapon:WeaponId;gold:number;armor:number;boss?:string;guardian?:string;guardians?:readonly string[];armorPiece?:ArmorId};
+export type Chest={id:string;title?:string;x:number;z:number;rarity:Rarity;weapon:WeaponId;gold:number;armor:number;boss?:string;guardian?:string;guardians?:readonly string[];armorPiece?:ArmorId;material?:string};
 export const worldChests:Chest[]=[
   {id:'ember-cache',x:-52,z:3,rarity:'Common',weapon:'shield',gold:8,armor:1},
   {id:'raven-cache',x:-189,z:62,rarity:'Uncommon',weapon:'axe',gold:14,armor:2},
@@ -16,6 +17,13 @@ export const worldChests:Chest[]=[
   {id:'greyfen-cache',x:169,z:-160,rarity:'Epic',weapon:'greatsword',gold:32,armor:4},
   {id:'gravespur-cache',x:207,z:-181,rarity:'Mythic',weapon:'katana',gold:156,armor:8,guardian:'elite-gravefang'},
 ];
+worldChests.push(
+  {id:'elaris-frostpine-cache',title:'Frostpine Survey Cache',x:-38,z:-277,rarity:'Rare',weapon:'shield',gold:56,armor:6,material:'Mountain Crystal'},
+  {id:'elaris-aqueduct-cache',title:'Moonfall Aqueduct Cache',x:23,z:-323,rarity:'Epic',weapon:'staff',gold:91,armor:7,material:'Mountain Crystal'},
+  {id:'elaris-slatefang-cache',title:'Slatefang War Chest',x:-24,z:-361,rarity:'Epic',weapon:'axe',gold:132,armor:8,material:'Troll Fang',guardians:frontierCamps.slice(0,3).map(guard=>guard.id)},
+  {id:'elaris-crownroad-cache',title:'Crownroad Garrison Chest',x:53,z:-380,rarity:'Epic',weapon:'greatsword',gold:146,armor:9,material:'Cursed Steel',guardians:frontierCamps.slice(3).map(guard=>guard.id)},
+  {id:'elaris-hidden-cache',title:'Oathbinder’s Hidden Chest',x:-37,z:-440,rarity:'Legendary',weapon:'katana',gold:185,armor:10,material:'Ancient Rune'},
+);
 export const denChests:Chest[]=[
     {id:'den-hidden',x:20,z:350,rarity:'Rare',weapon:'katana',gold:31,armor:4},
     {id:'den-entry-supplies',x:-4.1,z:382,rarity:'Common',weapon:'axe',gold:10,armor:1},
@@ -30,6 +38,16 @@ export const towerChests:Chest[]=[
   {id:'briar-sentinel-reward',x:0,z:towerFloors[4].z-10.4,rarity:'Legendary',weapon:'katana',gold:230,armor:9,
     boss:briarWatch.boss,armorPiece:'abyssal-chestplate'},
 ];
+towerChests.push(
+  ...[2,4,6].map(number=>{
+    const floor=fortressFloors[number-1];
+    return {id:'forsaken-cache-'+number,title:floor.title+' Cache',x:-7,z:floor.z-10,
+      rarity:'Epic' as const,weapon:'greatsword' as const,gold:102+number*29,armor:8+number,material:number===6?'Ancient Rune':'Ancient Stone',
+      guardians:floor.guards.map(guard=>guard.id)};
+  }),
+  {id:'forsaken-titan-reward',title:'Ancient Titan’s Reliquary',x:0,z:fortressFloors[7].z-11,rarity:'Mythic',
+    weapon:'greatsword',gold:850,armor:17,boss:fortress.boss,armorPiece:'abyssal-chestplate',material:'Titan Core'},
+);
 export const addedChestSites:Chest[]=[
   {id:'ember-north-grove',x:-59,z:-16,rarity:'Common',weapon:'staff',gold:7,armor:1},
   {id:'southwater-bank',x:59,z:113,rarity:'Common',weapon:'shield',gold:9,armor:1},
@@ -70,7 +88,7 @@ export function chestBonus(chest:Chest,seed:number){
   for(const char of chest.id) key=Math.imul(key^char.charCodeAt(0),16777619);
   const random=randomSequence(key),tier=rarityOrder.indexOf(chest.rarity);
   const extras=['Iron','Bones','Goblin Hide','Magic Crystal'];
-  return {material:chest.id==='briar-sentinel-reward'?'Magic Crystal':extras[Math.floor(random()*(tier<2?2:extras.length))],
+  return {material:chest.material??(chest.id==='briar-sentinel-reward'?'Magic Crystal':extras[Math.floor(random()*(tier<2?2:extras.length))]),
     count:1+Math.floor(random()*(tier+1)),potions:1+Math.floor(tier/2),
     armorPiece:chest.armorPiece??(`${tier<2?'iron':tier<4?'blacksteel':'abyssal'}-${armorSlots[(key>>>0)%armorSlots.length]}` as ArmorId)};
 }

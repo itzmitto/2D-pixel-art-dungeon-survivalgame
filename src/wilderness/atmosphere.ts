@@ -1,9 +1,12 @@
+import { frontierAt } from './frontier.ts';
 import * as T from 'three';
 import { height, randomSequence } from './layout';
 
 export function atmosphere(scene:T.Scene, fireY:number) {
-  scene.background=new T.Color('#182330');
-  scene.fog=new T.FogExp2('#182533',.0125);
+  const background=new T.Color('#182330'), fog=new T.FogExp2('#182533',.0125);
+  scene.background=background;scene.fog=fog;
+  const target=new T.Color();
+  let previous=NaN;
   scene.add(new T.HemisphereLight('#a6c5f7','#77705a',1.91));
   const moon=new T.DirectionalLight('#c7dcff',2.18);
   moon.castShadow=true;
@@ -58,7 +61,13 @@ export function atmosphere(scene:T.Scene, fireY:number) {
   });
 
   return (time:number,player:T.Vector3)=>{
-    moon.position.set(player.x-28,58,player.z-24);
+    const region=frontierAt(player.z);
+    target.set(region?.color??'#182330');
+    const blend=Number.isFinite(previous)?1-Math.exp(-4*Math.min(.1,Math.max(0,time-previous))):1;
+    previous=time;
+    background.lerp(target,blend);fog.color.lerp(target,blend);
+    fog.density=T.MathUtils.lerp(fog.density,region?.fog??.0125,blend);
+    moon.position.set(player.x-28,player.y+58,player.z-24);
     moon.target.position.copy(player);
     glow.intensity=65+7*Math.sin(time*9)+4*Math.sin(time*15.3);
     mistMaterial.uniforms.time.value=time;

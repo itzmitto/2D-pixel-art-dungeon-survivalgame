@@ -1,3 +1,4 @@
+import { frontierScenery } from './frontierScenery';
 import { fortress, frontierAt } from './frontier';
 import { shadowKeys } from './shadowData';
 import { bossCaves, caveAt, caveArrival, caveEntry, caveExit, caveLootLabel, caveRewardId, caveStatus, caveWalkable } from './bossCaves';
@@ -59,6 +60,7 @@ export function startWilderness(
   }
   const water=terrain(scene);
   const {obstacles,rocks,fireY,animateCamp,animateRitual,tower,caves,expedition}=scenery(scene,save.seed);
+  const frontier=frontierScenery(scene,obstacles,save.seed);
   const stones=waystoneModels(scene);
   obstacles.push(...waystones.map(({x,z})=>({x,z,r:.95})));
   const nearby = obstacleGrid(obstacles);
@@ -418,6 +420,7 @@ export function startWilderness(
       }
     },
     render(time){
+      frontier.update(time,body.position);
       expedition.update(time);
       caves.update(time,body.position);
       tower.update(time,body.position,save.defeated);
@@ -485,7 +488,7 @@ export function startWilderness(
       onSaveChange();
     },
     dispose(){
-    loop.stop(); controller.abort(); observer.disconnect(); encounters.dispose();stones.dispose();grass.dispose();tower.dispose();caves.dispose();expedition.dispose();horse.dispose();knight.disposeArmor();
+    loop.stop(); controller.abort(); observer.disconnect(); encounters.dispose();stones.dispose();grass.dispose();tower.dispose();caves.dispose();expedition.dispose();frontier.dispose();horse.dispose();knight.disposeArmor();
     const geometries=new Set<T.BufferGeometry>(),materials=new Set<T.Material>();
     scene.traverse(object=>{
       if(object instanceof T.InstancedMesh) object.dispose();

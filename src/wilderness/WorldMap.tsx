@@ -1,6 +1,8 @@
+import { fallsX, fortress, frontierAt, highlands } from './frontier';
+import { monsters } from './huntData';
 import { rarity, type Rarity } from './weapons';
 import { bossCaves, caveAt, caveBossPoint, caveExit, caveLootLabel, caveRewardId, caveRewardTier, caveStatus, caveTreasurePoint, type CaveRuns } from './bossCaves';
-import { briarWatch, floorRemaining, towerFloorAt } from './briarWatch';
+import { floorRemaining, towerFloorAt } from './briarWatch';
 import { waystones } from './worldSites';
 import { denChests, towerChests, worldChests } from './treasure';
 import { memo, useId, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
@@ -20,8 +22,11 @@ const trails=[
   ...branchTrails.map(trail=>trail.map(point=>point.join(',')).join(' ')),
 ];
 const bound=(value:number,half:number)=>Math.max(-extent+half,Math.min(extent-half,value));
+const boundZ=(value:number,half:number)=>Math.max(highlands.north-half*.15+half,Math.min(extent-half,value));
 let cartography:string[]|undefined;
 const symbols={
+  capital:'M-6 5v-7h3v-3h6v3h3v7zM-2 5V1h4v4',
+  capitalService:'M-5 5v-6l5-4 5 4v6z M-2 5V1h4v4',
   ruin:'M-4 5v-9h2v3h4v-5h2V5z M-1 5v-3h2v3',
   bridge:'M-5 -3H5M-5 3H5M-3 -3v6m3-6v6m3-6v6',
   campfire:'M0 -6C5-1 4 3 0 4c-5-2-5-5 0-10zM-4 6l8-2m-8 0 8 2',
@@ -40,7 +45,7 @@ const symbols={
   boss:'M-5-5-3 1 0 5 3 1 5-5M-4-2 0-4 4-2M-2 1l2 2 2-2',
 };
 const descriptions:Record<keyof typeof symbols,string>={
-  ruin:'Ancient ruin',bridge:'River crossing',campfire:'Safe campfire',camp:'Abandoned camp',
+  capital:'Safe capital',capitalService:'Capital landmark',ruin:'Ancient ruin',bridge:'River crossing',campfire:'Safe campfire',camp:'Abandoned camp',
   waystone:'Waystone',orcCamp:'Orc encampment',briar:'Tower dungeon',ritual:'Wizard encounter · Veil Hierophant',
   chest:'Discovered treasure',cave:'Cave landmark',tower:'Tower landmark · interior closed',gate:'Dungeon gate',boss:'Boss arena',bossCave:'Boss cave',encounter:'Active encounter',explore:'Exploration site',
 };
@@ -130,7 +135,7 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
   position:Position;discovered:number[];cleared:boolean;bossDefeated:boolean;opened:readonly string[];towerCleared:boolean;caveRuns:CaveRuns;worldSeed:number;defeated:readonly string[];waystonesActive:readonly string[];getEncounters:()=>EnemyMarker[];waypoint:AtlasWaypoint|null;onWaypoint:(waypoint:AtlasWaypoint|null)=>void;travel:(id:string)=>string;close:()=>void;
 }){
   const mask=useId();
-  const [region,setRegion]=useState<RegionId>('velren');
+  const [region,setRegion]=useState<RegionId>(frontierAt(position.z)?.id??'velren');
   const [selection,setSelection]=useState<string>('');
   const [travelError,reportTravel]=useState('');
   const [filters,setFilters]=useState<Record<MapFilter,boolean>>({
@@ -138,13 +143,13 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
   });
   const select=(id:string)=>{setSelection(id);reportTravel('');};
   const seen=useMemo(()=>new Set(discovered),[discovered]);
-  const [view,setView]=useState({x:0,z:0,size:span});
+  const [view,setView]=useState(()=>frontierAt(position.z)?{x:0,z:-350,size:247}:{x:0,z:0,size:span});
   const drag=useRef<{id:number;x:number;y:number;moved:boolean}|null>(null);
   const unlocked=waystones.filter(stone=>waystonesActive.includes(stone.id));
   const zoom=(factor:number)=>setView(current=>{
     const size=Math.max(85,Math.min(span,current.size*factor));
     const x=current.size===span?position.x:current.x,z=current.size===span?position.z:current.z;
-    return {size,x:bound(x,size/2),z:bound(z,size/2)};
+    return {size,x:bound(x,size/2),z:boundZ(z,size/2)};
   });
   const [clock,setClock]=useState(Date.now);
   useEffect(()=>{const timer=window.setInterval(()=>setClock(Date.now()),1000);return ()=>window.clearInterval(timer);},[]);
@@ -176,7 +181,7 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
   if(cave){
     const exit=caveExit(cave), run=caveRuns[cave.id], reward=caveRewardId(cave,run?.cycle??1);
     const pins=[
-      {pin:{...exit,id:'room-exit',name:'Exit to Velren Forest',kind:'gate' as const},detail:'Cave exit'},
+      {pin:{...exit,id:'room-exit',name:'Exit '+floor.dungeon.name,kind:'gate' as const},detail:'Cave exit'},
       {pin:{id:'room-boss',...caveBossPoint(cave),name:cave.boss,kind:'boss' as const},detail:caveStatus(cave,caveRuns,opened,clock)},
       {pin:{id:reward,...caveTreasurePoint(cave),name:'Boss Reward Chest',kind:'chest' as const,tier:run?caveRewardTier(cave,run,worldSeed):cave.rarity,claimed:opened.includes(reward)},
         detail:opened.includes(reward)?'Opened':run?.readyAt?'Reward chest available':'Unlocks on boss defeat'},
@@ -196,15 +201,15 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
   const floor=towerFloorAt(position.z);
   if(floor){
     const pins=[
-      {pin:{...floor.exit,id:'room-exit',name:'Exit to Velren Forest',kind:'gate' as const},detail:'Tower exit'},
+      {pin:{...floor.exit,id:'room-exit',name:'Exit '+floor.dungeon.name,kind:'gate' as const},detail:'Tower exit'},
       ...towerChests.filter(chest=>towerFloorAt(chest.z)===floor).map(lootPin),
-      ...(floor.number<5?[{pin:{...floor.stairs,id:'room-stairs',name:'Door to floor '+(floor.number+1),kind:'briar' as const},
+      ...(!floor.final?[{pin:{...floor.stairs,id:'room-stairs',name:'Door to floor '+(floor.number+1),kind:'briar' as const},
         detail:floorRemaining(floor,defeated)?'Locked · Defeat the guardians':'Unlocked'}]:
-        [{pin:{id:'room-boss',x:0,z:floor.z-5,name:'The Hollow Sentinel',kind:'boss' as const},detail:towerCleared?'Defeated':'Available · Lv 13'}]),
+        [{pin:{id:'room-boss',x:floor.guards[0].x,z:floor.guards[0].z,name:monsters[floor.guards[0].kind].name,kind:'boss' as const},detail:defeated.includes(floor.dungeon.boss)?'Defeated':'Available · Lv '+monsters[floor.guards[0].kind].level}]),
     ];
-    return <SystemPanel title={briarWatch.name} section={'Tower dungeon · Floor '+floor.number} close={close} style="atlas-panel atlas-den">
+    return <SystemPanel title={floor.dungeon.name} section={'Tower dungeon · Floor '+floor.number} close={close} style="atlas-panel atlas-den">
     <div className="atlas-den-meta">{floor.title} · {floorRemaining(floor,defeated)} remaining</div>
-    <svg viewBox={`-24 ${floor.z-22} 48 44`} role="img" aria-label={'Briar Watch floor '+floor.number+' map'}>
+    <svg viewBox={`-24 ${floor.z-22} 48 44`} role="img" aria-label={floor.dungeon.name+' floor '+floor.number+' map'}>
       <rect x="-24" y={floor.z-22} width="48" height="44" fill="#181621"/>
       {floor.rooms.map(room=><rect key={room.x+','+room.z} x={room.x-room.w/2} y={room.z-room.d/2} width={room.w} height={room.d}
         fill="#655565" stroke="#c9a978" strokeWidth=".35"/>)}
@@ -217,7 +222,7 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
 
   if(inDen(position.z)){
     const pins=[
-      {pin:{...den.exit,id:'room-exit',name:'Exit to Velren Forest',kind:'gate' as const},detail:'Den exit'},
+      {pin:{...den.exit,id:'room-exit',name:'Exit '+floor.dungeon.name,kind:'gate' as const},detail:'Den exit'},
       {pin:{id:'room-boss',x:0,z:315,name:'Fang Guardian',kind:'boss' as const},detail:bossDefeated?'Defeated':'Available · Lv 7'},
       ...denChests.map(lootPin),
     ];
@@ -265,14 +270,14 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
     ? 'Rank '+den.rank+' · Level '+den.level+' · '+(cleared?'Cleared':'Uncleared')+(bossDefeated?' · Fang Guardian defeated':'')
     : kind==='briar'?'Rank D · Recommended level 12 · '+(towerCleared?'Completed':'The Hollow Sentinel awaits'):descriptions[kind];
   const activate=(event:KeyboardEvent<SVGGElement>,name:string)=>{
-    if(event.key==='Enter'||event.key===' '){event.preventDefault();setRegion('velren');select(name);}
+    if(event.key==='Enter'||event.key===' '){event.preventDefault();setRegion(frontierAt(charted.find(pin=>pin.id===name)?.z??0)?.id??'velren');select(name);}
   };
   return <SystemPanel title="World Atlas" section="Cartographer’s archive / surveyed lands" close={close} style="atlas-panel">
     <div className="atlas-layout">
       <div className="atlas-chart">
         <div className="atlas-map-frame">
           <svg className="atlas-map" viewBox={`${view.x-view.size/2} ${view.z-view.size/2} ${view.size} ${view.size}`}
-            aria-label="Velren Forest coordinate atlas" onWheel={event=>zoom(event.deltaY>0?1.2:1/1.2)}
+            aria-label="World coordinate atlas" onWheel={event=>zoom(event.deltaY>0?1.2:1/1.2)}
             onPointerDown={event=>{if(event.button===0) drag.current={id:event.pointerId,x:event.clientX,y:event.clientY,moved:false};}}
             onPointerMove={event=>{
               const previous=drag.current;
@@ -282,7 +287,7 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
               if(!previous.moved) event.currentTarget.setPointerCapture(event.pointerId);
               const rect=event.currentTarget.getBoundingClientRect(), scale=view.size/Math.min(rect.width,rect.height);
               drag.current={id:event.pointerId,x:event.clientX,y:event.clientY,moved:true};
-              setView(v=>({...v,x:bound(v.x+dx*scale,v.size/2),z:bound(v.z+dz*scale,v.size/2)}));
+              setView(v=>({...v,x:bound(v.x+dx*scale,v.size/2),z:boundZ(v.z+dz*scale,v.size/2)}));
             }}
             onPointerUp={()=>{drag.current=null;}} onPointerCancel={()=>{drag.current=null;}}>
             <Discovery id={mask} cells={discovered}/>
@@ -292,10 +297,16 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
             <g clipPath={`url(#${mask})`}><use href={`#${mask}-terrain`} pointerEvents="none"/></g>
             <rect x={-extent+1.3} y={-extent+1.3} width={span-2.6} height={span-2.6}
               fill="none" stroke="#d6ae73" strokeWidth="2" strokeDasharray="5 3" pointerEvents="none"/>
+            <rect x={-110} y={highlands.north} width={220} height={highlands.south-highlands.north} fill="#303f55" stroke="#96a5bb" strokeWidth="1"/>
+            {[-87,83,-72,83,-81].map((x,i)=><g key={i} transform={`translate(${x} ${[-286,-295,-363,-408,-440][i]})`} fill="none" stroke="#76889f" opacity=".55">
+              {[8,16,25,35].map(r=><ellipse key={r} rx={r} ry={r*.75} strokeWidth=".7"/>)}
+            </g>)}
+            <polyline points={Array.from({length:71},(_,i)=>`${fallsX(-349+i)},${-349+i}`).join(' ')} fill="none" stroke="#759cba" strokeWidth="5"/>
+            {filters.roads&&<polyline points={highlands.road.map(point=>point.join(',')).join(' ')} fill="none" stroke="#c1b391" strokeWidth="1.8" strokeDasharray="4 2"/>}
             {charted.map(item=><g
               key={item.id} className={'atlas-pin '+item.kind+(item.id===selection?' selected':'')+(item.claimed?' claimed':'')+
                 (item.kind==='waystone'&&waystonesActive.includes(item.id)?' unlocked':'')} role="button" tabIndex={0}
-              aria-label={item.name+' · '+(item.kind==='bossCave'?caveCaption(item.name):caption(item.kind))} onClick={()=>{setRegion('velren');select(item.id);}} onKeyDown={event=>activate(event,item.id)}
+              aria-label={item.name+' · '+(item.kind==='bossCave'?caveCaption(item.name):caption(item.kind))} onClick={()=>{setRegion(frontierAt(item.z)?.id??'velren');select(item.id);}} onKeyDown={event=>activate(event,item.id)}
               style={item.tier?{'--pin-color':rarity[item.tier].color} as React.CSSProperties:undefined}
               transform={`translate(${item.x} ${item.z})`}>
               <title>{item.name} · {(item.kind==='bossCave'?caveCaption(item.name):caption(item.kind))}</title><circle r={item.kind==='gate'?6.4:item.kind==='chest'?3.95:5.3} />
@@ -308,11 +319,11 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
             {filters.player&&<PlayerMark position={position}/>}
           </svg>
           <Compass/>
-          <div className="atlas-caption"><strong>Velren Forest</strong><span>Blackwater Wilds · Levels 1–15</span></div>
+          <div className="atlas-caption"><strong>{selectedRegion.name}</strong><span>{selectedRegion.difficulty}</span></div>
         </div>
         <div className="atlas-controls">
           <button onClick={()=>zoom(1/1.27)} aria-label="Zoom in">+</button><button onClick={()=>zoom(1.27)} aria-label="Zoom out">−</button>
-          <button onClick={()=>setView(v=>({...v,x:bound(position.x,v.size/2),z:bound(position.z,v.size/2)}))}>Center on hunter</button>
+          <button onClick={()=>setView(v=>({...v,x:bound(position.x,v.size/2),z:boundZ(position.z,v.size/2)}))}>Center on hunter</button>
           <small>Wheel to zoom · Drag to chart</small>
         </div>
         <div className="atlas-filters" aria-label="Map layers" role="group">
@@ -329,20 +340,20 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
         {unlocked.length>0&&<div className="atlas-waystations">
           <span className="system-kicker">Activated Waystones</span>
           {unlocked.map(stone=><button key={stone.id} aria-pressed={selection===stone.id} onClick={()=>{
-            setFilters(previous=>({...previous,waystone:true}));setRegion('velren');select(stone.id);
-            setView(current=>{const size=Math.min(current.size,200);return {size,x:bound(stone.x,size/2),z:bound(stone.z,size/2)};});
+            setFilters(previous=>({...previous,waystone:true}));setRegion(frontierAt(stone.z)?.id??'velren');select(stone.id);
+            setView(current=>{const size=Math.min(current.size,200);return {size,x:bound(stone.x,size/2),z:boundZ(stone.z,size/2)};});
           }}>{stone.name}</button>)}
         </div>}
         <span className="system-kicker">Region index</span>
         <div className="atlas-regions" role="group" aria-label="Select region">
-          {regions.map(item=><button key={item.id} type="button" aria-pressed={item.id===region} onClick={()=>{setRegion(item.id);select('');}}>
+          {regions.map(item=><button key={item.id} type="button" aria-pressed={item.id===region} onClick={()=>{setRegion(item.id);select('');if(item.id==='elaris') setView({x:0,z:-350,size:247});else if(item.id==='velren'||item.id==='aurelia') setView({x:0,z:0,size:span});}}>
             <strong>{item.name}</strong><small>{item.difficulty} · {item.state}</small>
           </button>)}
         </div>
         <div className="atlas-selection" aria-live="polite">
           <span className="system-kicker">{selected?(seen.has(cellAt(selected.x,selected.z))?'Visited area':'Charted location'):selectedRegion.state==='Planned'?'Unsurveyed region':'Charted region'}</span>
           <strong>{selected?.name??selectedRegion.name}</strong>
-          <p>{selectedCave?caveCaption(selectedCave.name):selected?caption(selected.kind):selectedRegion.detail}</p>
+          <p>{selectedCave?caveCaption(selectedCave.name):selected?.name===fortress.name?'Eight chambers · Ancient Titan · Recommended level 55':selected?caption(selected.kind):selectedRegion.detail}</p>
           {selected&&<>
             <p>{Math.round(Math.hypot(position.x-selected.x,position.z-selected.z))} m away</p>
             {selected.kind==='chest'&&<p>{selected.tier} equipment · {selected.claimed?'Opened':'Unopened'}</p>}
@@ -352,7 +363,7 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
             {selected.kind==='gate'||selected.kind==='briar'?<details>
               <summary>Dungeon treasure</summary>
               <ul className="atlas-dungeon-loot">
-                {(selected.kind==='gate'?denChests:towerChests).map(chest=><li key={chest.id}>
+                {(selected.kind==='gate'?denChests:towerChests.filter(chest=>towerFloorAt(chest.z)?.dungeon.name===selected.name)).map(chest=><li key={chest.id}>
                   {chest.rarity} chest{towerFloorAt(chest.z)?' · Floor '+towerFloorAt(chest.z)?.number:''} · {opened.includes(chest.id)?'Opened':'Unopened'}
                 </li>)}
               </ul>

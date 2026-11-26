@@ -3,7 +3,7 @@ type Point = readonly [number, number];
 export const highlands = {
   id: 'elaris', name: 'Elaris Highlands', difficulty: 'Levels 15–30',
   south: -240, north: -460, color: '#192941', fog: .0135,
-  road: [[-27,-205],[-27,-240],[-17,-269],[21,-298],[21,-329],[38,-354],[25,-387],[-14,-413],[-20,-460]] as readonly Point[],
+  road: [[-27,-205],[-27,-240],[-17,-269],[21,-298],[21,-329],[38,-354],[25,-381],[5,-385],[4,-402],[-14,-413],[-20,-460]] as readonly Point[],
 } as const;
 
 export const frontierAt = (z: number) => z < highlands.south && z > highlands.north ? highlands : undefined;
@@ -26,7 +26,7 @@ export function routeDistance(x:number,z:number,route:readonly Point[]){
 }
 
 const peaks = [[-84,-287,37,43],[82,-295,42,54],[-72,-367,51,58],[84,-407,53,57],[-83,-441,39,42]] as const;
-export function frontierHeight(x:number,z:number,seam:number){
+export function frontierHeight(x:number,z:number,seam:number,deck=false){
   const road=routeDistance(x,z,highlands.road);
   const detail=Math.sin(x*.26+z*.18)*Math.cos(z*.31)*.8;
   const shelf=5+1.25*Math.sin((z+245)*.045)+.8*Math.cos(x*.045);
@@ -37,7 +37,7 @@ export function frontierHeight(x:number,z:number,seam:number){
   const roughness=Math.min(1,Math.max(0,(road-5)/12));
   const riverFade=Math.max(0,1-Math.abs(x-fallsX(z))/8)*Math.max(0,Math.min(1,(-279-z)/5,(z+349)/4));
   const blend=Math.max(0,Math.min(1,(-240-z)/24));
-  return seam+(shelf+roughness*(detail+bulk)-riverFade*3.3-seam)*blend;
+  return seam+(shelf+roughness*(detail+bulk)-(deck?0:riverFade*3.3)-seam)*blend;
 }
 export const frontierCrossing=(x:number,z:number)=>highlandBridge(x,z);
 export const frontierBlocked=(x:number,z:number)=>highlandRiver(x,z)&&!highlandBridge(x,z);

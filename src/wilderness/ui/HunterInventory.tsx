@@ -1,3 +1,4 @@
+import { instanceWeapon } from '../itemInstances';
 import { armorLabels, armorPiece, armorSlots, armorStats, type ArmorId, type ArmorSlot } from '../armor';
 import { effectiveStats } from '../progression';
 import { useState, type CSSProperties } from 'react';
@@ -62,7 +63,7 @@ export function HunterInventory({hero,close,equip,assign,redeem,canRedeem,equipA
   const [page,setPage]=useState(0);
   const [selection,select]=useState(hero.selectedItem);
   const items:Entry[]=[
-    ...hero.items.map((item):Entry=>({id:item.id,name:weapons[item.type].name,icon:item.type,category:'Weapons',tier:item.rarity,count:1,description:weapons[item.type].description})),
+    ...hero.items.map((item):Entry=>({id:item.id,name:instanceWeapon(item).name,icon:item.type,category:'Weapons',tier:item.rarity,count:1,description:instanceWeapon(item).description})),
     ...hero.armorItems.map((id):Entry=>{
       const piece=armorPiece(id);
       return {id,name:piece.name,icon:piece.icon,category:piece.slot==='amulet'||piece.slot==='ring'?'Accessories':'Armor',
