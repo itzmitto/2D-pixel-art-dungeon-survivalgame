@@ -1,4 +1,4 @@
-import { armorBonus, type EquippedArmor } from './armor.ts';
+import { armorBonus, type ArmorEnhancements, type EquippedArmor } from './armor.ts';
 export const statNames=['strength','vitality','agility','intelligence','defense','luck'] as const;
 export type Stat = typeof statNames[number];
 export type Stats = Record<Stat,number>;
@@ -12,7 +12,7 @@ export const progression = {
 };
 export interface Hunter {
   level:number; xp:number; health:number; stats:Stats; statPoints:number; kills:number;
-  equippedArmor?:EquippedArmor;
+  equippedArmor?:EquippedArmor;armorEnhancements?:ArmorEnhancements;
   completedDungeons:string[]; defeatedBosses:string[];
 }
 export const xpNeeded=(level:number)=>{
@@ -22,10 +22,10 @@ export const xpNeeded=(level:number)=>{
 export function rank(level:number) {
   return level>=200?'SSS':level>=150?'SS':level>=100?'S':level>=75?'A':level>=50?'B':level>=25?'C':level>=10?'D':'E';
 }
-export const maxHunterHealth=(hero:Pick<Hunter,'level'|'stats'|'equippedArmor'>)=>
-  progression.baseHealth+(hero.level-1)*progression.healthPerLevel+hero.stats.vitality*progression.vitalityHealth+armorBonus(hero.equippedArmor).health;
-export function effectiveStats(hero:Pick<Hunter,'stats'|'equippedArmor'>):Stats{
-  const {health:_,...bonuses}=armorBonus(hero.equippedArmor);
+export const maxHunterHealth=(hero:Pick<Hunter,'level'|'stats'|'equippedArmor'|'armorEnhancements'>)=>
+  progression.baseHealth+(hero.level-1)*progression.healthPerLevel+hero.stats.vitality*progression.vitalityHealth+armorBonus(hero.equippedArmor,hero.armorEnhancements).health;
+export function effectiveStats(hero:Pick<Hunter,'stats'|'equippedArmor'|'armorEnhancements'>):Stats{
+  const {health:_,...bonuses}=armorBonus(hero.equippedArmor,hero.armorEnhancements);
   const stats={...hero.stats};
   for(const key of Object.keys(bonuses) as (keyof typeof bonuses)[]) stats[key]+=bonuses[key];
   return stats;

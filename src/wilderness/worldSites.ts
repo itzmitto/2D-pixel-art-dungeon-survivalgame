@@ -1,4 +1,5 @@
 export const waystones=[
+  {id:'aurelia',name:'Aurelia Waystone',x:-34,z:-59,yaw:0},
   {id:'ember',name:'Ember Waystone',x:-37,z:7,yaw:0},
   {id:'raven',name:'Raven Waystone',x:-205,z:84,yaw:0},
   {id:'hollowmouth',name:'Hollowmouth Waystone',x:-207,z:-104,yaw:0},

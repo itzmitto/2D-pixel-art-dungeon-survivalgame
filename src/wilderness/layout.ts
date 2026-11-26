@@ -1,3 +1,4 @@
+import { aurelia, aureliaPlaces, aureliaReserved, aureliaRoad } from './aurelia.ts';
 import { bossCaves, caveAt } from './bossCaves.ts';
 import { briarWatch, towerFloorAt } from './briarWatch.ts';
 import { orcApproach, orcCamp, ritualGrounds, explorationSites, explorationTrails } from './worldSites.ts';
@@ -5,6 +6,8 @@ import { inDen } from './denLayout.ts';
 export const extent = 240;
 export const spawn = { x: -43, z: 4 };
 export const landmarks = [
+  aurelia,
+  ...aureliaPlaces,
   { name: 'Ember Clearing', x: -45, z: 0, kind: 'campfire' },
   { name: 'Blackwater Crossing', x: 32, z: 0, kind: 'bridge' },
   { name: 'Moonwatch Ruin', x: 112, z: -96, kind: 'ruin' },
@@ -48,6 +51,7 @@ export const branchTrails = [
   [[-110,99],[-117,85]],
   [[154,99],[154,107]],
   orcApproach,
+  aureliaRoad,
   ...explorationTrails,
 ] as const;
 export function trailDistance(x: number,z: number,trails:readonly (readonly (readonly [number,number])[])[]=branchTrails) {
@@ -72,7 +76,11 @@ export const height = (x: number, z: number) => {
   const base = 1.7 + 1.3*Math.sin(x*.048)*Math.cos(z*.04) + .65*Math.sin((x+z)*.09);
   const ridge = hills.reduce((sum,h)=>sum+h.rise*Math.max(0,1-((x-h.x)**2+(z-h.z)**2)/h.radius**2)**2,0);
   const edge = Math.min(1, Math.max(0, (bank(x,z)-4)/8));
-  return -.9 + (base+.9+ridge)*edge;
+  const terrain=-.9+(base+.9+ridge)*edge;
+  if(!aureliaReserved(x,z,7)) return terrain;
+  const margin=Math.max(0,Math.abs(x-aurelia.cx)-aurelia.halfWidth,Math.abs(z-aurelia.cz)-aurelia.halfDepth);
+  const t=Math.min(1,margin/7), blend=t*t*(3-2*t);
+  return aurelia.elevation+(terrain-aurelia.elevation)*blend;
 };
 export const onBridge = (x: number,z: number) => bridges.some(b=>Math.abs(z-b.z)<2.03 && Math.abs(x-b.x)<13);
 export const surface = (x: number,z: number) => onBridge(x,z) ? Math.max(height(x,z),1.6) : height(x,z);

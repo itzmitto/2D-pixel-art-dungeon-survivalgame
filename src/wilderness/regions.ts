@@ -1,9 +1,10 @@
+import { inAurelia } from './aurelia.ts';
 import { caveAt } from './bossCaves.ts';
 import { briarWatch, towerFloorAt } from './briarWatch.ts';
 import { inDen } from './denLayout.ts';
 export const regions=[
   {id:'velren',name:'Velren Forest',difficulty:'Levels 1–15',state:'Playable',detail:'Blackwater Wilds · Ember Clearing, the crossings, Hollow Fang Den and Briar Watch.'},
-  {id:'aurelia',name:'Aurelia',difficulty:'Safe capital',state:'Planned',detail:'Central capital and safe district.'},
+  {id:'aurelia',name:'Aurelia',difficulty:'Safe capital',state:'Playable',detail:'Golden Tree, merchant, blacksmith and Hunter Guild.'},
   {id:'elaris',name:'Elaris Highlands',difficulty:'Levels 15–30',state:'Planned',detail:'A highland route beyond Velren.'},
   {id:'mournshade',name:'Mournshade Marshes',difficulty:'Levels 30–50',state:'Planned',detail:'Marshlands beyond the surveyed forest.'},
   {id:'sunken',name:'Sunken Bastion',difficulty:'Levels 50–75',state:'Planned',detail:'A future coastal stronghold.'},
@@ -12,4 +13,4 @@ export const regions=[
   {id:'shadowspire',name:'Shadowspire Monolith',difficulty:'Levels 150–200+',state:'Planned',detail:'A future endgame region.'},
 ] as const;
 export type RegionId=typeof regions[number]['id'];
-export const regionLabel=(z:number)=>caveAt(z)?.name??(towerFloorAt(z)?briarWatch.name:inDen(z)?'Hollow Fang Den':'Velren Forest');
+export const regionLabel=(z:number,x=Infinity)=>inAurelia(x,z)?'Aurelia':caveAt(z)?.name??(towerFloorAt(z)?briarWatch.name:inDen(z)?'Hollow Fang Den':'Velren Forest');
