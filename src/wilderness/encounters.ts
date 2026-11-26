@@ -1,10 +1,12 @@
+import { orcModels } from './orcs.ts';
+import { orcCamp } from './worldSites.ts';
 import { goblinModels } from './goblins.ts';
 import { loft, shapedPlate, type CreatureRig } from './creatureGeometry.ts';
 import { skeletonModels } from './skeletons.ts';
 import { den, inDen } from './denLayout.ts';
 import { enemyXpReward, monsters, rarityOrder, rollDrop, type MonsterKind, type Drop } from './huntData.ts';
 import { elementalRarity, instanceWeapon } from './itemInstances.ts';
-import { chestBonus, chestModels, worldChests, type Chest } from './treasure.ts';
+import { chestBonus, chestModels, denChests, worldChests, type Chest } from './treasure.ts';
 import { attackSpeed, earnXP, elemental, maxHunterHealth, mitigation, physical, lootBonus } from './progression.ts';
 import * as T from 'three';
 import { inArc, swingTimer, wolfLoot } from './combatRules.ts';
@@ -57,7 +59,7 @@ export function createEncounters(
     return {...weapon,damage:weapon.damage*(magic||weapon.id==='staff'?elemental(save.stats)*(item&&magic?elementalRarity(item):1):physical(save.stats)),
       attackDuration:weapon.attackDuration/speed, impactTime:weapon.impactTime/speed,cooldown:weapon.cooldown/speed};
   }
-  const models=wolfModels(), skeletons=skeletonModels(), goblins=goblinModels();
+  const models=wolfModels(), skeletons=skeletonModels(), goblins=goblinModels(), orcs=orcModels();
   const group=new T.Group();
   scene.add(group);
   const rangeTimer=swingTimer();
@@ -78,7 +80,8 @@ export function createEncounters(
     echo.add(mesh);echoParts.push({source,mesh});
   });
   echo.visible=false;group.add(echo);
-  let echoLife=0,shake=0,waterTime=0;
+  let echoLife=0,shake=0,waterTime=0,combatUntil=0;
+  const knockback=new T.Vector2();
   function leaveEcho(){
     player.updateWorldMatrix(true,true);
     for(const {source,mesh} of echoParts){
@@ -92,12 +95,7 @@ export function createEncounters(
     fx.emit(player.position,0x83e5ff,'ring',1.36,.42,{grow:3.3,y:.19});
     fx.emit(player.position,0xd1f9ff,'arc',1.08,.29,{y:.91,yaw:player.rotation.y,aspect:1.8});
   }
-  const chests:Chest[]=[...worldChests,
-    {id:'den-hidden',x:20,z:350,rarity:'Rare',weapon:'katana',gold:31,armor:4},
-    {id:'den-entry-supplies',x:-4.1,z:382,rarity:'Common',weapon:'axe',gold:10,armor:1},
-    {id:'den-guardian-reliquary',x:13,z:314,rarity:'Epic',weapon:'shield',gold:38,armor:4,boss:den.boss},
-    {id:'den-reward',x:0,z:311,rarity:'Legendary',weapon:'greatsword',gold:100,armor:7,boss:den.boss},
-  ];
+  const chests=[...worldChests,...denChests];
   const chestViews=chestModels(group,chests,save.opened);
   const cooldowns=new Map<WeaponId,number>();
   let attackWeapon=weapons.longsword, queued:{weapon:Weapon;delay:number;yaw:number}|undefined;
@@ -120,7 +118,7 @@ export function createEncounters(
   const lootMaterial=new T.MeshStandardMaterial({color:'#bd9868',emissive:'#916024',emissiveIntensity:.7,roughness:.36});
   type Enemy = CreatureRig & {
     affinity:T.Mesh<T.BufferGeometry,T.MeshBasicMaterial>;
-    wolfRig:boolean; turn:number;
+    wolfRig:boolean; turn:number; slam?:{x:number;z:number};
     posePhase:number; gait:number; anticipation:number; collapse:number; impactAge:number; retreat:number; strikes:number;
 
     id:string; kind:MonsterKind; spec:typeof monsters[MonsterKind]; home:T.Vector3; hp:number; hpBar:T.Group; fill:T.Mesh;
@@ -142,6 +140,7 @@ export function createEncounters(
     ...[{x:-187,z:64},{x:-178,z:70},{x:-193,z:72}].map((center,i)=>({center,id:'goblin-'+i,kind:'goblin' as const})),
     {center:{x:205,z:-182},id:'elite-gravefang',kind:'elite' as const},
     ...den.encounters.map(entry=>({center:entry,id:entry.id,kind:entry.kind})),
+    ...orcCamp.guards.map(entry=>({center:entry,id:entry.id,kind:entry.kind})),
   ];
   for(const {center,id,kind} of spawns){
     const spec=monsters[kind];
@@ -149,9 +148,10 @@ export function createEncounters(
       const a=rand()*Math.PI*2,r=2+rand()*9;
       return {x:center.x+Math.cos(a)*r,z:center.z+Math.sin(a)*r};
     });
-    const spot=id.startsWith('den-') ? (canWalk(center.x,center.z) ? center : undefined) : candidates.find(({x,z})=>!safe(x,z)&&canWalk(x,z)&&enemies.every(enemy=>Math.hypot(enemy.home.x-x,enemy.home.z-z)>4));
+    const orc=kind==='brute'||kind==='assassin';
+    const spot=id.startsWith('den-')||orc ? (canWalk(center.x,center.z) ? center : undefined) : candidates.find(({x,z})=>!safe(x,z)&&canWalk(x,z)&&enemies.every(enemy=>Math.hypot(enemy.home.x-x,enemy.home.z-z)>4));
     if(!spot) continue;
-    const actor=kind==='skeleton'?skeletons.make():kind==='goblin'?goblins.make():models.make(kind);
+    const actor=kind==='skeleton'?skeletons.make():kind==='goblin'?goblins.make():kind==='brute'||kind==='assassin'?orcs.make(kind==='brute'):models.make(kind);
     actor.root.scale.setScalar(spec.scale);
     const home=new T.Vector3(spot.x,surface(spot.x,spot.z),spot.z);
     actor.root.position.copy(home);
@@ -181,7 +181,7 @@ export function createEncounters(
       opacity:.36,depthWrite:false,side:T.DoubleSide}));
     beam.visible=false;group.add(beam);
     if(save.drops[id]) loot.material.color.set(rarity[save.drops[id].rarity].color);
-    enemies.push({...actor,id,kind,spec,home,affinity,wolfRig:kind!=='skeleton'&&kind!=='goblin',turn:0,posePhase:enemies.length*.92,gait:0,anticipation:0,collapse:1,
+    enemies.push({...actor,id,kind,spec,home,affinity,wolfRig:!orc&&kind!=='skeleton'&&kind!=='goblin',turn:0,posePhase:enemies.length*.92,gait:0,anticipation:0,collapse:1,
       impactAge:3,retreat:0,strikes:0,hp:(oldDefeats.has(id)||save.defeatedBosses.includes(id))?0:spec.health,hpBar,fill,
       statuses:statuses(spec.resistance),visualTick:0,lastVisual:null,cooldown:0,windup:0,heading:rand()*6.28,phase:rand()*10,hitFlash:0,charge:0,chargeWindup:false,chargeHit:false,loot,beam});
   }
@@ -266,6 +266,7 @@ export function createEncounters(
   }
   function hitEnemy(enemy:Enemy, amount:number,element:Weapon['ability']=null,heavy=false){
     if(enemy.hp<=0) return;
+    combatUntil=time+4;
     const damage=Math.round(amount*10)/10;
     enemy.hp=Math.max(0,enemy.hp-damage);
     enemy.hitFlash=.22;
@@ -294,22 +295,26 @@ export function createEncounters(
   }
 
   function hitPlayer(enemy:Enemy, blocking:boolean, charge=false){
+    if(!save.health) return false;
+    combatUntil=time+4;
     const guard=blocking&&inArc(player.position,enemy.root.position,player.rotation.y,3,1.25);
     const shieldBlock=guard&&weapons[save.equipped].model.shield;
     if(!charge&&(shieldBlock || (guard&&save.equipped==='longsword'))){
       impact(player.position);
       if(shieldBlock) splash();
       notify('Blocked');
-      return;
+      return false;
     }
     const barrierActive=magic.shield.active;
     const damage=magic.shield.absorb(Math.max(.5,Math.round((guard ? Math.ceil(enemy.spec.damage*.46) : enemy.spec.damage*(charge?1.3:1))*(1-mitigation(save.stats,save.armor))*100)/100));
     if(barrierActive) splash();
-    if(damage===0){notify('Water barrier absorbed the attack.');return;}
+    if(damage===0){notify('Water barrier absorbed the attack.');return false;}
     save.health=Math.max(0,Math.round((save.health-damage)*100)/100);
+    if(!save.health) knockback.set(0,0);
     impact(player.position);
     if(!save.health){rangeTimer.cancel();queued=undefined;magic.reset();}
     notify(save.health?enemy.spec.name+' hit you.':'You fell in the Blackwater Wilds.');
+    return true;
   }
 
   function lootNearby(){
@@ -322,8 +327,9 @@ export function createEncounters(
     save.items.push({id,type,rarity:tier});
     if(!save.arsenal.includes(type)) save.arsenal.push(type);
   }
+  const visibleChest=(chest:Chest)=>(!chest.boss||save.defeatedBosses.includes(chest.boss))&&(!chest.guardian||oldDefeats.has(chest.guardian));
   function unopenedChest(){
-    return chests.find(chest=>!save.opened.includes(chest.id)&&(!chest.boss||save.defeatedBosses.includes(chest.boss))&&(!chest.guardian||oldDefeats.has(chest.guardian))&&
+    return chests.find(chest=>!save.opened.includes(chest.id)&&visibleChest(chest)&&
       Math.hypot(player.position.x-chest.x,player.position.z-chest.z)<2.9 &&
       clearLine(player.position.x,player.position.z,chest.x,chest.z));
   }
@@ -331,7 +337,33 @@ export function createEncounters(
     Math.hypot(player.position.x-154,player.position.z-103)<4;
   return {
     feedback:notify,
-    transition(){magic.reset();fx.clear();queued=undefined;rangeTimer.cancel();echoLife=shake=0;echo.visible=false;},
+    get inCombat(){
+      return time<combatUntil||rangeTimer.busy||!!queued||magic.dashing||
+        (!safe(player.position.x,player.position.z)&&enemies.some(enemy=>enemy.hp>0&&
+          Math.hypot(player.position.x-enemy.home.x,player.position.z-enemy.home.z)<enemy.spec.leash&&
+          Math.hypot(player.position.x-enemy.root.position.x,player.position.z-enemy.root.position.z)<enemy.spec.awareness));
+    },
+    arrivalClear(x:number,z:number){
+      return !enemies.some(enemy=>enemy.hp>0&&Math.hypot(x-enemy.root.position.x,z-enemy.root.position.z)<7);
+    },
+    grassInfluences(actors:T.Vector4[],gusts:T.Vector4[]){
+      let i=0;
+      for(const enemy of enemies){
+        const p=enemy.root.position;
+        if(i===actors.length) break;
+        if(enemy.hp>0&&Math.hypot(p.x-player.position.x,p.z-player.position.z)<19)
+          actors[i++].set(p.x,p.z,enemy.spec.scale*1.12,.27+enemy.gait*.50);
+      }
+      for(;i<actors.length;i++) actors[i].set(0,0,1,0);
+      fx.grassInfluences(gusts,player.position);
+    },
+    waystoneEffect(){
+      fx.emit(player.position,0x79bfff,'ray',1.95,.53,{y:2.12,aspect:3.2});
+      fx.emit(player.position,0xe1faff,'ring',.64,.55,{grow:7.4});
+      fx.emit(player.position,0x805eff,'ring',.43,.48,{grow:6.4,y:.19,delay:.07});
+      fx.scatter(player.position,0x91e7ff,15,.98);
+    },
+    transition(){combatUntil=0;knockback.set(0,0);magic.reset();fx.clear();queued=undefined;rangeTimer.cancel();echoLife=shake=0;echo.visible=false;},
     get bossHealth(){
       const boss=enemies.find(enemy=>enemy.kind==='guardian');
       return boss&&boss.hp>0&&inDen(player.position.z)&&
@@ -376,6 +408,7 @@ export function createEncounters(
         save.gold+=drop.gold;
         if(loot.kind==='wild') save.fangs+=wolfLoot.count;
         save.materials[drop.material]=(save.materials[drop.material]??0)+1;
+        if(drop.extra) save.materials[drop.extra]=(save.materials[drop.extra]??0)+1;
         save.potions+=drop.potion??0;
         if(drop.weapon) grantWeapon(loot.id+'-'+(save.returns[loot.id]??0),drop.weapon,drop.rarity);
         notify('Collected '+drop.material+' · '+drop.gold+' gold'+
@@ -383,6 +416,7 @@ export function createEncounters(
       } else {
         const chest=unopenedChest();
         if(chest){
+          if(chest.guardians?.some(id=>!oldDefeats.has(id))){notify('Defeat the Thornhide guards to open the war chest.');return;}
           save.opened.push(chest.id);
           save.gold+=chest.gold;
           save.armor=Math.max(save.armor,chest.armor);
@@ -410,12 +444,25 @@ export function createEncounters(
       const loot=lootNearby(), chest=unopenedChest();
       const prompt=!save.health?'E · Return to Ember Clearing':
         loot?(loot.kind==='wild'?'E · Collect wolf loot':'E · Collect monster loot'):
-        chest?'E · Open '+chest.rarity+' Chest':
+        chest?(chest.guardians?.some(id=>!oldDefeats.has(id))?'War chest · Defeat the Thornhide guards':'E · Open '+chest.rarity+' Chest'):
         atCamp()&&save.health<maxHealth()?'E · Rest at campfire':'';
       return {notification,prompt};
     },
     update(dt:number,blocking:boolean){
       time+=dt;
+      if(save.health&&knockback.lengthSq()>.04){
+        const {x,z}=player.position, dx=knockback.x*dt,dz=knockback.y*dt;
+        if(canWalk(x+dx,z)) player.position.x+=dx;
+        if(canWalk(player.position.x,z+dz)) player.position.z+=dz;
+        knockback.multiplyScalar(Math.exp(-8.5*dt));
+      }
+      let discovered=false;
+      for(const chest of chests){
+        if(save.seenChests.includes(chest.id)||!visibleChest(chest)||Math.hypot(player.position.x-chest.x,player.position.z-chest.z)>13||
+          !clearLine(player.position.x,player.position.z,chest.x,chest.z)) continue;
+        save.seenChests.push(chest.id);discovered=true;
+      }
+      if(discovered) changed();
       shake=Math.max(0,shake-dt*2.8);
       if(notification&&time>=noticeUntil){notification='';changed();}
       if(queued){
@@ -509,33 +556,57 @@ export function createEncounters(
         let gait=0;
         const previousX=p.x, previousZ=p.z;
         if(enemy.statuses.halted){
-          enemy.windup=0; enemy.charge=0; enemy.chargeWindup=false;
+          enemy.windup=0; enemy.charge=0; enemy.chargeWindup=false;enemy.slam=undefined;
         } else if(enemy.charge>0){
           enemy.charge=Math.max(0,enemy.charge-dt);
-          const x=p.x+Math.sin(enemy.heading)*dt*16,z=p.z+Math.cos(enemy.heading)*dt*16;
+          const speed=enemy.kind==='assassin'?19:16;
+          const x=p.x+Math.sin(enemy.heading)*dt*speed,z=p.z+Math.cos(enemy.heading)*dt*speed;
           if(canWalk(x,z)&&spaceAround(enemy,x,z)){p.x=x;p.z=z;gait=1;}
           else enemy.charge=0;
           if(!enemy.chargeHit&&Math.hypot(p.x-player.position.x,p.z-player.position.z)<2.1){
             enemy.chargeHit=true;
             hitPlayer(enemy,blocking,true);
+            if(enemy.kind==='assassin'){fx.slash(p,null,enemy.heading,1.48);enemy.impactAge=0;}
           }
-          if(!enemy.charge) enemy.cooldown=enemy.kind==='guardian'?1.8:1.45;
+          if(!enemy.charge){
+            enemy.cooldown=enemy.kind==='guardian'?1.8:1.45;
+            if(enemy.kind==='assassin') enemy.retreat=.70;
+          }
         } else if(enemy.windup>0){
           enemy.windup=Math.max(0,enemy.windup-dt);
           if(!enemy.windup){
             enemy.cooldown=spec.recovery;
             enemy.impactAge=0;
-            if(enemy.kind==='goblin'&&++enemy.strikes%2===0) enemy.retreat=.72;
-            if(enemy.chargeWindup){
+            if((enemy.kind==='goblin'||enemy.kind==='assassin')&&++enemy.strikes%2===0) enemy.retreat=.72;
+            if(enemy.slam){
+              const target=enemy.slam;
+              enemy.slam=undefined;
+              fx.emit(target,0xffaf54,'ring',.72,.52,{grow:7.2});
+              fx.emit(target,0x9b5026,'scorch',2.24,.74,{opacity:.55});
+              fx.emit(target,0xb4a28c,'mist',1.38,.42,{grow:4.8,y:.21});
+              fx.scatter(target,0xd9a276,10,.22);
+              if(gap<9) shake=Math.max(shake,.58);
+              if(Math.hypot(player.position.x-target.x,player.position.z-target.z)<3.15&&
+                clearLine(p.x,p.z,player.position.x,player.position.z)&&hitPlayer(enemy,blocking,true)&&save.health){
+                knockback.set(player.position.x-p.x,player.position.z-p.z).setLength(18);
+              }
+            } else if(enemy.chargeWindup){
               enemy.chargeWindup=false;
               enemy.charge=enemy.kind==='guardian'?.65:.43;enemy.chargeHit=false;
             } else if(aggro && gap<spec.reach+.35 && Math.abs(player.position.y-p.y)<1.9 &&
               clearLine(p.x,p.z,player.position.x,player.position.z)) hitPlayer(enemy,blocking);
           }
-        } else if(['guardian','dire','elite'].includes(enemy.kind)&&aggro&&gap>4&&gap<(enemy.kind==='guardian'?15:9)&&enemy.cooldown===0&&
+        } else if(enemy.kind==='brute'&&aggro&&gap>2.25&&gap<5.2&&enemy.cooldown===0&&
           clearLine(p.x,p.z,player.position.x,player.position.z)){
           enemy.heading=Math.atan2(player.position.x-p.x,player.position.z-p.z);
-          enemy.windup=enemy.kind==='guardian'?1.15:.89;enemy.chargeWindup=true;
+          enemy.slam={x:p.x+Math.sin(enemy.heading)*1.9,z:p.z+Math.cos(enemy.heading)*1.9};
+          enemy.windup=1.27;
+          fx.emit(enemy.slam,0xff9d41,'ring',3.4,1.27,{opacity:.96});
+          fx.emit(enemy.slam,0xffd16d,'ring',2.9,1.27,{opacity:.49,y:.12});
+        } else if(['guardian','dire','elite','assassin'].includes(enemy.kind)&&aggro&&!enemy.retreat&&gap>4&&gap<(enemy.kind==='guardian'?15:9)&&enemy.cooldown===0&&
+          clearLine(p.x,p.z,player.position.x,player.position.z)){
+          enemy.heading=Math.atan2(player.position.x-p.x,player.position.z-p.z);
+          enemy.windup=enemy.kind==='guardian'?1.15:enemy.kind==='assassin'?.51:.89;enemy.chargeWindup=true;
           const aim={x:Math.sin(enemy.heading),z:Math.cos(enemy.heading)};
           for(let i=1;i<=(enemy.kind==='guardian'?10:7);i++){
             const point={x:p.x+aim.x*i,z:p.z+aim.z*i};
@@ -544,8 +615,12 @@ export function createEncounters(
           }
         } else if(aggro&&!enemy.retreat&&gap<spec.reach&&enemy.cooldown===0&&clearLine(p.x,p.z,player.position.x,player.position.z)){
           enemy.windup=spec.windup;
-        } else if(!aggro||gap>spec.reach-.18||enemy.retreat){
-          const goal = enemy.retreat && aggro ? {
+        } else if(!aggro||gap>spec.reach-.18||enemy.retreat||enemy.kind==='assassin'){
+          const strafe=enemy.kind==='assassin'&&aggro&&!enemy.retreat&&gap<5&&enemy.cooldown>0;
+          const side=enemy.id.endsWith('north')?-1:1;
+          const goal = strafe ? {
+            x:p.x+side*(p.z-player.position.z),z:p.z-side*(p.x-player.position.x),
+          } : enemy.retreat && aggro ? {
             x:p.x+(p.x-player.position.x)*3,z:p.z+(p.z-player.position.z)*3,
           } : aggro ? packGoal(enemy,gap) : homeGap>8 ? enemy.home : {
             x:enemy.home.x+Math.sin(time*.31+enemy.phase)*5,
@@ -558,13 +633,13 @@ export function createEncounters(
               const angle=Math.atan2(dx,dz)+factor;
               const x=p.x+Math.sin(angle)*step,z=p.z+Math.cos(angle)*step;
               if(!canWalk(x,z)||!spaceAround(enemy,x,z)||safe(x,z)||Math.hypot(x-player.position.x,z-player.position.z)<.9) return false;
-              p.x=x;p.z=z;enemy.heading=angle;gait=aggro?(gap>8?1:.71):.40;
+              p.x=x;p.z=z;enemy.heading=strafe?Math.atan2(player.position.x-x,player.position.z-z):angle;gait=aggro?(gap>8?1:.71):.40;
               return true;
             };
             tryStep(0)||tryStep(.87)||tryStep(-.87);
           }
         }
-        if(enemy.windup>0&&!enemy.chargeWindup) enemy.heading=Math.atan2(player.position.x-p.x,player.position.z-p.z);
+        if(enemy.windup>0&&!enemy.chargeWindup&&!enemy.slam) enemy.heading=Math.atan2(player.position.x-p.x,player.position.z-p.z);
         const angle=enemy.heading-root.rotation.y;
         const facing=Math.atan2(Math.sin(angle),Math.cos(angle));
         root.rotation.y+=facing*(1-Math.exp(-10*dt));
@@ -580,7 +655,7 @@ export function createEncounters(
             : dt*(3.1+enemy.gait*9.4);
         }
         const leapDuration=enemy.kind==='guardian'?.65:.43;
-        const currentWindup=enemy.chargeWindup?(enemy.kind==='guardian'?1.15:.89):spec.windup;
+        const currentWindup=enemy.slam?1.27:enemy.chargeWindup?(enemy.kind==='guardian'?1.15:enemy.kind==='assassin'?.51:.89):spec.windup;
         enemy.anticipation=T.MathUtils.damp(enemy.anticipation,
           enemy.windup>0?Math.min(1,(1-enemy.windup/currentWindup)*1.5+.22):0,enemy.windup>0?12:20,dt);
         enemy.animate({time,phase:enemy.posePhase,gait:enemy.gait,
@@ -600,7 +675,7 @@ export function createEncounters(
       echoMaterial.opacity=echoLife*.98;
       for(const enemy of enemies){
         enemy.hpBar.position.copy(enemy.root.position);
-        enemy.hpBar.position.y+=2.23*enemy.spec.scale;
+        enemy.hpBar.position.y+=(enemy.kind==='brute'?2.62:enemy.kind==='assassin'?2.51:2.23)*enemy.spec.scale;
         enemy.hpBar.quaternion.copy(camera.quaternion);
         enemy.fill.material=enemy.windup>0?alert:red;
         enemy.fill.scale.x=enemy.hp/enemy.spec.health;
@@ -639,7 +714,7 @@ export function createEncounters(
     },
     dispose(){
       scene.remove(group);
-      models.dispose();skeletons.dispose();goblins.dispose();
+      models.dispose();skeletons.dispose();goblins.dispose();orcs.dispose();
       affinityGeometry.dispose();Object.values(affinities).forEach(material=>material.dispose());
       for(const resource of [barGeometry,backing,red,alert,lootGeometry,drawstring,lootFang,lootCoin,bagTie,boneLoot,metalLoot,lootBeamGeometry,lootMaterial,sparkGeometry,sparks.material,echoMaterial]) resource.dispose();
       fx.dispose();

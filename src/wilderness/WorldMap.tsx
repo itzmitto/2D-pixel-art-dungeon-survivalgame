@@ -1,4 +1,5 @@
-import { worldChests } from './treasure';
+import { waystones } from './worldSites';
+import { denChests, worldChests } from './treasure';
 import { memo, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { branchTrails, bridges, extent, hills, landmarks, path, river, southPath } from './layout';
 import { den, inDen } from './denLayout';
@@ -21,6 +22,8 @@ const symbols={
   ruin:'M-4 5v-9h2v3h4v-5h2V5z M-1 5v-3h2v3',
   bridge:'M-5 -3H5M-5 3H5M-3 -3v6m3-6v6m3-6v6',
   campfire:'M0 -6C5-1 4 3 0 4c-5-2-5-5 0-10zM-4 6l8-2m-8 0 8 2',
+  orcCamp:'M-5 5 0-5 5 5zM-5-5l9 8m1-8-9 8M-5-5h2m8 0H3',
+  waystone:'M-5 5H5M-3 3l1-8 2-2 2 2 1 8zM0-3l1.3 2L0 1l-1.3-2Z',
   camp:'M-5 5 0-5 5 5zM0-4v9',
   cave:'M-6 4-3-3 0-5 4-2 6 4zM-2 4V1l2-2 2 2v3',
   tower:'M-4 5v-8l-1-1v-2h2v2h2v-2h2v2h2v-2h2v2l-1 1v8zM0 0v2',
@@ -30,6 +33,7 @@ const symbols={
 };
 const descriptions:Record<keyof typeof symbols,string>={
   ruin:'Ancient ruin',bridge:'River crossing',campfire:'Safe campfire',camp:'Abandoned camp',
+  waystone:'Waystone',orcCamp:'Orc encampment',
   chest:'Discovered treasure',cave:'Cave landmark',tower:'Tower landmark · interior closed',gate:'Dungeon gate',boss:'Boss arena',
 };
 const AtlasTerrain=memo(function AtlasTerrain(){
@@ -39,15 +43,34 @@ const AtlasTerrain=memo(function AtlasTerrain(){
     {texture?<image href={texture} x={-extent} y={-extent} width={span} height={span}/>:
       <rect x={-extent} y={-extent} width={span} height={span} fill="#4f5440"/>}
     {lines.map((d,i)=><path key={i} d={d} fill="none" stroke={i%2?'#d3b889':'#bbac83'} strokeWidth={i%2?.66:.46} opacity={.37+i*.026}/>)}
-    <g fill="#b8ab7b" fillOpacity=".29" stroke="#162a27" strokeWidth=".4">
-      {cartographicTrees.map(({x,z,s},i)=><path key={i} d={`M${x} ${z-s}l${-s*.7} ${s*1.7}h${s*1.4}z`}/>)}
+    <g fill="#334a35" stroke="#d2bd84" strokeWidth=".22" opacity=".87">
+      {cartographicTrees.map(({x,z,s},i)=><path key={i}
+        d={`M${x} ${z-s}l${-s*.46} ${s*.71}h${s*.15}l${-s*.43} ${s*.73}h${s*.48}v${s*.28}h${s*.47}v${-s*.28}h${s*.48}l${-s*.43} ${-s*.73}h${s*.15}z`}/>)}
     </g>
-    {hills.map(h=><path key={h.x} d={`M${h.x-9} ${h.z+4}l7-10 5 6 3-4 6 8z`} fill="#c7b592" fillOpacity=".29" stroke="#d3bb8b" strokeWidth=".55"/>)}
+    <g className="atlas-mountains">
+      {hills.map(h=><g key={h.x} transform={`translate(${h.x} ${h.z}) scale(${h.radius/44})`}>
+        {[[-13,5,.79],[9,2,.86],[-3,7,1.22],[19,10,.62]].map(([x,z,size])=>
+          <g key={x} transform={`translate(${x} ${z}) scale(${size})`}>
+            <path d="M-14 7-6-3-2-6 3-14 7-5 10-3 15 7 9 5 2 7-5 5Z" fill="#bcb08a" stroke="#413f37" strokeWidth=".68"/>
+            <path d="M3-14 4-6 1-2 6 1 7 4 15 7 10-3 7-5Z" fill="#62624e"/>
+            <path d="M-2-6l5-8 4 9-3-2-3 3-1-3Z" fill="#eee0b4"/>
+            <path d="m-3-3-5 7m8-5-3 5m11-4 4 5m-9-9 3 6" fill="none" stroke="#565447" strokeWidth=".58"/>
+          </g>)}
+      </g>)}
+    </g>
     <g fill="none" strokeLinecap="round">
-      {trails.map((line,i)=><polyline key={i} points={line} stroke="#d0b286" strokeWidth={i<2?2.4:1.35} strokeDasharray={i<2?undefined:'2 2'}/>)}
-      <polyline points={riverLine} stroke="#9cae9f" strokeWidth="17"/>
-      <polyline points={riverLine} stroke="#315e69" strokeWidth="14"/>
-      <polyline points={riverLine} stroke="#a1cbcd" strokeWidth=".75" opacity=".65"/>
+      {trails.map((line,i)=><g key={i}>
+        <polyline points={line} stroke="#423a2e" strokeWidth={i<2?3.9:2.3} opacity=".67"/>
+        <polyline points={line} stroke={i<2?'#e2c594':'#cda978'} strokeWidth={i<2?1.78:1.30} strokeDasharray={i<2?undefined:'2.2 1.75'}/>
+      </g>)}
+      <polyline points={riverLine} stroke="#d5bd8b" strokeWidth="17"/>
+      <polyline points={riverLine} stroke="#2a555c" strokeWidth="14.2"/>
+      <polyline points={riverLine} stroke="#7faab1" strokeWidth="9.1" opacity=".38"/>
+      <polyline points={riverLine} stroke="#a4d1d1" strokeWidth="1.3" strokeDasharray="6 10 3 8" opacity=".67"/>
+    </g>
+    <g className="atlas-place-labels">
+      <text x="-95" y="-103" transform="rotate(-8 -95 -103)">VELREN FOREST</text>
+      <text x="48" y="61" transform="rotate(77 48 61)">BLACKWATER</text>
     </g>
     {bridges.map(b=><rect key={b.name} x={b.x-13} y={b.z-2.5} width={26} height={5} fill="#daba87" stroke="#352820"/>)}
   </>;
@@ -67,20 +90,23 @@ function Compass(){
 }
 function PlayerMark({position,scale=1}:{position:Position;scale?:number}){
   return <g transform={`translate(${position.x} ${position.z}) rotate(${-position.yaw*180/Math.PI}) scale(${scale})`} pointerEvents="none">
-    <circle r="8" fill="#1c2424" stroke="#e2c28b" strokeWidth=".8"/>
+    <circle r="8.8" fill="#1c2424" stroke="#e2c28b" strokeWidth=".8"/><circle r="10.7" fill="none" stroke="#ffe4a3" strokeWidth=".55" strokeDasharray="2 2"/>
     <path d="M0 6 4-4 0-2-4-4Z" fill="#ffe6a7"/>
   </g>;
 }
 
-export function WorldMap({position,discovered,cleared,bossDefeated,opened,close}:{
-  position:Position;discovered:number[];cleared:boolean;bossDefeated:boolean;opened:readonly string[];close:()=>void;
+export function WorldMap({position,discovered,cleared,bossDefeated,opened,waystonesActive,seenChests,travel,close}:{
+  position:Position;discovered:number[];cleared:boolean;bossDefeated:boolean;opened:readonly string[];waystonesActive:readonly string[];seenChests:readonly string[];travel:(id:string)=>string;close:()=>void;
 }){
   const mask=useId();
   const [region,setRegion]=useState<RegionId>('velren');
-  const [selection,select]=useState<string>('');
+  const [selection,setSelection]=useState<string>('');
+  const [travelError,reportTravel]=useState('');
+  const select=(id:string)=>{setSelection(id);reportTravel('');};
   const seen=useMemo(()=>new Set(discovered),[discovered]);
   const [view,setView]=useState({x:0,z:0,size:span});
   const drag=useRef<{id:number;x:number;y:number;moved:boolean}|null>(null);
+  const unlocked=waystones.filter(stone=>waystonesActive.includes(stone.id));
   const zoom=(factor:number)=>setView(current=>{
     const size=Math.max(85,Math.min(span,current.size*factor));
     const x=current.size===span?position.x:current.x,z=current.size===span?position.z:current.z;
@@ -96,15 +122,31 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,close}
       {(position.z<339||bossDefeated)&&<g transform="translate(0 315) scale(.26)" fill="none" stroke="#f0d5a1" strokeWidth="1.5">
         <path d={symbols.boss}/><title>{bossDefeated?'Fang Guardian defeated':'Fang Guardian · Boss arena'}</title>
       </g>}
+      {denChests.filter(chest=>seenChests.includes(chest.id)||opened.includes(chest.id)).map(chest=>
+        <g className="atlas-pin" key={chest.id} transform={`translate(${chest.x} ${chest.z}) scale(.21)`}>
+          <title>{chest.rarity} Chest · {opened.includes(chest.id)?'Claimed':'Unclaimed'}</title><path d={symbols.chest}/>
+        </g>)}
       <PlayerMark position={position} scale={.27}/>
     </svg><p>Gold arrow: hunter · Blue: exit {bossDefeated?'· Fang Guardian defeated':''}</p>
+    {unlocked.length>0&&<div className="atlas-waystations den-travel">
+      <span className="system-kicker">Activated Waystones</span>
+      {unlocked.map(stone=><button key={stone.id} onClick={()=>reportTravel(travel(stone.id))}>
+        Travel to {stone.name} · Free
+      </button>)}
+      {travelError&&<p className="atlas-travel-error" role="status">{travelError}</p>}
+    </div>}
   </SystemPanel>;
 
   const selectedRegion=regions.find(item=>item.id===region)??regions[0];
-  const pins=[...landmarks,...worldChests.filter(chest=>seen.has(cellAt(chest.x,chest.z))&&
-    (opened.includes(chest.id)||Math.hypot(position.x-chest.x,position.z-chest.z)<17))
-    .map(chest=>({name:chest.rarity+' Chest · '+(opened.includes(chest.id)?'Claimed':'Nearby'),x:chest.x,z:chest.z,kind:'chest' as const}))];
-  const selected=pins.find(item=>item.name===selection&&seen.has(cellAt(item.x,item.z)));
+  const pins=[
+    ...landmarks.map(site=>({...site,id:site.name})),
+    ...waystones.map(site=>({...site,kind:'waystone' as const})),
+    ...worldChests.filter(chest=>opened.includes(chest.id)||seenChests.includes(chest.id))
+      .map(chest=>({id:chest.id,name:chest.rarity+' Chest · '+(opened.includes(chest.id)?'Claimed':chest.guardians?'War Chest':'Unclaimed'),x:chest.x,z:chest.z,kind:'chest' as const})),
+  ];
+  const charted=pins.filter(item=>seen.has(cellAt(item.x,item.z))||
+    (item.kind==='waystone'&&waystonesActive.includes(item.id)));
+  const selected=charted.find(item=>item.id===selection);
   const caption=(kind:keyof typeof symbols)=>kind==='gate'
     ? 'Rank '+den.rank+' · Level '+den.level+' · '+(cleared?'Cleared':'Uncleared')+(bossDefeated?' · Fang Guardian defeated':'')
     : descriptions[kind];
@@ -136,13 +178,14 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,close}
             <g clipPath={`url(#${mask})`}><use href={`#${mask}-terrain`} pointerEvents="none"/></g>
             <rect x={-extent+1.3} y={-extent+1.3} width={span-2.6} height={span-2.6}
               fill="none" stroke="#d6ae73" strokeWidth="2" strokeDasharray="5 3" pointerEvents="none"/>
-            {pins.filter(item=>seen.has(cellAt(item.x,item.z))).map(item=><g
-              key={item.name} className={'atlas-pin '+(item.name===selection?'selected':'')} role="button" tabIndex={0}
-              aria-label={item.name+' · '+caption(item.kind)} onClick={()=>{setRegion('velren');select(item.name);}} onKeyDown={event=>activate(event,item.name)}
+            {charted.map(item=><g
+              key={item.id} className={'atlas-pin '+item.kind+(item.id===selection?' selected':'')+
+                (item.kind==='waystone'&&waystonesActive.includes(item.id)?' unlocked':'')} role="button" tabIndex={0}
+              aria-label={item.name+' · '+caption(item.kind)} onClick={()=>{setRegion('velren');select(item.id);}} onKeyDown={event=>activate(event,item.id)}
               transform={`translate(${item.x} ${item.z})`}>
               <title>{item.name} · {caption(item.kind)}</title><circle r={item.kind==='gate'?7:5.6} />
               <path d={symbols[item.kind]} />
-              <text y={item.kind==='gate'?16:-9} textAnchor="middle">{item.name}{item.kind==='gate'&&cleared?' ✓':''}</text>
+              {(item.id===selection||item.kind!=='chest'&&item.kind!=='waystone')&&<text y={item.kind==='gate'?16:-9} textAnchor="middle">{item.name}{item.kind==='gate'&&cleared?' ✓':''}</text>}
             </g>)}
             <PlayerMark position={position}/>
           </svg>
@@ -159,6 +202,13 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,close}
           {key==='tower'?'Tower':label}</li>)}</ul>
       </div>
       <aside className="atlas-index">
+        {unlocked.length>0&&<div className="atlas-waystations">
+          <span className="system-kicker">Activated Waystones</span>
+          {unlocked.map(stone=><button key={stone.id} aria-pressed={selection===stone.id} onClick={()=>{
+            setRegion('velren');select(stone.id);
+            setView(current=>{const size=Math.min(current.size,200);return {size,x:bound(stone.x,size/2),z:bound(stone.z,size/2)};});
+          }}>{stone.name}</button>)}
+        </div>}
         <span className="system-kicker">Region index</span>
         <div className="atlas-regions" role="group" aria-label="Select region">
           {regions.map(item=><button key={item.id} type="button" aria-pressed={item.id===region} onClick={()=>{setRegion(item.id);select('');}}>
@@ -169,6 +219,10 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,close}
           <span className="system-kicker">{selected?'Discovered location':selectedRegion.state==='Planned'?'Unsurveyed region':'Charted region'}</span>
           <strong>{selected?.name??selectedRegion.name}</strong>
           <p>{selected?caption(selected.kind):selectedRegion.detail}</p>
+          {selected?.kind==='waystone'&&(waystonesActive.includes(selected.id)
+            ? <button onClick={()=>reportTravel(travel(selected.id))}>Travel here · Free</button>
+            : <p>Activate this stone in person with E.</p>)}
+          {travelError&&<p className="atlas-travel-error" role="status">{travelError}</p>}
           {selectedRegion.state==='Planned'&&<p>Future region · No travel route available.</p>}
         </div>
       </aside>

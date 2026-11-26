@@ -1,10 +1,12 @@
+import { den } from './denLayout.ts';
+import { orcCamp } from './worldSites.ts';
 import * as T from 'three';
 import { surface, randomSequence } from './layout.ts';
 import { loft, shapedPlate, joint, meshPart, rigidBatcher } from './creatureGeometry.ts';
 import { rarity, type Rarity, type WeaponId } from './weapons.ts';
 import { rarityOrder } from './huntData.ts';
 
-export type Chest={id:string;x:number;z:number;rarity:Rarity;weapon:WeaponId;gold:number;armor:number;boss?:string;guardian?:string};
+export type Chest={id:string;x:number;z:number;rarity:Rarity;weapon:WeaponId;gold:number;armor:number;boss?:string;guardian?:string;guardians?:readonly string[]};
 export const worldChests:Chest[]=[
   {id:'ember-cache',x:-52,z:3,rarity:'Common',weapon:'shield',gold:8,armor:1},
   {id:'raven-cache',x:-189,z:62,rarity:'Uncommon',weapon:'axe',gold:14,armor:2},
@@ -12,6 +14,12 @@ export const worldChests:Chest[]=[
   {id:'greyfen-cache',x:169,z:-160,rarity:'Epic',weapon:'greatsword',gold:32,armor:4},
   {id:'gravespur-cache',x:207,z:-181,rarity:'Mythic',weapon:'katana',gold:156,armor:8,guardian:'elite-gravefang'},
 ];
+export const denChests:Chest[]=[
+    {id:'den-hidden',x:20,z:350,rarity:'Rare',weapon:'katana',gold:31,armor:4},
+    {id:'den-entry-supplies',x:-4.1,z:382,rarity:'Common',weapon:'axe',gold:10,armor:1},
+    {id:'den-guardian-reliquary',x:13,z:314,rarity:'Epic',weapon:'shield',gold:38,armor:4,boss:den.boss},
+    {id:'den-reward',x:0,z:311,rarity:'Legendary',weapon:'greatsword',gold:100,armor:7,boss:den.boss},
+  ];
 export const addedChestSites:Chest[]=[
   {id:'ember-north-grove',x:-59,z:-16,rarity:'Common',weapon:'staff',gold:7,armor:1},
   {id:'southwater-bank',x:59,z:113,rarity:'Common',weapon:'shield',gold:9,armor:1},
@@ -23,7 +31,8 @@ export const addedChestSites:Chest[]=[
   {id:'hollowmouth-overlook',x:-194,z:-117,rarity:'Epic',weapon:'staff',gold:34,armor:4},
   {id:'moonwatch-deep-woods',x:106,z:-116,rarity:'Epic',weapon:'katana',gold:36,armor:4},
 ];
-worldChests.push(...addedChestSites);
+worldChests.push(...addedChestSites,{id:'thornhide-war-chest',...orcCamp.chest,rarity:'Epic',weapon:'axe',gold:87,armor:6,
+  guardians:orcCamp.guards.map(guard=>guard.id)});
 export const cacheBoulders=[{x:-94,z:129,r:1.65},{x:-195,z:-115,r:1.25}];
 export function chestBonus(chest:Chest,seed:number){
   let key=seed;
@@ -118,6 +127,13 @@ export function chestModels(group:T.Group,chests:readonly Chest[],opened:readonl
         meshPart(root,rune,style.magic,x,.32,side*.561).scale.setScalar(tier===5?.92:.66);
       }
     }
+    if(chest.guardians){
+      for(const face of [-1,1]){
+        meshPart(root,wall,style.trim,0,.166,face*.54).scale.set(1.36,.084,.115);
+        for(const x of [-.40,-.19,.19,.40]) meshPart(root,rivet,style.trim,x,.166,face*.61);
+      }
+      for(const x of [-.68,.68]) meshPart(lid,style.band,style.trim,x);
+    }
     meshPart(lid,style.lid,style.own);
     for(const x of tier>=4?[-.53,0,.53]:[-.49,.49]) meshPart(lid,style.band,style.trim,x);
     for(const x of [-.46,.46]) meshPart(lid,hinge,style.trim,x,.013,-.018);
@@ -147,6 +163,7 @@ export function chestModels(group:T.Group,chests:readonly Chest[],opened:readonl
     interior.position.y=.19;interior.visible=false;root.add(interior);
     const shine=new T.Mesh(beam,new T.MeshBasicMaterial({color:rarity[chest.rarity].color,transparent:true,opacity:.24,depthWrite:false}));
     shine.position.y=1.48;root.add(shine);group.add(root);
+    if(chest.guardians) root.scale.set(1.26,1.19,1.22);
     const isOpen=opened.includes(chest.id);
     lid.rotation.x=isOpen?-1.48:0;
     reveal.visible=false;shine.visible=false;
@@ -167,7 +184,7 @@ export function chestModels(group:T.Group,chests:readonly Chest[],opened:readonl
         holder.interior.material.opacity=.14+holder.opening*.27;
         holder.reveal.visible=holder.opening>0;
         holder.reveal.position.y=.22+Math.min(1.0,(2.65-holder.opening)*.87);
-        holder.shine.visible=holder.root.visible&&holder.tier>=2&&(!nowOpen||holder.opening>0);
+        holder.shine.visible=holder.root.visible&&(!holder.chest.guardians||holder.chest.guardians.every(id=>defeated.includes(id)))&&holder.tier>=2&&(!nowOpen||holder.opening>0);
         holder.shine.material.opacity=holder.opening>0?Math.min(.47,holder.opening*.24):.16;
       }
     },

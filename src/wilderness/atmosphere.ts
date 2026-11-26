@@ -3,16 +3,16 @@ import { height, randomSequence } from './layout';
 
 export function atmosphere(scene:T.Scene, fireY:number) {
   scene.background=new T.Color('#182330');
-  scene.fog=new T.FogExp2('#182330',.014);
-  scene.add(new T.HemisphereLight('#a6c5f7','#635447',1.78));
-  const moon=new T.DirectionalLight('#b8d1fc',2.08);
+  scene.fog=new T.FogExp2('#182533',.0125);
+  scene.add(new T.HemisphereLight('#a6c5f7','#77705a',1.91));
+  const moon=new T.DirectionalLight('#c7dcff',2.18);
   moon.castShadow=true;
   moon.shadow.mapSize.set(1024,1024);
   Object.assign(moon.shadow.camera,{left:-35,right:35,top:35,bottom:-35,near:1,far:140});
   moon.shadow.camera.updateProjectionMatrix();
-  moon.shadow.normalBias=.11;
+  moon.shadow.normalBias=.066;
   moon.shadow.bias=-.0003;
-  moon.shadow.radius=2;
+  moon.shadow.radius=2.5;
   scene.add(moon,moon.target);
   const glow=new T.PointLight('#ff993d',65,22,2);
   glow.position.set(-45,fireY+1.45,0);

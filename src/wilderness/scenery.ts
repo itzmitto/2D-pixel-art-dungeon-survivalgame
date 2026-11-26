@@ -1,7 +1,9 @@
+import { waystones, orcCamp, orcApproach } from './worldSites';
+import { buildOrcCamp } from './orcCamp';
 import { addedChestSites, cacheBoulders } from './treasure';
 import { huntScenery } from './huntScenery';
 import * as T from 'three';
-import { bank, bridges, clearing, extent, height, inForest, landmarkDistance, randomSequence, trailDistance } from './layout';
+import { bank, branchTrails, bridges, clearing, extent, height, inForest, landmarks, randomSequence, trailDistance } from './layout';
 
 export function scenery(scene:T.Scene, seed:number) {
   const obstacles:{x:number;z:number;r:number}[]=[];
@@ -26,12 +28,18 @@ export function scenery(scene:T.Scene, seed:number) {
     batch.entries.push({matrix:form.matrix.clone(),color:color?.clone()});
   }
   const tint=new T.Color();
+  const fixedLandmarks=landmarks.filter(location=>location!==orcCamp);
+  const oldTrails=branchTrails.filter(trail=>trail!==orcApproach);
+  const landmarkDistance=(x:number,z:number)=>Math.min(...fixedLandmarks.map(location=>Math.hypot(x-location.x,z-location.z)));
+  const reservedSite=(x:number,z:number,r:number)=>Math.hypot(x-orcCamp.x,z-orcCamp.z)<13+r||
+    waystones.some(stone=>Math.hypot(x-stone.x,z-stone.z)<r+3.1)||
+    (x>106&&x<129&&z>64&&z<110&&trailDistance(x,z)<r+3.2);
   const nearCache=(x:number,z:number,r:number)=>addedChestSites.some(chest=>Math.hypot(x-chest.x,z-chest.z)<r+1.35);
   for(let i=0;i<5100;i++){
     const x=(rand()*2-1)*extent,z=(rand()*2-1)*extent;
-    if((!inForest(x,z)&&rand()>.025)||trailDistance(x,z)<5||bank(x,z)<11||clearing(x,z)<14||landmarkDistance(x,z)<13) continue;
+    if((!inForest(x,z)&&rand()>.025)||trailDistance(x,z,oldTrails)<5||bank(x,z)<11||clearing(x,z)<14||landmarkDistance(x,z)<13) continue;
     const y=height(x,z),h=4+rand()*7,rot=rand()*6.3;
-    const reserved=nearCache(x,z,h*.08);
+    const reserved=nearCache(x,z,h*.08)||reservedSite(x,z,h*.08);
     if(!reserved) write(trunkGeo,wood,x,y+h*.28,z,h*.13,h*.62,h*.13,rot);
     for(let j=0;j<3;j++){
       const r=h*(.29-j*.058);
@@ -43,9 +51,9 @@ export function scenery(scene:T.Scene, seed:number) {
   const rocks:{x:number;z:number;r:number}[]=[];
   for(let i=0;i<480;i++){
     const x=(rand()*2-1)*extent,z=(rand()*2-1)*extent,r=.65+rand()*2.1;
-    if(trailDistance(x,z)<4||clearing(x,z)<12||bank(x,z)<8||landmarkDistance(x,z)<12) continue;
+    if(trailDistance(x,z,oldTrails)<4||clearing(x,z)<12||bank(x,z)<8||landmarkDistance(x,z)<12) continue;
     const rotation=rand()*6;
-    if(nearCache(x,z,r)) continue;
+    if(nearCache(x,z,r)||reservedSite(x,z,r)) continue;
     write(rockGeo,stone,x,height(x,z)+r*.36,z,r,r*.76,r*.86,rotation);
     rocks.push({x,z,r:r*.88});
   }
@@ -145,5 +153,6 @@ export function scenery(scene:T.Scene, seed:number) {
   for(let i=0;i<3;i++) place(wood,-45,fireY+.23,0,1.5,.28,.28).rotation.y=i*1.1;
   obstacles.push({x:-45,z:0,r:1.04});
   huntScenery(scene,obstacles);
-  return {obstacles,rocks,fireY};
+  const animateCamp=buildOrcCamp(scene,obstacles);
+  return {obstacles,rocks,fireY,animateCamp};
 }

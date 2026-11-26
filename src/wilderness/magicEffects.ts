@@ -243,6 +243,17 @@ export function createMagicEffects(group:T.Group) {
   }
   return {
     emit,scatter,lightning,slash,impact,treasure,
+    grassInfluences(output:T.Vector4[],player:Point){
+      let i=0;
+      for(const effect of pools[0]){
+        if(i===output.length) break;
+        if(effect.life<=0||effect.delay>0||(effect.shape!=='arc'&&effect.shape!=='ring'&&effect.shape!=='frost'&&effect.shape!=='scorch')) continue;
+        const p=effect.mesh.position;
+        if(Math.hypot(p.x-player.x,p.z-player.z)>25) continue;
+        output[i++].set(p.x,p.z,Math.min(7,effect.mesh.scale.x+1),effect.life/effect.max*.74);
+      }
+      for(;i<output.length;i++) output[i].set(0,0,1,0);
+    },
     barrier(player:T.Vector3,active:boolean){
       barrier.visible=active;
       if(active){barrier.position.copy(player);barrier.position.y+=.99;}

@@ -1,3 +1,5 @@
+import { waystones } from './worldSites';
+import { waystoneModels } from './waystones';
 import { den, denWalkable, inDen } from './denLayout';
 import { denScenery } from './denScene';
 import { legacyItem } from './itemInstances';
@@ -43,7 +45,9 @@ export function startWilderness(
 
   scene.add(body);
   const water=terrain(scene);
-  const {obstacles,rocks,fireY}=scenery(scene,save.seed);
+  const {obstacles,rocks,fireY,animateCamp}=scenery(scene,save.seed);
+  const stones=waystoneModels(scene);
+  obstacles.push(...waystones.map(({x,z})=>({x,z,r:.95})));
   const nearby = obstacleGrid(obstacles);
   const canWalk = (x:number,z:number) => inDen(z) ? denWalkable(x,z) : walkable(x,z,nearby(x,z));
   const updateDen=denScenery(scene);
@@ -51,9 +55,11 @@ export function startWilderness(
   body.position.set(start.x,surface(start.x,start.z),start.z);
   body.rotation.y=start.yaw;
   onPosition(start);
-  const animateGrass=meadow(scene,body.position,rocks,save.seed);
+  const grass=meadow(scene,body.position,rocks,save.seed);
   const animateNight=atmosphere(scene,fireY);
   const encounters=createEncounters(scene,camera,body,save,canWalk,onSaveChange);
+  let travel:{target:Position;remaining:number;arrived:boolean}|undefined;
+  const nearStone=()=>waystones.find(stone=>Math.hypot(body.position.x-stone.x,body.position.z-stone.z)<3.65);
   let blocking=false, frameDelta=0, prompt='', notification='', abilitySeconds=0,bossHealth=0;
   function equip(id:WeaponId,itemId?:string){
     const best=save.items.filter(item=>item.type===id).sort((a,b)=>rarity[b.rarity].multiplier-rarity[a.rarity].multiplier)[0];
@@ -87,7 +93,7 @@ export function startWilderness(
   observer.observe(canvas);
   resize();
   window.addEventListener('keydown',e=>{
-    if(e.ctrlKey||e.altKey||e.metaKey) return;
+    if(e.ctrlKey||e.altKey||e.metaKey||travel) return;
     if(e.code==='KeyM'||e.code==='Tab'||e.code==='KeyP'||(e.code==='Escape'&&uiOpen())){
       e.preventDefault();
       keys.clear();
@@ -113,12 +119,20 @@ export function startWilderness(
       const atGate=!inDen(p.z)&&Math.hypot(p.x-den.gate.x,p.z-den.gate.z)<3.4;
       const atExit=inDen(p.z)&&Math.hypot(p.x-den.exit.x,p.z-den.exit.z)<2.8;
       const wasInside=inDen(p.z);
+      const stone=save.health?nearStone():undefined;
       if(save.health&&(atGate||atExit)){
         const point=atGate?den.entry:{x:den.gate.x,z:den.gate.z+3.9};
         p.set(point.x,surface(point.x,point.z),point.z);
         body.rotation.y=atGate?Math.PI:0;
         encounters.transition();
         keys.clear();blocking=false;
+      } else if(stone){
+        if(save.waystones.includes(stone.id)) encounters.feedback('Open the World Atlas with M to travel.');
+        else {
+          save.waystones.push(stone.id);
+          encounters.waystoneEffect();
+          encounters.feedback(stone.name+' activated · Fast travel unlocked');
+        }
       } else encounters.interact();
       if(wasInside!==inDen(p.z)) focus.copy(p);
       onPosition({x:body.position.x,z:body.position.z,yaw:body.rotation.y});
@@ -133,7 +147,7 @@ export function startWilderness(
   window.addEventListener('pointercancel',()=>{blocking=false;},{signal});
   canvas.addEventListener('contextmenu',e=>e.preventDefault(),{signal});
   canvas.addEventListener('pointerdown',e=>{
-    if(!e.isPrimary||uiOpen()) return;
+    if(!e.isPrimary||uiOpen()||travel) return;
     if(e.button===2) blocking=true;
     if(e.button===0&&!blocking) encounters.attack(knight.playAttack);
   },{signal});
@@ -144,9 +158,23 @@ export function startWilderness(
   const loop=createGameLoop({
     scheduler:browserFrameScheduler,
     update(dt){
-      frameDelta=uiOpen()?0:dt;
+      frameDelta=uiOpen()&&!travel?0:dt;
+      if(travel){
+        travel.remaining-=dt;
+        if(!travel.arrived&&travel.remaining<=.43){
+          travel.arrived=true;
+          const next=travel.target;
+          body.position.set(next.x,surface(next.x,next.z),next.z);
+          body.rotation.y=next.yaw;
+          focus.set(next.x,body.position.y+.75,next.z);
+          onPosition(next);
+          encounters.waystoneEffect();
+        }
+        body.visible=travel.remaining>.64||travel.remaining<.35;
+        if(travel.remaining<=0){travel=undefined;body.visible=true;}
+      }
       shakePhase+=frameDelta;
-      if(uiOpen()||!save.health) {keys.clear(); blocking=false;}
+      if(uiOpen()||!save.health||travel) {keys.clear(); blocking=false;}
       const x=Number(keys.has('KeyD'))-Number(keys.has('KeyA'));
       const z=Number(keys.has('KeyS'))-Number(keys.has('KeyW'));
       const length=encounters.dashing?0:Math.hypot(x,z);
@@ -167,13 +195,15 @@ export function startWilderness(
         facing:length?Math.atan2(x,z):undefined,
       });
       p.y=T.MathUtils.lerp(p.y,surface(p.x,p.z),1-Math.exp(-22*dt));
-      if(!uiOpen()) {
+      if(!uiOpen()&&!travel) {
         encounters.update(dt,blocking);
         const view=encounters.ui();
         if(save.health&&Math.hypot(p.x-den.gate.x,p.z-den.gate.z)<3.4)
           view.prompt='E · Enter Hollow Fang Den · Rank E · Suggested level 5';
         if(save.health&&Math.hypot(p.x-den.exit.x,p.z-den.exit.z)<2.8)
           view.prompt='E · Return to Blackwater Wilds';
+        const stone=save.health?nearStone():undefined;
+        if(stone) view.prompt=save.waystones.includes(stone.id)?'M · Travel from '+stone.name:'E · Activate '+stone.name;
         const seconds=Math.ceil(encounters.abilityRemaining);
         if(view.prompt!==prompt||view.notification!==notification||seconds!==abilitySeconds||bossHealth!==encounters.bossHealth){
           prompt=view.prompt; notification=view.notification; abilitySeconds=seconds; bossHealth=encounters.bossHealth;
@@ -194,7 +224,9 @@ export function startWilderness(
     },
     render(time){
       water.value=time;
-      animateGrass(time,encounters.dashing);
+      grass.update(time,encounters.dashing,encounters.grassInfluences);
+      stones.update(time,body.position,save.waystones);
+      animateCamp(time,body.position);
       animateNight(time,body.position);
       updateDen(time);
       encounters.render(frameDelta);
@@ -205,6 +237,22 @@ export function startWilderness(
   canvas.addEventListener('webglcontextrestored',()=>loop.start(),{signal});
   loop.start();
   return {
+    travelTo(id:string){
+      if(travel||!save.health) return 'Travel is unavailable right now.';
+      if(inDen(body.position.z)&&body.position.z<330)
+        return 'Waystone travel is unavailable in the Fang Guardian arena.';
+      if(encounters.inCombat) return 'Leave combat before using a Waystone.';
+      const stone=waystones.find(entry=>entry.id===id);
+      if(!stone||!save.waystones.includes(id)) return 'Activate this Waystone in the wilderness first.';
+      const target={x:stone.x,z:stone.z+2.55,yaw:stone.yaw};
+      if(Math.hypot(body.position.x-target.x,body.position.z-target.z)<3) return 'You are already at this Waystone.';
+      if(!canWalk(target.x,target.z)||!encounters.arrivalClear(target.x,target.z)) return 'The destination is obstructed or threatened.';
+      keys.clear();blocking=false;
+      encounters.transition();
+      encounters.waystoneEffect();
+      travel={target,remaining:.88,arrived:false};
+      return '';
+    },
     equip,
     allocate(stat:Stat){if(allocate(save,stat)) onSaveChange();},
     assign(slot:number,itemId:string|null){
@@ -224,7 +272,7 @@ export function startWilderness(
       onSaveChange();
     },
     dispose(){
-    loop.stop(); controller.abort(); observer.disconnect(); encounters.dispose();
+    loop.stop(); controller.abort(); observer.disconnect(); encounters.dispose();stones.dispose();grass.dispose();
     const geometries=new Set<T.BufferGeometry>(),materials=new Set<T.Material>();
     scene.traverse(object=>{
       if(object instanceof T.InstancedMesh) object.dispose();

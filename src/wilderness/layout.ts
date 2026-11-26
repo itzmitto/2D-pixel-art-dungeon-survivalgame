@@ -1,3 +1,4 @@
+import { orcApproach, orcCamp } from './worldSites.ts';
 import { inDen } from './denLayout.ts';
 export const extent = 240;
 export const spawn = { x: -43, z: 4 };
@@ -13,6 +14,7 @@ export const landmarks = [
   { name: 'Hollow Fang Den', x: -187, z: -114, kind: 'gate' },
   { name: 'Greyfen Tower', x: 169, z: -168, kind: 'tower' },
   { name: 'Lantern Rest', x: 154, z: 103, kind: 'campfire' },
+  orcCamp,
   { name: 'Southwater Crossing', x: 32, z: 107, kind: 'bridge' },
 ] as const;
 export const hills = [
@@ -39,10 +41,11 @@ export const branchTrails = [
   [[-176,100],[-185,85],[-189,67]],
   [[-110,99],[-117,85]],
   [[154,99],[154,107]],
+  orcApproach,
 ] as const;
-export function trailDistance(x: number,z: number) {
+export function trailDistance(x: number,z: number,trails:readonly (readonly (readonly [number,number])[])[]=branchTrails) {
   let distance=Math.min(Math.abs(z-path(x)),Math.abs(z-southPath(x)));
-  for(const trail of branchTrails){
+  for(const trail of trails){
     for(let i=1;i<trail.length;i++){
       const [ax,az]=trail[i-1], [bx,bz]=trail[i];
       const vx=bx-ax,vz=bz-az;

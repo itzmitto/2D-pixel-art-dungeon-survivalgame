@@ -38,13 +38,13 @@ export function terrainTexture(){
   for(let row=0;row<size;row++) for(let col=0;col<size;col++){
     const x=-extent+col/size*extent*2,z=-extent+row/size*extent*2;
     const elevation=height(x,z), forest=inForest(x,z);
-    const slope=(height(x-2,z-2)-height(x+2,z+2))*18;
+    const slope=(height(x-2,z-2)-height(x+2,z+2))*24;
     const grain=Math.sin(x*7.29+z*15.72)*3+Math.sin(x*.38-z*.24)*2;
     const blend=Math.min(1,Math.max(0,(elevation-3)/8));
     const shade=slope+grain;
-    const base=forest?[33,56,48]:[75,75,53];
+    const base=forest?[65,81,55]:[135,119,78];
     const index=(row*size+col)*4;
-    for(let channel=0;channel<3;channel++) data.data[index+channel]=base[channel]*(1-blend)+[109,102,83][channel]*blend+shade;
+    for(let channel=0;channel<3;channel++) data.data[index+channel]=base[channel]*(1-blend)+[165,145,109][channel]*blend+shade;
     data.data[index+3]=255;
   }
   context.putImageData(data,0,0);

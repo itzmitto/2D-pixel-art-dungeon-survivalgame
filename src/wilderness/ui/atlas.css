@@ -21,3 +21,16 @@
 .atlas-selection {padding:.65rem 0;border-top:1px solid var(--line);font-size:.8rem;}.atlas-selection strong{font:400 1rem Georgia,serif;margin:.3rem 0;}.atlas-selection p{margin:.2rem 0;}
 .wild .atlas-den { width:min(100%,34rem); }.atlas-den svg{display:block;width:100%;height:min(58dvh,30rem);}.atlas-den-meta{font-size:.8rem;color:var(--silver);}
 @media(max-width:730px){ .atlas-layout {grid-template-columns:1fr;}.atlas-index{border-left:0;padding-left:0;}.atlas-regions{grid-template-columns:1fr 1fr;}.atlas-map{height:46dvh;} }
+.wild .atlas-panel { border-color:#be965c; background:linear-gradient(152deg,#433e2d,#1e2626 52%,#342c23); }
+.atlas-map-frame { border:3px double #be985e; padding:5px; background:#392d22; box-shadow:0 0 0 1px #6d523b,inset 0 0 18px #120d07; }
+.atlas-map-frame::after { content:'';position:absolute;inset:7px;border:1px solid #e4c38b70;pointer-events:none; }
+.atlas-place-labels { fill:#f0da9f; opacity:.79; letter-spacing:4px; font:600 8px Georgia,serif; paint-order:stroke; stroke:#354431; stroke-width:1.4; }
+.atlas-pin.waystone circle { stroke:#81bfce; fill:#1e3741; }
+.atlas-pin.waystone path { stroke:#b9e8ee; }
+.atlas-pin.waystone.unlocked circle { fill:#255569; stroke:#c0efff; }
+.atlas-pin.orcCamp path { stroke:#ffc295; }
+.atlas-pin.chest path,.atlas-pin.boss path { stroke:#ffcd73; }
+.atlas-waystations { display:grid; gap:.26rem; border-bottom:1px solid var(--line); padding:0 0 .62rem; margin-bottom:.7rem; }
+.atlas-waystations button { text-align:left; font-size:.78rem!important; }
+.atlas-selection button { margin-top:.38rem; }
+.atlas-travel-error { color:#ffd0a4!important; }
