@@ -1,4 +1,5 @@
 import * as T from 'three';
+import { fracturedRock, weatherStone } from './rockDetail.ts';
 import { loft, meshPart, rigidBatcher } from './creatureGeometry.ts';
 import { surface } from './layout.ts';
 import { orcCamp } from './worldSites.ts';
@@ -11,11 +12,12 @@ export function buildOrcCamp(scene:T.Scene,obstacles:{x:number;z:number;r:number
   const iron=new T.MeshStandardMaterial({color:0x75808a,metalness:.54,roughness:.45});
   const bone=new T.MeshStandardMaterial({color:0xbbad8e,roughness:.81});
   const stone=new T.MeshStandardMaterial({color:0x4a4a43,roughness:.98});
+  weatherStone(stone,.43);
   const flame=new T.MeshBasicMaterial({color:0xff732a,toneMapped:false});
   const ember=new T.MeshBasicMaterial({color:0xffde78,toneMapped:false});
   const pole=new T.CylinderGeometry(.093,.19,1,6);
   const spike=new T.ConeGeometry(.13,.46,6).translate(0,.48,0);
-  const beam=new T.BoxGeometry(1,1,1), rock=new T.DodecahedronGeometry(1,0);
+  const beam=new T.BoxGeometry(1,1,1), rock=fracturedRock(184);
   const skull=loft([[-.24,.24,-.14,.16],[0,.33,-.19,.28],[.21,.23,-.15,.17],[.44,.135,-.13,.053]],12);
   const horn=new T.TorusGeometry(.28,.061,5,10,2.5);
   const lick=loft([[0,.18,-.10,.10],[.29,.14,-.092,.096],[.56,.09,-.043,.072],[.86,.012,0,.015]],7).rotateX(-Math.PI/2);

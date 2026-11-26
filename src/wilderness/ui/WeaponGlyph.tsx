@@ -33,7 +33,7 @@ export function WeaponGlyph({kind,id}:{kind:string;id:string}){
         <stop stopColor="#f7fcff"/><stop offset=".34" stopColor={energy}/><stop offset="1" stopColor={body}/>
       </radialGradient>
     </defs>
-    <g transform={scytheWeapon?'translate(23 36) rotate(29) scale(.86)':axe?'translate(30 35) rotate(29) scale(.92)':
+    <g transform={scytheWeapon?'translate(20 36) rotate(29) scale(.86)':axe?'translate(30 35) rotate(29) scale(.92)':
       weapon==='shield'?'translate(27 28) rotate(28) scale(.78)':'translate(33 32) rotate(38) scale(.95)'} strokeLinejoin="round">
       <path d={staff||axe||scytheWeapon?'M-2.8-22H2.8L2.2 29 0 33-3 29Z':'M-3 5H3L2.6 23 5 26 3 30-3 30-5 26-2.6 23Z'} fill={dark} stroke="#141522" strokeWidth="1.9"/>
       <path d={staff||axe||scytheWeapon?'M0-21-1.1 29m-2 0h6M-2-8h4m-4 5h4m-4 6h4':wrap} fill="none" stroke={trim} strokeWidth="1.05"/>

@@ -120,9 +120,9 @@ export function weaponModel(id:WeaponId,relic?:RelicId) {
   const edges=new T.ShaderMaterial({
     uniforms:{clock,rank,energyColor},transparent:true,depthWrite:false,side:T.DoubleSide,
     forceSinglePass:true,blending:T.AdditiveBlending,
-    vertexShader:`varying vec2 vUv; void main(){vUv=uv;vec3 p=position;
+    vertexShader:`uniform float clock; varying vec2 vUv; void main(){vUv=uv;vec3 p=position;
       p.z+=sin(22.*uv.x-clock*17.)*.038*sin(uv.x*3.14159);
-      gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.);}`.replace('varying vec2','uniform float clock; varying vec2'),
+      gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.);}`,
     fragmentShader:`uniform float clock,rank; uniform vec3 energyColor; varying vec2 vUv;
       void main(){
         float t=vUv.x;
@@ -163,6 +163,7 @@ export function weaponModel(id:WeaponId,relic?:RelicId) {
       }
     }else{
       const helix=new class extends T.Curve<T.Vector3>{
+        constructor(){super();}
         override getPoint(t:number,target=new T.Vector3()){
           return target.set(Math.cos(t*n*6.283)*w,lo+t*(hi-lo),Math.sin(t*n*6.283)*w);
         }
@@ -270,7 +271,8 @@ export function weaponModel(id:WeaponId,relic?:RelicId) {
       add(ribbon(scrolls,.008),engraving,0,0,0,left);
       runeMarks(silhouette.filter((_,i)=>i%2===0).map(([x,y])=>[x*.72,y*.76,.150]),.052,1,left);
       for(const y of [-.20,.14]) add(new T.TorusGeometry(.09,.025,5,12).rotateY(Math.PI/2),grip,0,y,-.095,left);
-      const flowing=new T.Mesh(ribbon(scrolls,.020),edges);flowing.position.z=.006;left.add(flowing);
+      const flowing=new T.Mesh(ribbon(scrolls,.020),edges);
+      flowing.position.z=.006;left.add(flowing);activeEdges=flowing;
     }
   }else if(id==='axe'){
     const slate=relic==='slatebreaker',blood=relic==='bloodfang';
@@ -364,6 +366,13 @@ export function weaponModel(id:WeaponId,relic?:RelicId) {
     activeEdges=new T.Mesh(ribbon([spectral],.055),edges);
     right.add(activeEdges);
   }
+  const adornment=id==='staff'?[.214,1.51]:id==='axe'?[.165,.989]:
+    id==='scythe'?[.173,1.66]:id==='shield'?[.133,.213]:id==='katana'?[.110,.233]:[.14,.211];
+  for(const side of [-1,1]){
+    const [w,y]=adornment;
+    fit([[side*w*.63,y-.030],[side*w*1.19,y-.013],[side*w*1.43,y+.082],
+      [side*w*.91,y+.046],[side*w*.53,y+.024]],.034,.009,trim,rankDetails,.061);
+  }
   for(const [parent,patterns] of rigid) for(const [material,parts] of patterns){
     const colored=material===crystal&&parts.every(p=>p.hasAttribute('color'));
     const compatible=parts.map(source=>{
@@ -407,7 +416,7 @@ export function weaponModel(id:WeaponId,relic?:RelicId) {
       engraving.visible=level>=2||Boolean(relic);
     }
     crystal.emissiveIntensity=.04+rank.value*(.65+.23*Math.sin(time*4.3));
-    if(activeEdges) activeEdges.visible=level>=(id==='axe'?1:3);
+    if(activeEdges) activeEdges.visible=level>=(id==='axe'||id==='shield'?1:3);
     if(floats){
       floats.count=level<2?0:Math.min(8,(id==='staff'||id==='scythe'?3:0)+level-2);
       for(let i=0;i<floats.count;i++){

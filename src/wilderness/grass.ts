@@ -185,7 +185,7 @@ export function meadow(scene:T.Scene,player:T.Vector3,obstacles:readonly Terrain
       diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.28,.47,.56)*(.33+tip*.67),vegetationLight.y*.73);
       diffuseColor.rgb*=1.-vegetationLight.w*.19;`)
       .replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
-      float transmit=max(0.,dot(normalize(vNormal),normalize(vec3(-.42,-.76,.33))));
+      float transmit=max(0.,dot(normal,normalize(vec3(-.42,-.76,.33))));
       totalEmissiveRadiance+=diffuseColor.rgb*(.09+.22*transmit)*tip;
       totalEmissiveRadiance+=vec3(.27,.46,.79)*vegetationLight.z*(.18+.40*tip);
       totalEmissiveRadiance+=vec3(.052,.013,.001)*vegetationLight.x*tip;`);

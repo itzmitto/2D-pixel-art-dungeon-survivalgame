@@ -7,16 +7,18 @@ export function atmosphere(scene:T.Scene, fireY:number) {
   scene.background=background;scene.fog=fog;
   const target=new T.Color();
   let previous=NaN;
-  scene.add(new T.HemisphereLight('#a6c5f7','#77705a',1.91));
-  const moon=new T.DirectionalLight('#c7dcff',2.18);
+  scene.add(new T.HemisphereLight('#a4bee1','#847264',1.47));
+  const moon=new T.DirectionalLight('#cbdcff',2.48);
   moon.castShadow=true;
-  moon.shadow.mapSize.set(1024,1024);
-  Object.assign(moon.shadow.camera,{left:-35,right:35,top:35,bottom:-35,near:1,far:140});
+  moon.shadow.mapSize.set(1536,1536);
+  Object.assign(moon.shadow.camera,{left:-31,right:31,top:31,bottom:-31,near:1,far:140});
   moon.shadow.camera.updateProjectionMatrix();
-  moon.shadow.normalBias=.066;
+  moon.shadow.normalBias=.045;
   moon.shadow.bias=-.0003;
-  moon.shadow.radius=2.5;
+  moon.shadow.radius=2.8;
   scene.add(moon,moon.target);
+  const fill=new T.DirectionalLight('#6c92ad',.48);
+  fill.position.set(20,28,31);scene.add(fill);
   const glow=new T.PointLight('#ff993d',65,22,2);
   glow.position.set(-45,fireY+1.45,0);
   scene.add(glow);
@@ -50,8 +52,9 @@ export function atmosphere(scene:T.Scene, fireY:number) {
     vertexShader:`varying vec2 tex; void main(){tex=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
     fragmentShader:`uniform float time; varying vec2 tex;
     void main(){vec2 p=(tex-.5)*2.;float a=pow(max(0.,1.-dot(p,p)),2.);
-    float veil=.62+.22*sin(p.x*6.+p.y*4.+time*.24)+.15*cos(p.y*12.-time*.31);
-    gl_FragColor=vec4(.35,.44,.53,a*veil*.18);}`,
+    float wind=p.x*6.+p.y*3.+time*.25;
+    float veil=.42+.22*sin(wind)+.17*cos(p.y*12.-time*.31+sin(wind))+.11*sin(p.x*17.-p.y*5.+time*.12);
+    gl_FragColor=vec4(.27,.38,.49,a*veil*.24);}`,
   });
   const mistGeo=new T.PlaneGeometry(45,22).rotateX(-Math.PI/2);
   const wisps=Array.from({length:16},(_,i)=>{
@@ -69,7 +72,7 @@ export function atmosphere(scene:T.Scene, fireY:number) {
     fog.density=T.MathUtils.lerp(fog.density,region?.fog??.0125,blend);
     moon.position.set(player.x-28,player.y+58,player.z-24);
     moon.target.position.copy(player);
-    glow.intensity=65+7*Math.sin(time*9)+4*Math.sin(time*15.3);
+    glow.intensity=72+7*Math.sin(time*9)+4*Math.sin(time*15.3);
     mistMaterial.uniforms.time.value=time;
     for(const {mesh,x} of wisps) mesh.position.x=x+Math.sin(time*.13+mesh.position.z)*5;
     for(let i=0;i<count;i++){

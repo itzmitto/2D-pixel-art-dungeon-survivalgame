@@ -1,4 +1,5 @@
 import * as T from 'three';
+import { fracturedRock } from './rockDetail.ts';
 import { joint, loft, meshPart, rigidBatcher, shapedPlate, type CreatureRig } from './creatureGeometry.ts';
 
 export function elementalBossModels(){
@@ -9,7 +10,7 @@ export function elementalBossModels(){
   const chips=own(new T.MeshStandardMaterial({color:0x51414a,roughness:.96,flatShading:true}));
   const fire=own(new T.MeshStandardMaterial({color:0xff8e49,emissive:0xc74e23,emissiveIntensity:1.32,roughness:.56}));
   const vertical=(profiles:Parameters<typeof loft>[0],sides=10)=>own(loft(profiles,sides).rotateX(-Math.PI/2));
-  const stone=own(new T.DodecahedronGeometry(1,0));
+  const stone=own(fracturedRock(742,'slab'));
   const prism=own(new T.IcosahedronGeometry(1,0));
   const fissure=own(shapedPlate([[-.07,-.31],[-.015,-.11],[-.09,-.06],[.02,.15],[.078,.28],[.061,.10],[.015,-.045],[.09,-.068],[.005,-.31]],.012,0));
   const core=own(new T.OctahedronGeometry(.22));

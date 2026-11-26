@@ -1,9 +1,10 @@
 import * as T from 'three';
+import { fracturedRock } from './rockDetail.ts';
 import { joint, meshPart, rigidBatcher, shapedPlate } from './creatureGeometry.ts';
 import type { RegionalKind } from './huntData.ts';
 
 export function regionalModels(){
-  const rock=new T.DodecahedronGeometry(1);
+  const rock=fracturedRock(912);
   const shard=new T.OctahedronGeometry(1);
   const box=new T.BoxGeometry();
   const tusk=new T.ConeGeometry(1,1,5);

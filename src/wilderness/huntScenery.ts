@@ -1,4 +1,5 @@
 import * as T from 'three';
+import { fracturedRock, weatherStone } from './rockDetail.ts';
 import { height } from './layout';
 import { loft, shapedPlate, meshPart } from './creatureGeometry';
 
@@ -7,11 +8,12 @@ export const huntSites={
 };
 export function huntScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number}[]){
   const stone=new T.MeshStandardMaterial({color:0x50535a,roughness:.95,flatShading:true});
+  weatherStone(stone,.45);
   const wood=new T.MeshStandardMaterial({color:0x4c3527,roughness:.92});
   const bone=new T.MeshStandardMaterial({color:0xa89579,roughness:.91});
   const tarp=new T.MeshStandardMaterial({color:0x62604a,roughness:1,side:T.DoubleSide});
   const ash=new T.MeshStandardMaterial({color:0x292521,roughness:1});
-  const rock=new T.DodecahedronGeometry(1,0), pole=new T.CylinderGeometry(.06,.11,1,6);
+  const rock=fracturedRock(305), pole=new T.CylinderGeometry(.06,.11,1,6);
   const plank=new T.BoxGeometry(1,1,1), wheel=new T.TorusGeometry(.68,.066,5,12);
   const skull=loft([[-.22,.10,-.13,.14],[-.13,.17,-.15,.19],[.06,.19,-.12,.15],[.22,.09,-.07,.092]],10);
   const rib=new T.TorusGeometry(.26,.032,5,11,Math.PI*1.1);

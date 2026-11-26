@@ -1,13 +1,16 @@
 import * as T from 'three';
+import { fracturedRock, weatherStone } from './rockDetail.ts';
 import { den, denWalkable } from './denLayout';
 import { randomSequence, surface } from './layout';
 
 export function denScenery(scene:T.Scene){
   const slate=new T.MeshStandardMaterial({color:0x34343e,roughness:1});
   const basalt=new T.MeshStandardMaterial({color:0x262633,roughness:.94});
+  weatherStone(slate,.12);
+  weatherStone(basalt,.12);
   const glow=new T.MeshStandardMaterial({color:0x637d99,emissive:0x476888,emissiveIntensity:.85,roughness:.35});
   const rune=new T.MeshBasicMaterial({color:0x8faccc,transparent:true,opacity:.79});
-  const rockGeo=new T.DodecahedronGeometry(1);
+  const rockGeo=fracturedRock(157,'pillar');
   const wallGeo=new T.BoxGeometry(1,1,1);
   const crystal=new T.OctahedronGeometry(1);
   const rand=randomSequence(591);

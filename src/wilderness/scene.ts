@@ -16,6 +16,7 @@ import { allocate, effectiveStats, maxHunterHealth, moveSpeed, type Stat } from 
 import * as T from 'three';
 import { browserFrameScheduler, createGameLoop } from '../game/core/loop';
 import { atmosphere } from './atmosphere';
+import { reflectionLighting } from './reflectionLighting';
 import { meadow } from './grass';
 import { onBridge, spawn, surface, walkable } from './layout';
 import { scenery } from './scenery';
@@ -47,6 +48,8 @@ export function startWilderness(
   renderer.shadowMap.type=T.PCFShadowMap;
   renderer.toneMapping=T.ACESFilmicToneMapping;
   const scene=new T.Scene();
+  const environment=reflectionLighting();
+  scene.environment=environment;scene.environmentIntensity=.62;
   const camera=new T.PerspectiveCamera(43,1,.3,400);
   const knight=createDarkKnight();
   const body=knight.root;
@@ -510,7 +513,7 @@ export function startWilderness(
       }
     });
     geometries.forEach(g=>g.dispose()); materials.forEach(m=>m.dispose());
-    renderer.dispose();
+    environment.dispose();renderer.dispose();
     },
   };
 }

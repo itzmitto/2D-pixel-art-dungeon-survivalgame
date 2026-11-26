@@ -1,4 +1,5 @@
 import * as T from 'three';
+import { fracturedRock, weatherStone } from './rockDetail.ts';
 import { loft, meshPart, rigidBatcher, shapedPlate } from './creatureGeometry.ts';
 import { randomSequence } from './layout.ts';
 
@@ -6,13 +7,15 @@ export function dragonHollow(center:number,width:number,depth:number){
   const root=new T.Group();
   root.position.z=center;
   const random=randomSequence(0x1765ace), stamp=new T.Object3D(), tint=new T.Color();
-  const rock=new T.DodecahedronGeometry(1,0);
+  const rock=fracturedRock(180,'slab');
   const blocks=new T.BoxGeometry();
   const pillar=loft([[0,.98,-.95,.95],[.33,1.02,-1.03,1.03],[.56,.73,-.74,.74],[3.02,.65,-.68,.68],
     [5.1,.57,-.60,.60],[5.35,.78,-.78,.78],[5.61,.89,-.89,.89],[5.88,.88,-.89,.89]],9).rotateX(-Math.PI/2);
   const floorPiece=new T.CylinderGeometry(.92,1.09,.27,8);
   const basalt=new T.MeshStandardMaterial({color:0x413038,roughness:.94,flatShading:true});
   const masonry=new T.MeshStandardMaterial({color:0x645253,roughness:.90,flatShading:true});
+  weatherStone(basalt,.08);
+  weatherStone(masonry,.08);
   const soot=new T.MeshStandardMaterial({color:0x3c2928,roughness:.98});
   const pyrite=new T.MeshStandardMaterial({color:0x9d522d,emissive:0x8d2b0a,emissiveIntensity:.83,roughness:.73});
   const gold=new T.MeshStandardMaterial({color:0xb88940,metalness:.72,roughness:.39});

@@ -1,4 +1,5 @@
 import * as T from 'three';
+import { fracturedRock, weatherStone } from './rockDetail.ts';
 import { loft, meshPart, shapedPlate, rigidBatcher } from './creatureGeometry.ts';
 import { surface } from './layout.ts';
 import { ritualGrounds as site } from './worldSites.ts';
@@ -6,10 +7,11 @@ import { ritualGrounds as site } from './worldSites.ts';
 export function buildRitualGrounds(scene:T.Scene,obstacles:{x:number;z:number;r:number}[]){
   const root=new T.Group(), batch=rigidBatcher();
   const stone=new T.MeshStandardMaterial({color:0x565360,roughness:.96,flatShading:true});
+  weatherStone(stone,.47);
   const slab=loft([[-.25,.43,-.33,.33],[.32,.47,-.36,.33],[1.12,.39,-.29,.31],[2.45,.28,-.24,.22],[2.75,.13,-.16,.17]],6).rotateX(-Math.PI/2);
   const altar=loft([[-.88,.54,-.11,.18],[-.54,.63,-.10,.15],[.04,.54,-.10,.18],[.24,.22,-.09,.10]],8);
   const base=new T.CylinderGeometry(.88,1.09,.29,8);
-  const debris=new T.DodecahedronGeometry(.46,0);
+  const debris=fracturedRock(762,'slab').scale(.48,.55,.47);
   const rune=shapedPlate([[0,.19],[-.075,.046],[-.038,-.09],[.041,-.119],[.096,-.016],[.03,.042]],.015,.005);
   const glow=new T.MeshBasicMaterial({color:0x9d69ef,toneMapped:false});
   const mote=new T.InstancedMesh(new T.OctahedronGeometry(.074),glow,24);

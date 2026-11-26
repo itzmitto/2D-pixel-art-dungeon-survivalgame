@@ -1,4 +1,5 @@
 import * as T from 'three';
+import { fracturedRock, weatherStone } from './rockDetail.ts';
 import { explorationSites } from './worldSites.ts';
 import { surface } from './layout.ts';
 import { joint, loft, meshPart, rigidBatcher, shapedPlate } from './creatureGeometry.ts';
@@ -7,6 +8,7 @@ import type { Obstacle } from './spatial.ts';
 export function buildExplorationScenery(scene:T.Scene,obstacles:Obstacle[]){
   const root=new T.Group(), batch=rigidBatcher();
   const stone=new T.MeshStandardMaterial({color:0x60605c,roughness:.91,flatShading:true});
+  weatherStone(stone,.47);
   const slate=new T.MeshStandardMaterial({color:0x474853,roughness:.93});
   const moss=new T.MeshStandardMaterial({color:0x596545,roughness:.98,flatShading:true});
   const wood=new T.MeshStandardMaterial({color:0x4b3428,roughness:1});
@@ -16,7 +18,7 @@ export function buildExplorationScenery(scene:T.Scene,obstacles:Obstacle[]){
   const crystal=new T.MeshStandardMaterial({color:0x665889,emissive:0x6845bf,emissiveIntensity:.66,metalness:.29,roughness:.43});
   const flame=new T.MeshBasicMaterial({color:0xff944c,toneMapped:false});
   const lights:T.Mesh[]=[];
-  const block=new T.BoxGeometry(1,1,1), shard=new T.DodecahedronGeometry(1,0);
+  const block=new T.BoxGeometry(1,1,1), shard=fracturedRock(525);
   const wheel=new T.TorusGeometry(.75,.077,6,13);
   const vertical=(sections:Parameters<typeof loft>[0],sides=10)=>loft(sections,sides).rotateX(-Math.PI/2);
   const statue=vertical([[0,.25,-.13,.14],[.18,.28,-.145,.14],[.71,.21,-.14,.13],[1.13,.49,-.26,.20],

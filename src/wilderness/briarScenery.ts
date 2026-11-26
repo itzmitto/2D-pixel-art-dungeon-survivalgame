@@ -1,4 +1,5 @@
 import * as T from 'three';
+import { fracturedRock, weatherStone } from './rockDetail.ts';
 import { briarWatch, towerFloorAt, dungeonFloors, towerWalkable, floorRemaining } from './briarWatch.ts';
 import { height, randomSequence } from './layout.ts';
 import { loft, meshPart, rigidBatcher, shapedPlate } from './creatureGeometry.ts';
@@ -9,6 +10,8 @@ export function briarScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number
   const rand=randomSequence(3256), stamp=new T.Object3D(), tint=new T.Color(), batch=rigidBatcher();
   const slate=new T.MeshStandardMaterial({color:0x626675,roughness:.94});
   const mortar=new T.MeshStandardMaterial({color:0x353745,roughness:.96});
+  weatherStone(slate,.30);
+  weatherStone(mortar,.30);
   const wood=new T.MeshStandardMaterial({color:0x46332c,roughness:.94});
   const bronze=new T.MeshStandardMaterial({color:0xaa8a5e,metalness:.59,roughness:.50});
   const obsidian=new T.MeshStandardMaterial({color:0x211e2b,roughness:.54,metalness:.18});
@@ -17,7 +20,7 @@ export function briarScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number
   const amber=new T.MeshBasicMaterial({color:0xffa552,toneMapped:false});
   const runic=new T.MeshBasicMaterial({color:0x9665d9,toneMapped:false,transparent:true,opacity:.69,depthWrite:false});
   const openedRune=new T.MeshBasicMaterial({color:0xb7eaff,toneMapped:false});
-  const block=new T.BoxGeometry(), chip=new T.DodecahedronGeometry(1,0);
+  const block=new T.BoxGeometry(), chip=fracturedRock(273,'slab');
   const torch=loft([[0,.105,-.10,.10],[.29,.083,-.081,.083],[.44,.046,-.039,.042],[.59,.001,-.001,.001]],7).rotateX(-Math.PI/2);
   const hook=new T.TorusGeometry(.12,.027,5,10);
   const arch=shapedPlate([[-1.12,0],[1.12,0],[1.12,2.05],[.86,2.55],[.46,2.95],[0,3.32],[-.46,2.95],[-.86,2.55],[-1.12,2.05]],.14,.036);

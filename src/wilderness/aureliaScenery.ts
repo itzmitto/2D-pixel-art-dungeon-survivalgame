@@ -1,4 +1,5 @@
 import * as T from 'three';
+import { fracturedRock, weatherStone } from './rockDetail.ts';
 import { aurelia, aureliaBuildings, aureliaServices, inAurelia } from './aurelia.ts';
 import { joint, loft, meshPart, rigidBatcher, shapedPlate } from './creatureGeometry.ts';
 import { randomSequence } from './layout.ts';
@@ -10,12 +11,13 @@ export function aureliaScenery(scene:T.Scene,obstacles:Obstacle[]){
   const y=aurelia.elevation;
   const mat=(color:number,roughness=.91)=>new T.MeshStandardMaterial({color,roughness});
   const granite=mat(0x80746d), mortar=mat(0x55474d), slate=mat(0x503d4b), plaster=mat(0x9c7a60);
+  weatherStone(granite,.28);
   const wood=mat(0x594031), dark=mat(0x382a30), brass=mat(0xb38c55,.51), skin=mat(0xb47c60);
   const cloth=[mat(0x694052),mat(0x4b4d5b),mat(0x55336b),mat(0x48626d)];
   const glow=new T.MeshBasicMaterial({color:0xffbf73,toneMapped:false});
   const gold=new T.MeshStandardMaterial({color:0xdb9b43,emissive:0xd29529,emissiveIntensity:.72,roughness:.76});
   const water=new T.MeshStandardMaterial({color:0x587e91,emissive:0x3a6277,emissiveIntensity:.4,roughness:.23,metalness:.28});
-  const box=new T.BoxGeometry(1,1,1), pebble=new T.DodecahedronGeometry(1,0), leaf=new T.IcosahedronGeometry(1,0);
+  const box=new T.BoxGeometry(1,1,1), pebble=fracturedRock(622), leaf=new T.IcosahedronGeometry(1,0);
   const column=new T.CylinderGeometry(1,1,1,8), torus=new T.TorusGeometry(1,.075,6,27).rotateX(Math.PI/2);
   const shingle=shapedPlate([[-.5,0],[.5,0],[0,1]],.06,.015);
   const arch=shapedPlate([[-.5,0],[-.5,.68],[-.31,.90],[0,1.08],[.31,.90],[.5,.68],[.5,0]],.072,.014);
