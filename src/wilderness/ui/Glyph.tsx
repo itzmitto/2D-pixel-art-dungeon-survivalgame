@@ -1,9 +1,11 @@
 import { armorPiece, isArmorId, type ArmorSlot } from '../armor';
 import { useId } from 'react';
+import { isWeaponId } from '../weapons';
+import { bossRelics } from '../itemInstances';
+import { WeaponGlyph } from './WeaponGlyph';
 
 type Art={color:string; silhouette:string; shade:string; detail:string};
 const art:Record<string,Art>={
-  scythe:{color:'#be7afa',silhouette:'M5 57l5-9 4 1 23-28-8-1Q15 22 7 32 13 13 34 8q15-5 26 1l-5 8-8 1-7 6-22 29 1 5-7 4Z',shade:'M10 28q14-18 26-19 14-4 22 0l-6 5-12 1-10 1ZM16 51l25-30 3-1-26 34Z',detail:'m13 24 10-7 9-1 8-5 11 1M34 27l3 3m-9 3 3 3m-9 4 3 3m-10 4 3 3'},
   Darkness:{color:'#bd71ef',silhouette:'M7 26 20 10 43 5 57 17 58 41 43 56 23 58 8 44Z M17 32 27 21 43 18 50 26 43 41 29 47 19 43Z',shade:'M7 26 20 10 43 5 57 17 43 16 28 18 15 33 8 44Z',detail:'m10 29 11-6 3-8 12-4m-5 41 10-3 10-10m-30-4 7-8 11-3 5 4-5 8-10 4-3-4 4-5'},
 
   'Mountain Crystal':{color:'#86d9ff',silhouette:'M8 49 16 24l10 12 3-21L42 4l9 16-6 20 11-5-2 14-18 10Z',shade:'M29 15 42 4l-5 24-12 28-9-10 12-9ZM42 33l9-13-5 25-10 13Z',detail:'m31 17 7 9 9-6M16 27l6 18m15-18-9 25'},
@@ -14,12 +16,6 @@ const art:Record<string,Art>={
   'Titan Core':{color:'#67c8ff',silhouette:'M17 12 34 4l17 9 10 19-9 19-19 10-20-9L3 31Z',shade:'M34 4l17 9 10 19-17 5-11 24-8-23L3 31l14-19Z',detail:'M33 13 47 30 33 50 18 31Zm0 0v37m-15-19h29m-14-8 7 8-7 10-7-10Z'},
   'Ancient Rune':{color:'#dab1f8',silhouette:'M13 9 38 4l17 10 2 21-11 23-27 1L7 45Z',shade:'M38 4l17 10 2 21-11 23-7-11-3-25-23-13Z',detail:'m20 44 11-28 13 26M24 33l15-7m-9 20 8-9m-22 11 4 5 21-1'},
 
-  longsword:{color:'#8baad9',silhouette:'M12 49l5-6 4 3 7-8-5-4 2-3 7 4L49 9l9-5-2 11-19 24 5 7-3 2-6-5-8 8 3 4-5 5Z',shade:'M32 35 56 7 52 17 36 39Z M14 49l9 7-3 2Z',detail:'m25 47 3 3m0-7 3 3m6-11L53 12m-25 25 10 8'},
-  greatsword:{color:'#ff794d',silhouette:'M7 54l5-9 5 1 9-9-7-8 2-3 9 4L47 8 60 3l-2 18-19 19 1 9-4 2-6-8-9 9 1 5-8 5Z',shade:'m31 30 20-20 8-5-5 14-20 19Z M22 30l13 12 2 6-6-6Z',detail:'m32 35 5-8 4-1 3-7 6-2 5-9M14 48l5 4m-7 0 5 4m22-21 14-16'},
-  axe:{color:'#85a8ff',silhouette:'M8 56l3-5 4 1 21-25-5-3-13 8-8-4 1-12 8-10 4 9 10 3 7-7 11-5 10 7-5 12-12 7-4-3-21 27 1 5-6 1Z',shade:'M10 28 12 17 19 9l1 6-5 7 4 5-2 5Z M44 12 51 6l10 7-5 12-4-4 3-6-6-3Z',detail:'m19 23 7-5 7 2 5-6 2 7 8-3-4 7m-24 21 3 3m2-9 3 3m2-9 3 3'},
-  staff:{color:'#83e8ff',silhouette:'M6 58l5-8 4 1 22-27-2-10 5 4 4-7 1-6 9-3 6 11-4 9-6 3-4 9-3-4-22 27-1 5-7 1Z',shade:'M45 18 47 6l7-4-1 13-7 9Z M53 15l6-3-3 10-9 4Z M14 54l4 4-4 2Z',detail:'M42 24l5-4 6-5 5-3m-6-8 1 11-6 9m-13 6 5 4m-9 1 4 3m-14 8 4 3'},
-  shield:{color:'#73c6ff',silhouette:'M5 54l6-8 4 1 7-8-6-6 3-3 7 3L47 9l9-4-2 9-17 20 5 5-4 4-9-4-9 12 1 4-8 6Z M26 20l14 3 14-6 5 4-1 17q-3 13-18 21Q29 55 25 44l-2-20Z',shade:'M40 24 55 19l2 6-1 13q-4 11-16 19Z M26 34 51 9 54 8 36 30Z',detail:'M29 26l12 2 12-5-1 14q-2 9-12 15-8-4-10-11Zm4 9q4-6 8 0t8 0m-16 6q4-5 7 0t8-1'},
-  katana:{color:'#a1edd4',silhouette:'M6 54l4-5 4 1 10-10-7-5 2-3 9 4Q49 22 59 5q-1 14-9 24L34 43l3 7-3 2-6-6-10 10 1 4-7 2Z',shade:'M32 39Q49 26 58 8l-3 10-10 13-11 11Z M11 51l7 6-4 3Z',detail:'M29 38Q49 25 56 13m-40 35 4 3m0-7 4 3m-12 6 4 3'},
   potion:{color:'#f485ba',silhouette:'M24 5h16l3 7-3 3v8l10 8 4 11-4 11-11 6H23l-12-7-3-10 4-10 12-9v-8l-3-3Z',shade:'M12 38q9-6 19 0t19 0l2 8-5 8-10 3H23l-9-6-4-8Z M25 6h14l1 7H24Z',detail:'M25 17h14m-15 7h16M16 42q5-3 10-1m15 8 5-5m-15-3v11m-5-5h10'},
   'Wolf Fang':{color:'#e4c493',silhouette:'M18 9q13-8 25 2l5 9Q44 46 18 59l-4-4q12-12 8-24l-8-10Z',shade:'M18 9q13-7 24 3l3 9-8-3-10 7-10-5Z M28 33q1 13-10 22 23-14 27-32-8 12-17 10Z',detail:'m23 12 6 4 7-6m-5 19q2 9-6 17'},
   'Dire Fang':{color:'#c6a2fa',silhouette:'M14 9 25 4l12 4 12-4 5 8-1 12Q43 50 12 60l-4-5q17-12 16-25l-10-8Z',shade:'m26 7 11 4 11-5 3 8-9 11-13-5-11 4-4-9Z M43 27Q32 49 13 56 32 53 47 33Z',detail:'m20 13 8 1 5 8 5-2m9-11-6 7m2 12-7 8-3 8-10 5'},
@@ -55,6 +51,7 @@ const armorArt:Record<ArmorSlot,Art>={
 export const categoryIcon:Record<string,string>={All:'All',Weapons:'longsword',Armor:'armor',Consumables:'potion',Materials:'Magic Crystal',Accessories:'Accessories'};
 export function Glyph({kind}:{kind:string}){
   const id=useId();
+  if(isWeaponId(kind)||Object.hasOwn(bossRelics,kind)) return <WeaponGlyph kind={kind} id={id}/>;
   const piece=isArmorId(kind)?armorPiece(kind):undefined;
   const {color:base,silhouette,shade,detail}=piece?armorArt[piece.slot]:art[kind]??art.Iron;
   const color=piece?(piece.set==='iron'?'#c7aa8c':piece.set==='abyssal'?'#b57bf2':base):base;

@@ -2,7 +2,7 @@ import { armorLabels, armorPiece, armorSlots, armorStats, type ArmorId, type Arm
 import { effectiveStats } from '../progression';
 import { useState, type CSSProperties } from 'react';
 import type { Exploration } from '../exploration';
-import { instanceWeapon } from '../itemInstances';
+import { instanceWeapon, itemIcon } from '../itemInstances';
 import { commonElementalIds, rarity, weapons, type Rarity, type WeaponId } from '../weapons';
 import { SystemPanel } from './SystemPanel';
 import { Glyph, categoryIcon } from './Glyph';
@@ -23,11 +23,11 @@ function Equipment({hero,equipArmor}:{hero:Exploration;equipArmor:EquipArmor}){
   const weapon=weapons[hero.equipped];
   const detail=instanceWeapon(item??{id:weapon.id,type:weapon.id,rarity:weapon.rarity});
   return <div className="equipment-layout">
-      <KnightPreview weapon={weapon.id} tier={item?.rarity??weapon.rarity} armor={hero.equippedArmor}/>
+      <KnightPreview weapon={weapon.id} tier={item?.rarity??weapon.rarity} relic={item?.relic} armor={hero.equippedArmor}/>
       <div className="equipment-points">
         {slots.map((slot,index)=>{
-          const label=index===0?weapon.name:index===1?(weapon.model.shield?'Water Shield':'Empty'):String(hero.armor);
-          const icon=index===0?weapon.id:index===1?(weapon.model.shield?'shield':null):'armor';
+          const label=index===0?detail.name:index===1?(weapon.model.shield?'Water Shield':'Empty'):String(hero.armor);
+          const icon=index===0?(item?itemIcon(item):weapon.id):index===1?(weapon.model.shield?'shield':null):'armor';
           return <div key={slot} className="equipment-point equipped" style={tint(item?.rarity??'Common')}>
             <span className="equipment-icon">{icon&&<Glyph kind={icon}/>}</span>
             <span><small>{slot}</small><strong>{label}</strong></span>

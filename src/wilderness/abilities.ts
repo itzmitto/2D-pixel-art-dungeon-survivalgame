@@ -42,8 +42,8 @@ export function abilityCombat(
       switch(weapon.ability){
         case 'fire': {
           const a=abilityTuning.fire;
-          fx.emit(point,0xff5123,'arc',2.2,.47,{yaw,y:.88,grow:2.1,aspect:1.55});
-          fx.emit(point,0xffe3aa,'arc',1.75,.27,{yaw,y:.96,opacity:.82});
+          fx.emit(point,0xff5123,'flame',2.2,.47,{yaw,y:.33,grow:2.1,aspect:2.0});
+          fx.emit(point,0xffc77f,'flame',1.75,.27,{yaw,y:.41,opacity:.82,aspect:1.48});
           moving('fire',yaw,a.length,a.speed,a.radius,damage*a.damage,weapon.color);
           break;
         }
@@ -51,8 +51,8 @@ export function abilityCombat(
           const a=abilityTuning.lightning;
           const strike={x:point.x+Math.sin(yaw)*1.2,z:point.z+Math.cos(yaw)*1.2};
           fx.lightning(strike,strike,true);
-          fx.emit(strike,0xdaf7ff,'ray',.7,.19,{y:4.5,aspect:13,opacity:.75});
-          fx.emit(strike,0x4269ff,'ring',.75,.55,{grow:9});
+          fx.emit(strike,0xdaf7ff,'ray',.7,.19,{y:4.5,aspect:13,opacity:.75,element:'lightning'});
+          fx.emit(strike,0x4269ff,'ring',.75,.55,{grow:9,element:'lightning'});
           fx.emit(strike,0xe3fcff,'ring',.45,.36,{grow:8,y:.14});
           for(let i=0;i<6;i++){
             const angle=i*Math.PI/3+yaw;
@@ -92,9 +92,9 @@ export function abilityCombat(
         case 'water': {
           const a=abilityTuning.water;
           shield.activate(statusTuning.protection,a.absorb);
-          fx.emit(point,0x367ddf,'ring',.8,.78,{grow:6,y:.22});
-          fx.emit(point,0xb2faff,'ring',.5,.7,{grow:5,y:.38,delay:.11,opacity:.70});
-          fx.scatter(point,weapon.color,10);
+          fx.emit(point,0x367ddf,'ring',.8,.78,{grow:6,y:.22,element:'water'});
+          fx.emit(point,0xb2faff,'ring',.5,.7,{grow:5,y:.38,delay:.11,opacity:.70,element:'water'});
+          fx.scatter(point,weapon.color,12,.50,'droplet');
           for(const target of nearby(point,a.radius)){
             const x=target.point.x-point.x,z=target.point.z-point.z,length=Math.hypot(x,z)||1;
             target.effects.knockback(x/length*a.force,z/length*a.force);
@@ -107,7 +107,8 @@ export function abilityCombat(
           abyss={point,remaining:a.duration,damage,tick:a.interval,seen:new Set(),pulse:0};
           fx.emit(point,0x822fec,'vortex',a.radius,a.duration,{y:.15,opacity:.96});
           fx.emit(point,0xce83ff,'ring',.45,.62,{grow:11,y:.21});
-          fx.emit(point,0x9e48e1,'arc',3.65,.39,{yaw,y:1.05,grow:4.8});
+          for(let i=0;i<3;i++) fx.emit(point,i%2?0x6741ad:0xbd70f2,'tendril',a.radius*.72,a.duration-.18,
+            {yaw:yaw+i*2.094,y:.32+i*.12,grow:.78,aspect:1.35,opacity:.66});
           break;
         }
         case 'wind': {
@@ -139,13 +140,15 @@ export function abilityCombat(
         if(abyss.pulse<=0){
           abyss.pulse=.16;
           const angle=abyss.remaining*7, edge={x:point.x+Math.sin(angle)*4.9,z:point.z+Math.cos(angle)*4.9};
-          fx.emit(edge,0x9431e5,'mist',1.25,.61,{y:.47,lift:1.82,opacity:.55});
+          fx.emit(edge,0x33223e,'smoke',1.25,.71,{y:.47,lift:1.82,opacity:.59});
           fx.emit(point,0x7617c8,'arc',3.1,.36,{yaw:angle,y:.37,aspect:1.8,grow:3.5});
           if(walkable(edge.x,edge.z)) fx.lightning(edge,point,false,true,true,0xb357ff);
         }
         if(abyss.remaining<=0){
           for(const target of affected) target.hit(damage*a.finishDamage,'darkness',true);
-          fx.scatter(point,0xb84bff,20,.6);
+          fx.scatter(point,0xb84bff,15,.6);
+          fx.scatter(point,0xd7b8ff,7,.45,'crystal');
+          fx.emit(point,0x352047,'smoke',2.6,1.0,{y:.82,lift:2.3,grow:3.2,opacity:.60});
           fx.emit(point,0xe2adff,'ray',2.42,.54,{y:2.9,aspect:6.3});
           for(let i=0;i<3;i++) fx.emit(point,i===0?0xe5b6ff:0x782cdc,'ring',.58,.50+i*.14,{y:.15+i*.14,grow:12,delay:i*.065});
           finishAbyss();abyss=undefined;
@@ -189,17 +192,18 @@ export function abilityCombat(
           spell.trail=spell.kind==='fire'?.085:.043;
           const yaw=Math.atan2(spell.x,spell.z);
           if(spell.kind==='fire'){
-            fx.emit(spell.point,0xff551e,'arc',2.05,.29,{y:.73,yaw,aspect:1.75,grow:2.2});
-            fx.emit(spell.point,0xffd083,'arc',1.54,.19,{y:.63,yaw,opacity:.7});
-            fx.emit(spell.point,0xfa4317,'scorch',1.36,.76,{y:.05});
+            fx.emit(spell.point,0xff551e,'flame',2.05,.29,{y:.22,yaw,aspect:2.0,grow:2.2});
+            fx.emit(spell.point,0xffd083,'flame',1.54,.19,{y:.27,yaw,opacity:.7,aspect:1.31});
+            fx.emit(spell.point,0xfa4317,'scorch',1.53,2.25,{y:.048,opacity:.80});
+            fx.emit(spell.point,0x3b302d,'smoke',.68,.67,{y:.66,yaw,lift:1.56,grow:1.65,opacity:.57});
             fx.scatter(spell.point,spell.color,3);
           }else if(spell.kind==='wind'){
-            fx.emit(spell.point,0xb1ffe4,'arc',1.67,.24,{y:1.03,yaw,aspect:.7,grow:1.65});
-            fx.emit(spell.point,0xf0fff8,'arc',1.36,.19,{y:.84,yaw:yaw+.20,aspect:.46});
+            fx.emit(spell.point,0xa9dccd,'arc',1.78,.31,{y:.96,yaw,aspect:.61,grow:1.97,element:'wind'});
+            fx.emit(spell.point,0xf0fff8,'arc',1.36,.22,{y:.82,yaw:yaw+.20,aspect:.46,element:'wind'});
             fx.emit(spell.point,0xc5b9a1,'mist',.54,.39,{y:.20,dx:-spell.x*1.4,dz:-spell.z*1.4,grow:1.4,opacity:.42});
           }else{
-            fx.emit(spell.point,0xccf8ff,'crystal',.94,.15,{y:1.05,yaw,aspect:.56});
-            fx.emit(spell.point,0x75bfff,'mist',.40,.29,{y:1.04,grow:1.2,opacity:.40});
+            fx.emit(spell.point,0xccf8ff,'crystal',.67,.18,{y:1.05,yaw,aspect:.54,dx:spell.x*6,dz:spell.z*6});
+            fx.emit(spell.point,0x75bfff,'mist',.30,.27,{y:1.04,grow:1.2,opacity:.32});
           }
         }
         if(spell.remaining<=0) travel.splice(i,1);
