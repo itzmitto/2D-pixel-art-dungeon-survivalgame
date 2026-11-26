@@ -20,7 +20,7 @@ function Equipment({hero}:{hero:Exploration}){
   const weapon=weapons[hero.equipped];
   return <>
     <div className="equipment-layout">
-      <KnightPreview weapon={weapon.id} tier={weapon.rarity}/>
+      <KnightPreview weapon={weapon.id} tier={item?.rarity??weapon.rarity}/>
       <div className="equipment-points">
         {slots.map((slot,index)=>{
           const active=index===6?weapon.name:index===7&&weapon.model.shield?'Water Shield':null;

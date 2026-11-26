@@ -156,6 +156,64 @@ export function weaponModel(id:Exclude<WeaponId,'longsword'>) {
   inscriptions(right);
   if(id==='shield') inscriptions(left,true);
 
+  if(id==='greatsword'||id==='shield'||id==='katana'){
+    const fire=id==='greatsword',wind=id==='katana';
+    const bladeLength=fire?1.64:wind?1.27:1.04;
+    const positions:number[]=[], uv:number[]=[], indices:number[]=[];
+    for(let lane=0;lane<3;lane++) for(let i=0;i<=18;i++){
+      const t=i/18;
+      for(const edge of [0,1]){
+        positions.push(0,.29+t*bladeLength,0);
+        uv.push(t,(lane+edge*.82)/3);
+      }
+      if(i>0){
+        const end=lane*38+i*2;
+        indices.push(end-2,end-1,end,end,end-1,end+1);
+      }
+    }
+    const geometry=new T.BufferGeometry()
+      .setAttribute('position',new T.Float32BufferAttribute(positions,3))
+      .setAttribute('uv',new T.Float32BufferAttribute(uv,2));
+    geometry.setIndex(indices);
+    const material=new T.ShaderMaterial({
+      uniforms:{...energyMaterial.uniforms,style:{value:fire?0:wind?2:1}},
+      vertexShader:`
+        uniform float clock, rank, style;
+        varying vec2 flowUv;
+        void main(){
+          flowUv=vec2(uv.x,fract(uv.y*3.)/.82);
+          float lane=floor(uv.y*3.);
+          float phase=lane*2.094+uv.x*(style==0.?15.:9.)-clock*(style==0.?7.4:4.8);
+          float taper=sin(uv.x*3.14159);
+          float width=taper*(.04+rank*.085);
+          float windCenter=style==2.?(.033+.25*uv.x*uv.x*uv.x):0.;
+          vec3 p=position;
+          p.x+=windCenter+(cos(phase)*width+(flowUv.y-.5)*width*(style==0.?2.5:1.));
+          p.z+=sin(phase)*width+(lane-1.)*.047;
+          p.y+=taper*.038*sin(phase*1.43);
+          gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.);
+        }`,
+      fragmentShader:`
+        uniform float clock,rank,style;
+        uniform vec3 tint,crown;
+        varying vec2 flowUv;
+        void main(){
+          float pulse=.5+.5*sin(flowUv.x*(style==0.?38.:23.)-clock*(style==0.?14.:9.));
+          float edge=sin(flowUv.y*3.14159);
+          float lengthFade=sin(flowUv.x*3.14159);
+          vec3 hue=style==0.?vec3(1.,.115,.011):tint;
+          vec3 color=mix(hue,crown,rank*rank*.25);
+          color=mix(color,vec3(1.,.94,.82),pulse*edge*.69);
+          gl_FragColor=vec4(color,edge*lengthFade*(.14+pulse*.55)*smoothstep(.06,.58,rank));
+          #include <colorspace_fragment>
+        }`,
+      transparent:true,depthWrite:false,side:T.DoubleSide,forceSinglePass:true,
+      blending:T.AdditiveBlending,toneMapped:false,
+    });
+    const stream=new T.Mesh(geometry,material);
+    stream.frustumCulled=false;
+    right.add(stream);
+  }
   const floating=new T.InstancedMesh(new T.OctahedronGeometry(1),new T.MeshBasicMaterial({
     color:weapons[id].color,transparent:true,opacity:.58,depthWrite:false,blending:T.AdditiveBlending,
   }),10);

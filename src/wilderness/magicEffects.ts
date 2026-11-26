@@ -208,8 +208,13 @@ export function createMagicEffects(group:T.Group) {
         {y:(element==='fire'?.76:1.02)-i*.17,yaw:yaw+(i===2?.18:-i*.06),aspect:element==='fire'?1.45:.84,
           grow:1.25,dx:Math.sin(yaw)*speed,dz:Math.cos(yaw)*speed,opacity:i===0?.89:.56});
     }
-    if(element==='lightning') lightning({x:point.x-Math.cos(yaw),z:point.z+Math.sin(yaw)},
-      {x:point.x+Math.sin(yaw)*size,z:point.z+Math.cos(yaw)*size},false,true);
+    const ahead={x:point.x+Math.sin(yaw)*size*.82,z:point.z+Math.cos(yaw)*size*.82};
+    if(element==='fire'){
+      scatter(ahead,color,5,.54);
+      emit(ahead,0xdb3c15,'scorch',.79,.6,{y:.05,opacity:.65});
+    }
+    if(element==='wind') emit(ahead,0xbfb8a7,'mist',.58,.27,{y:.18,grow:1.45,opacity:.34});
+    if(element==='lightning') lightning({x:point.x-Math.cos(yaw),z:point.z+Math.sin(yaw)},ahead,false,true);
   }
   function impact(point:Point,element:Ability|null,strong=false){
     const [color,core]=element?tones[element]:[0xd9a35a,0xffedbf];

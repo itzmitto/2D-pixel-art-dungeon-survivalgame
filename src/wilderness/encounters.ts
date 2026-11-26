@@ -430,7 +430,7 @@ export function createEncounters(
         const weapon=attackWeapon;
         if(weapon.id==='staff') magic.bolt(weapon,player.rotation.y);
         else {
-          fx.slash(player.position,weapon.ability,player.rotation.y,weapon.range*.68);
+          fx.slash(player.position,weapon.ability,player.rotation.y,weapon.range*.68,rarity[weapon.rarity].multiplier>=2.5);
           for(const enemy of enemies){
             const p=enemy.root.position;
             if(enemy.hp && Math.abs(player.position.y-p.y)<2 &&
