@@ -46,14 +46,18 @@ export function rollDrop(kind:MonsterKind,random:()=>number,luck:number,guarante
     extra:orc?(kind==='brute'?'Iron':'Leather'):undefined};
 }
 
-export function enemyArmor(kind:MonsterKind,id:string,seed:number):ArmorId|undefined{
-  let key=seed;
+export function enemyArmor(kind:MonsterKind,id:string,seed:number,kill:number,level:number,owned:readonly ArmorId[]):ArmorId|undefined{
+  let key=seed^Math.imul(kill,1103515245);
   for(const char of id) key=Math.imul(key^char.charCodeAt(0),16777619);
   const roll=(key>>>0)%100;
-  const set=kind==='guardian'||kind==='ritualElite'?(roll<58?'abyssal':'blacksteel'):
-    kind==='wizard'||kind==='elite'||kind==='brute'?(roll<62?'blacksteel':undefined):
+  const repeatable=kind==='dire'||kind==='skeleton';
+  const set=kind==='guardian'||kind==='ritualElite'?(roll<63?'abyssal':'blacksteel'):
+    repeatable&&level>=15&&roll<9?'abyssal':
+    kind==='wizard'||kind==='elite'||kind==='brute'||repeatable?(roll<59?'blacksteel':undefined):
     roll<35?'iron':undefined;
   if(!set) return;
-  const slot=kind==='ritualElite'?(key&256?'amulet':'ring'):armorSlots[(key>>>8)%armorSlots.length];
-  return `${set}-${slot}`;
+  if(kind==='ritualElite') return `${set}-ring`;
+  const start=(key>>>8)%armorSlots.length;
+  const candidates=armorSlots.map((_,i):ArmorId=>`${set}-${armorSlots[(start+i)%armorSlots.length]}`);
+  return candidates.find(id=>!owned.includes(id))??candidates[0];
 }

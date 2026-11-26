@@ -140,11 +140,11 @@ export function createDarkKnight() {
       const width=.56+.32*Math.sin(down*1.7);
       for(let col=0;col<=10;col++){
         const u=col/5-1;
-        const tail=.10*stride+.46*run;
+        const tail=.10*stride+.46*run+(motion.saddleBob===undefined?0:.19);
         const flutter=.042*Math.sin(time*4.1-down*6+u*3)+.028*Math.sin(time*7.2+u*7-down*4);
         cloth.setXYZ(row*11+col,
           u*width*.5-turn*.074*slack+.071*Math.sin(time*2.6-down*4)*slack,
-          .406-down*(1.13-.19*run)+slack*(.09*Math.abs(u)+flutter*.6),
+          .406-down*(1.13-.19*run-(motion.saddleBob===undefined?0:.22))+slack*(.09*Math.abs(u)+flutter*.6),
           -.153-down*(.31+tail)+.045*Math.cos(u*10+down*1.4)*down-flutter*down);
       }
     }

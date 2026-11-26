@@ -11,7 +11,7 @@ import * as T from 'three';
 import { browserFrameScheduler, createGameLoop } from '../game/core/loop';
 import { atmosphere } from './atmosphere';
 import { meadow } from './grass';
-import { spawn, surface, walkable } from './layout';
+import { onBridge, spawn, surface, walkable } from './layout';
 import { scenery } from './scenery';
 import { terrain } from './terrain';
 import { createEncounters } from './encounters';
@@ -48,9 +48,9 @@ export function startWilderness(
   knight.equipArmor(save.equippedArmor);
   const horse=warhorse();
   scene.add(body,horse.root);
-  let mounted=false;
+  let mounted=false,summoning=0;
   function dismissHorse(){
-    mounted=false;horse.root.visible=false;
+    mounted=false;summoning=0;horse.root.visible=false;
   }
   const water=terrain(scene);
   const {obstacles,rocks,fireY,animateCamp,animateRitual}=scenery(scene,save.seed);
@@ -72,7 +72,15 @@ export function startWilderness(
     const a=Math.sin(yaw),b=Math.cos(yaw),y=surface(x,z);
     for(const [forward,side] of [[1.23,0],[-1.15,0],[.28,.54],[.28,-.54],[-.72,.54],[-.72,-.54]]){
       const xx=x+a*forward+b*side,zz=z+b*forward-a*side;
-      if(!canWalk(xx,zz)||Math.abs(surface(xx,zz)-y)>.78) return false;
+      const heightLimit=onBridge(x,z)||onBridge(xx,zz)?1.32:.78;
+      if(!canWalk(xx,zz)||Math.abs(surface(xx,zz)-y)>heightLimit) return false;
+    }
+    return true;
+  }
+  function groundLink(from:T.Vector3,x:number,z:number){
+    for(let i=1;i<=5;i++){
+      const xx=T.MathUtils.lerp(from.x,x,i/5),zz=T.MathUtils.lerp(from.z,z,i/5);
+      if(!canWalk(xx,zz)||Math.abs(surface(xx,zz)-from.y)>.85) return false;
     }
     return true;
   }
@@ -107,7 +115,7 @@ export function startWilderness(
     if(mounted){
       for(const angle of [yaw+Math.PI/2,yaw-Math.PI/2,yaw+Math.PI,yaw]){
         const x=p.x+Math.sin(angle)*1.65,z=p.z+Math.cos(angle)*1.65;
-        if(!canWalk(x,z)||Math.abs(surface(x,z)-p.y)>.8) continue;
+        if(!groundLink(p,x,z)) continue;
         mounted=false;
         p.set(x,surface(x,z),z);
         onPosition({x,z,yaw});
@@ -117,9 +125,10 @@ export function startWilderness(
       encounters.feedback('Move onto open ground to dismount.');
       return;
     }
-    if(knight.animating||encounters.weaponLocked) return;
+    if(knight.animating||encounters.weaponLocked||summoning>0) return;
     if(horse.root.visible&&horse.root.position.distanceTo(p)<3.15&&
-      horseClear(horse.root.position.x,horse.root.position.z,horse.root.rotation.y)){
+      horseClear(horse.root.position.x,horse.root.position.z,horse.root.rotation.y)&&
+      groundLink(p,horse.root.position.x,horse.root.position.z)){
       mounted=true;blocking=false;
       p.copy(horse.root.position);body.rotation.y=horse.root.rotation.y;
       encounters.feedback('Mounted · Hold Shift to gallop');
@@ -128,8 +137,9 @@ export function startWilderness(
     if(encounters.inCombat){encounters.feedback('Leave combat before summoning your warhorse.');return;}
     for(const angle of [yaw+Math.PI/2,yaw-Math.PI/2,yaw+Math.PI,yaw,yaw+.75,yaw-.75]){
       const x=p.x+Math.sin(angle)*2.74,z=p.z+Math.cos(angle)*2.74;
-      if(!horseClear(x,z,yaw)) continue;
+      if(!horseClear(x,z,yaw)||!groundLink(p,x,z)) continue;
       horse.root.position.set(x,surface(x,z),z);horse.root.rotation.y=yaw;horse.root.visible=true;
+      horse.root.scale.setScalar(.61);summoning=.42;
       encounters.waystoneEffect(horse.root.position,0x9778ff);
       encounters.feedback('Warhorse summoned · H to mount');
       return;
@@ -159,7 +169,11 @@ export function startWilderness(
     }
     if(!uiOpen()&&!e.repeat){
       if(e.code==='KeyH'){e.preventDefault();handleHorse();}
-      if(e.code==='KeyQ'&&!blocking&&!mounted){e.preventDefault();encounters.cast(knight.playAttack);}
+      if(e.code==='KeyQ'&&!blocking){
+        e.preventDefault();
+        if(mounted) encounters.feedback('Dismount to use your weapon.');
+        else encounters.cast(knight.playAttack);
+      }
       if(/^Digit[1-9]$/.test(e.code)){
         const id=save.hotbar[Number(e.code.slice(-1))-1];
         if(id) equip(id,save.slotItems[Number(e.code.slice(-1))-1]??undefined);
@@ -261,6 +275,10 @@ export function startWilderness(
       if(mounted){
         body.rotation.y=heading;
         horse.root.position.set(p.x,surface(p.x,p.z),p.z);horse.root.rotation.y=heading;
+      }
+      if(summoning>0){
+        summoning=Math.max(0,summoning-frameDelta);
+        horse.root.scale.setScalar(.61+.39*T.MathUtils.smoothstep(1-summoning/.42,0,1));
       }
       if(horse.root.visible) horse.update(frameDelta,mounted?travelled/Math.max(dt,.001):0,sprinting,(heading-previousYaw)/Math.max(.01,dt)*.28);
       knight.update(frameDelta,{

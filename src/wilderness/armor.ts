@@ -17,15 +17,15 @@ const bonuses={
   legs:{defense:1,health:1},boots:{agility:1},cape:{health:1,luck:1},amulet:{intelligence:1},ring:{luck:1,strength:1},
 };
 type BonusKey='defense'|'health'|'strength'|'agility'|'intelligence'|'luck';
+const catalog=new Map(armorSets.flatMap((set,index)=>armorSlots.map(slot=>{
+  const id:ArmorId=`${set}-${slot}`;
+  const bonus=Object.fromEntries(Object.entries(bonuses[slot]).map(([key,value])=>[key,value*(index+1)])) as Partial<Record<BonusKey,number>>;
+  return [id,{id,set,slot,bonus,...sets[set],name:sets[set].name+' '+armorLabels[slot],icon:id}] as const;
+})));
 export function isArmorId(value:unknown):value is ArmorId{
-  return typeof value==='string'&&armorSets.some(set=>armorSlots.some(slot=>value===set+'-'+slot));
+  return typeof value==='string'&&catalog.has(value as ArmorId);
 }
-export function armorPiece(id:ArmorId){
-  const [set,slot]=id.split('-') as [ArmorSet,ArmorSlot];
-  const power=armorSets.indexOf(set)+1;
-  const bonus=Object.fromEntries(Object.entries(bonuses[slot]).map(([key,value])=>[key,value*power])) as Partial<Record<BonusKey,number>>;
-  return {id,set,slot,bonus,...sets[set],name:sets[set].name+' '+armorLabels[slot],icon:id};
-}
+export const armorPiece=(id:ArmorId)=>catalog.get(id)!;
 export function armorBonus(equipped:EquippedArmor={}){
   const total:Record<BonusKey,number>={defense:0,health:0,strength:0,agility:0,intelligence:0,luck:0};
   for(const slot of armorSlots){

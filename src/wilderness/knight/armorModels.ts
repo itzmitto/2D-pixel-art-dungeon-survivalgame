@@ -66,6 +66,12 @@ export function armorModels(model:ReturnType<typeof createKnightModel>){
         const layer=i%5;
         mesh.visible=layer<2||(layer===2?set==='abyssal':set!=='iron');
         if(layer!==2) mesh.material=layer===0?plate:edge;
+        if(layer>2){
+          const growth=set==='abyssal'?1.66:1;
+          mesh.scale.y=mesh.userData.baseHeight??mesh.scale.y;
+          mesh.userData.baseHeight=mesh.scale.y;
+          mesh.scale.y*=growth;
+        }
       });
     }
     const capeSet=equipped.cape?armorPiece(equipped.cape).set:undefined;

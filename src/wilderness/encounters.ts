@@ -288,7 +288,7 @@ export function createEncounters(
     save.pending[enemy.id]={x:enemy.loot.position.x,z:enemy.loot.position.z};
     const guaranteed=/^wolf-[0-4]$/.test(enemy.id)&&!collected.has(enemy.id)?elementalIds[Number(enemy.id.slice(-1))]:undefined;
     save.drops[enemy.id]=rollDrop(enemy.kind,rand,lootBonus(effectiveStats(save)),guaranteed&&!save.arsenal.includes(guaranteed)?guaranteed:undefined);
-    const piece=enemyArmor(enemy.kind,enemy.id,save.seed);
+    const piece=enemyArmor(enemy.kind,enemy.id,save.seed,save.kills,save.level,save.armorItems);
     if(piece) save.drops[enemy.id].armorPiece=piece;
     enemy.loot.material.color.set(rarity[save.drops[enemy.id].rarity].color);
     if(enemy.spec.respawn&&!enemy.id.startsWith('den-')) save.returns[enemy.id]=Date.now()+enemy.spec.respawn*1000;
@@ -542,7 +542,7 @@ export function createEncounters(
         const active=gap<nearDistance&&enemy.hp>0;
         const dying=!enemy.hp&&enemy.collapse<1&&gap<nearDistance;
         root.visible=active||dying;
-        enemy.hpBar.visible=active&&gap<23&&(['guardian','elite'].includes(enemy.kind)||enemy.hp<spec.health||enemy.windup>0);
+        enemy.hpBar.visible=active&&gap<23&&(['guardian','elite','ritualElite'].includes(enemy.kind)||enemy.hp<spec.health||enemy.windup>0);
         const status=enemy.statuses.visual;
         enemy.visualTick-=dt;
         if(active&&gap<24&&status!==enemy.lastVisual&&enemy.lastVisual==='frozen'){
@@ -578,7 +578,11 @@ export function createEncounters(
         const aggro=save.health>0&&gap<spec.awareness&&playerHome<spec.leash&&!safe(player.position.x,player.position.z);
         enemy.ward=Math.max(0,enemy.ward-dt);
         enemy.wardCool=Math.max(0,enemy.wardCool-dt);
-        if(enemy.barrier) enemy.barrier.visible=enemy.ward>0;
+        if(enemy.barrier){
+          enemy.barrier.visible=enemy.ward>0;
+          const pulse=1+.06*Math.sin(time*6);
+          enemy.barrier.scale.set(.92*pulse,1.46*pulse,.92*pulse);
+        }
         enemy.cooldown=Math.max(0,enemy.cooldown-dt);
         enemy.hitFlash=Math.max(0,enemy.hitFlash-dt);
         let gait=0;

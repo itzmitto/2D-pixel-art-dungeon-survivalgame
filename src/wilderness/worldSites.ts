@@ -19,7 +19,7 @@ export const ritualGrounds={name:'Forgotten Ritual Grounds',x:139,z:-63,kind:'ri
   guards:[
     {id:'ritual-wizard-west',kind:'wizard',x:133,z:-63},
     {id:'ritual-wizard-east',kind:'wizard',x:146,z:-65},
-    {id:'ritual-skeleton-west',kind:'skeleton',x:134,z:-57},
+    {id:'ritual-skeleton-west',kind:'skeleton',x:136,z:-57},
     {id:'ritual-skeleton-east',kind:'skeleton',x:145,z:-57},
     {id:'ritual-elite',kind:'ritualElite',x:139,z:-68},
   ],

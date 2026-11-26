@@ -143,7 +143,7 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
     ...landmarks.map(site=>({...site,id:site.name})),
     ...waystones.map(site=>({...site,kind:'waystone' as const})),
     ...worldChests.filter(chest=>opened.includes(chest.id)||seenChests.includes(chest.id))
-      .map(chest=>({id:chest.id,name:chest.rarity+' Chest · '+(opened.includes(chest.id)?'Claimed':chest.guardians?'War Chest':'Unclaimed'),x:chest.x,z:chest.z,kind:'chest' as const})),
+      .map(chest=>({id:chest.id,name:chest.rarity+' Chest · '+(opened.includes(chest.id)?'Claimed':chest.id==='thornhide-war-chest'?'War Chest':chest.guardians?'Sealed':'Unclaimed'),x:chest.x,z:chest.z,kind:'chest' as const})),
   ];
   const charted=pins.filter(item=>seen.has(cellAt(item.x,item.z))||
     (item.kind==='waystone'&&waystonesActive.includes(item.id)));
