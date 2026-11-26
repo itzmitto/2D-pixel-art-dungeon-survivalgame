@@ -15,3 +15,12 @@ export const orcCamp={name:'Thornhide Camp',x:113,z:63,kind:'orcCamp',chest:{x:1
   ],
 } as const;
 export const orcApproach=[[121,106],[117,88],[113,75],[113,65]] as const;
+export const ritualGrounds={name:'Forgotten Ritual Grounds',x:139,z:-63,kind:'ritual',chest:{x:141,z:-71.5},
+  guards:[
+    {id:'ritual-wizard-west',kind:'wizard',x:133,z:-63},
+    {id:'ritual-wizard-east',kind:'wizard',x:146,z:-65},
+    {id:'ritual-skeleton-west',kind:'skeleton',x:134,z:-57},
+    {id:'ritual-skeleton-east',kind:'skeleton',x:145,z:-57},
+    {id:'ritual-elite',kind:'ritualElite',x:139,z:-68},
+  ],
+} as const;

@@ -1,3 +1,4 @@
+import { armorSlots, type ArmorId } from './armor.ts';
 import { wolf } from './combatRules.ts';
 import { bossResistance, ordinaryResistance } from './statusEffects.ts';
 import { elementalIds, type Rarity, type WeaponId } from './weapons.ts';
@@ -16,26 +17,43 @@ export const monsters={
     awareness:19,leash:24,recovery:1.5,windup:1.02,reach:3.0,xp:135,resistance:{control:.61,damageOverTime:.86},gold:26,material:'Orc Tusks',respawn:0},
   assassin:{...wolf,name:'Orc Assassin',scale:1.07,level:6,levelRange:[5,7],health:32,damage:4,speed:6.4,
     awareness:21,leash:25,recovery:.82,windup:.49,reach:2.15,xp:105,resistance:{control:.84,damageOverTime:1},gold:18,material:'Orc Tusks',respawn:0},
+  wizard:{...wolf,name:'Dark Wizard',scale:1.12,level:8,levelRange:[7,9],health:42,damage:6,speed:3.5,
+    awareness:24,leash:33,recovery:1.15,windup:.72,reach:15,xp:155,resistance:{control:.73,damageOverTime:.87},gold:34,material:'Magic Crystal',respawn:0},
+  ritualElite:{...wolf,name:'Veil Hierophant',scale:1.35,level:11,levelRange:[10,12],health:91,damage:9,speed:3.8,
+    awareness:29,leash:37,recovery:1.36,windup:.92,reach:17,xp:265,resistance:{control:.32,damageOverTime:.68},gold:79,material:'Magic Crystal',respawn:0},
   guardian:{...wolf,name:'Fang Guardian',scale:1.95,level:7,levelRange:[7,7],health:85,damage:9,speed:5.8,
     awareness:40,leash:48,recovery:1.4,windup:.85,reach:3.2,xp:210,resistance:bossResistance,gold:45,material:'Magic Crystal',respawn:0},
 } as const;
 export type MonsterKind=keyof typeof monsters;
 export const enemyXpMultiplier=10;
 export const enemyXpReward=(kind:MonsterKind)=>enemyXpMultiplier*(monsters[kind].xp+(kind==='guardian'?160:0));
-export type Drop={gold:number;material:string;weapon?:WeaponId;rarity:Rarity;potion?:number;armor?:number;extra?:'Leather'|'Iron'};
+export type Drop={gold:number;material:string;weapon?:WeaponId;rarity:Rarity;potion?:number;armor?:number;armorPiece?:ArmorId;extra?:'Leather'|'Iron'};
 export const rarityOrder=['Common','Uncommon','Rare','Epic','Legendary','Mythic'] as const;
 const weights=[56,27,12,4,.9,.1] as const;
 export function rollDrop(kind:MonsterKind,random:()=>number,luck:number,guaranteed?:WeaponId):Drop {
   const spec=monsters[kind];
+  const wizard=kind==='wizard'||kind==='ritualElite';
   const orc=kind==='brute'||kind==='assassin';
   const scale=kind==='wild'?1:kind==='dire'?1.8:4;
   const odds=weights.map((weight,index)=>index<2?weight:weight*scale*(1+luck));
   let roll=random()*odds.reduce((sum,weight)=>sum+weight,0);
   const index=odds.findIndex(weight=>(roll-=weight)<0);
-  const tier=kind==='guardian'||kind==='elite'?Math.max(3,index):Math.max(0,index);
-  const weapon=guaranteed??((kind==='guardian'||kind==='elite')||random()<(orc?.26:.13)+luck*.14
+  const tier=kind==='guardian'||kind==='elite'||kind==='ritualElite'?Math.max(3,index):Math.max(0,index);
+  const weapon=guaranteed??(wizard&&(kind==='ritualElite'||random()<.40)?'staff':undefined)??((kind==='guardian'||kind==='elite')||random()<(orc?.26:.13)+luck*.14
     ? elementalIds[Math.floor(random()*elementalIds.length)] : undefined);
   return {gold:spec.gold,material:kind==='skeleton'&&random()<.35?'Iron':spec.material,rarity:rarityOrder[tier],weapon,
-    potion:(kind==='guardian'||kind==='elite')||random()<(orc?.54:.19)?1:0,
+    potion:(kind==='guardian'||kind==='elite')||random()<(wizard?.72:orc?.54:.19)?1:0,
     extra:orc?(kind==='brute'?'Iron':'Leather'):undefined};
+}
+
+export function enemyArmor(kind:MonsterKind,id:string,seed:number):ArmorId|undefined{
+  let key=seed;
+  for(const char of id) key=Math.imul(key^char.charCodeAt(0),16777619);
+  const roll=(key>>>0)%100;
+  const set=kind==='guardian'||kind==='ritualElite'?(roll<58?'abyssal':'blacksteel'):
+    kind==='wizard'||kind==='elite'||kind==='brute'?(roll<62?'blacksteel':undefined):
+    roll<35?'iron':undefined;
+  if(!set) return;
+  const slot=kind==='ritualElite'?(key&256?'amulet':'ring'):armorSlots[(key>>>8)%armorSlots.length];
+  return `${set}-${slot}`;
 }
