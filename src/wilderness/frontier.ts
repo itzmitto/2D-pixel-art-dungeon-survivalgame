@@ -6,7 +6,13 @@ export const highlands = {
   road: [[-27,-205],[-27,-240],[-17,-269],[21,-298],[21,-329],[38,-354],[25,-381],[5,-385],[4,-402],[-14,-413],[-20,-460]] as readonly Point[],
 } as const;
 
-export const frontierAt = (z: number) => z < highlands.south && z > highlands.north ? highlands : undefined;
+export const marshes = {
+  id:'mournshade',name:'Mournshade Marshes',difficulty:'Levels 30–50',
+  south:-460,north:-636,color:'#112e33',fog:.022,
+  road:[[-20,-460],[-25,-481],[-11,-502],[8,-518],[17,-546],[-4,-568],[-22,-590],[-13,-617],[-13,-633]] as readonly Point[],
+} as const;
+export const frontierRegions=[highlands,marshes] as const;
+export const frontierAt = (z:number)=>z<highlands.south&&z>marshes.north?(z>marshes.south?highlands:marshes):undefined;
 export const frontierBounds = (x: number, z: number) => Math.abs(x) < 109 && !!frontierAt(z);
 export const outdoorBounds = (x: number, z: number) => (Math.abs(x)<240 && Math.abs(z)<240) || frontierBounds(x,z) ||
   (z===-240 && Math.abs(x)<109);
@@ -39,7 +45,17 @@ export function frontierHeight(x:number,z:number,seam:number,deck=false){
   const blend=Math.max(0,Math.min(1,(-240-z)/24));
   return seam+(shelf+roughness*(detail+bulk)-(deck?0:riverFade*3.3)-seam)*blend;
 }
-export const frontierCrossing=(x:number,z:number)=>highlandBridge(x,z);
+export const marshPools=[[-43,-502,37,19],[31,-518,44,19],[27,-565,49,24],[-43,-575,34,20],[43,-610,32,17]] as const;
+const poolDepth=(x:number,z:number)=>Math.max(0,...marshPools.map(([a,b,w,d])=>1-Math.hypot((x-a)/w,(z-b)/d)));
+export const marshWaterLevel=.66;
+export const marshBridge=(x:number,z:number)=>z<-490&&z>-618&&routeDistance(x,z,marshes.road)<3.1;
+export function marshHeight(x:number,z:number,seam:number){
+  const flat=2.05+Math.sin(x*.19+z*.18)*.34+Math.cos(z*.36)*.28;
+  const blend=Math.min(1,Math.max(0,(marshes.south-z)/29));
+  const shelf=flat-Math.min(1,poolDepth(x,z)*3)*2.3;
+  return seam+(shelf-seam)*blend;
+}
+export const frontierCrossing=(x:number,z:number)=>highlandBridge(x,z)||marshBridge(x,z);
 export const frontierBlocked=(x:number,z:number)=>highlandRiver(x,z)&&!highlandBridge(x,z);
 
 export const fortress={id:'forsaken-fortress',name:'Forsaken Fortress',kind:'briar',x:25,z:-387,boss:'tower-ancient-titan'} as const;
@@ -52,13 +68,23 @@ export const frontierLandmarks=[
   {name:'Frostpine Road',kind:'explore',x:-17,z:-269},
   {name:'Crownroad Pass',kind:'explore',x:-14,z:-413},
   fortress,
+  {name:'Drowned Causeway',kind:'bridge',x:8,z:-518},
+  {name:'Mournshade Gate',kind:'explore',x:-20,z:-464},
+  {name:'Witchwater Pools',kind:'explore',x:17,z:-547},
+  {name:'Pale Reed Ruins',kind:'ruin',x:-38,z:-595},
+  {name:'Hushfen Ambush',kind:'camp',x:28,z:-584},
+  {name:'Bleakroot Walk',kind:'bridge',x:-4,z:-568},
 ] as const;
 export const frontierStones=[
+  {id:'drowned-crossing',name:'Drowned Crossing Waystone',x:-32,z:-489,yaw:0},
+  {id:'pale-reed',name:'Pale Reed Waystone',x:-30,z:-610,yaw:0},
   {id:'frostpine',name:'Frostpine Waystone',x:-26,z:-274,yaw:0},
   {id:'crownroad',name:'Crownroad Waystone',x:-5,z:-410,yaw:0},
 ] as const;
 
 export const frontierCamps=[
+  {id:'orc-hushfen-stalker',kind:'swampStalker',x:28,z:-584},
+  {id:'orc-hushfen-ambusher',kind:'swampStalker',x:34,z:-587},
   {id:'orc-slatefang-troll',kind:'mountainTroll',x:-24,z:-364},
   {id:'orc-slatefang-golem',kind:'stoneGolem',x:-28,z:-369},
   {id:'orc-slatefang-guard',kind:'cursedKnight',x:-18,z:-367},

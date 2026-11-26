@@ -2,6 +2,7 @@ import { enhancedName, enhancementLevel, enhancementTuning } from './materials.t
 import { rarity, weapons, type Rarity, type WeaponId } from './weapons.ts';
 
 export const bossRelics={
+  venomReed:{name:'Venomreed Katana',type:'katana',description:'The Venom Queen’s translucent barb honed into a slender wind blade.'},
   slatebreaker:{name:'Slatebreaker',type:'axe',description:'A jagged axe cut from the Troll King’s monumental club.'},
   oathbreaker:{name:'Oathbreaker’s Vow',type:'greatsword',description:'A greatsword etched with the last oath of the vault’s fallen sovereign.'},
   titanEdge:{name:'Moonfall, Edge of the Titan',type:'greatsword',description:'Stone and ancient metal bound around an undying blue rune.'},
@@ -17,6 +18,7 @@ export type RelicId=keyof typeof bossRelics;
 export type WeaponItem={id:string;type:WeaponId;rarity:Rarity;enhancement?:number;relic?:RelicId};
 export const legacyItem=(type:WeaponId):WeaponItem=>({id:type,type,rarity:weapons[type].rarity});
 export function relicForReward(id:string,type:WeaponId):RelicId|undefined{
+  if(type==='katana'&&id.startsWith('chest-reward-venomroot-grotto-')) return 'venomReed';
   if(type==='axe'&&id.startsWith('chest-reward-slatefang-hollow-')) return 'slatebreaker';
   if(type==='greatsword'&&id.startsWith('chest-reward-oathbreakers-vault-')) return 'oathbreaker';
   if(type==='greatsword'&&id==='chest-forsaken-titan-reward') return 'titanEdge';

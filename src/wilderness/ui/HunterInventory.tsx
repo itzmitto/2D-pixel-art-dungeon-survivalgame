@@ -1,4 +1,3 @@
-import { instanceWeapon } from '../itemInstances';
 import { armorLabels, armorPiece, armorSlots, armorStats, type ArmorId, type ArmorSlot } from '../armor';
 import { effectiveStats } from '../progression';
 import { useState, type CSSProperties } from 'react';

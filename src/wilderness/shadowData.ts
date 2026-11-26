@@ -1,6 +1,6 @@
 import { rank } from './progression.ts';
 
-export const shadowKinds=['wild','dire','skeleton','goblin','brute','assassin','wizard','elite','ritualElite','guardian','warlord','frostGuardian','sentinel','skeletonKing','darkArchmage','infernalGolem','ancientDragon','mountainTroll','stoneGolem','cursedKnight','trollKing','cursedWarlord','ancientTitan'] as const;
+export const shadowKinds=['wild','dire','skeleton','goblin','brute','assassin','wizard','elite','ritualElite','guardian','warlord','frostGuardian','sentinel','skeletonKing','darkArchmage','infernalGolem','ancientDragon','mountainTroll','stoneGolem','cursedKnight','trollKing','cursedWarlord','ancientTitan','swampStalker','venomQueen'] as const;
 export type ShadowKind=typeof shadowKinds[number];
 export type ShadowGrade='ordinary'|'elite'|'boss';
 export const shadowCommands=['Defensive','Aggressive','Follow'] as const;
@@ -22,6 +22,8 @@ export const shadowRankIndex=(level:number)=>shadowTuning.ranks.reduce((best,[re
 export const shadowRank=(level:number)=>shadowTuning.ranks[shadowRankIndex(level)][1];
 
 export const shadowProfiles={
+  swampStalker:{name:'Shadow Swamp Stalker',category:'Beast',range:3.5,cooldown:1.19,windup:.33,color:0x45bdff,style:'dash'},
+  venomQueen:{name:'Shadow Venom Queen',category:'Boss',range:9.4,cooldown:2.05,windup:.56,color:0x66d9ff,style:'spell'},
   mountainTroll:{name:'Shadow Mountain Troll',category:'Giant',range:3.1,cooldown:1.85,windup:.56,color:0x589cff,style:'slam'},
   stoneGolem:{name:'Shadow Stone Golem',category:'Construct',range:3.4,cooldown:2,windup:.64,color:0x54c2ff,style:'slam'},
   cursedKnight:{name:'Shadow Cursed Knight',category:'Undead',range:3.1,cooldown:1.4,windup:.41,color:0x779dff,style:'sword'},

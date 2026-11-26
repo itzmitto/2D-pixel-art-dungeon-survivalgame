@@ -181,7 +181,7 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
   if(cave){
     const exit=caveExit(cave), run=caveRuns[cave.id], reward=caveRewardId(cave,run?.cycle??1);
     const pins=[
-      {pin:{...exit,id:'room-exit',name:'Exit '+floor.dungeon.name,kind:'gate' as const},detail:'Cave exit'},
+      {pin:{...exit,id:'room-exit',name:'Exit cave',kind:'gate' as const},detail:'Cave exit'},
       {pin:{id:'room-boss',...caveBossPoint(cave),name:cave.boss,kind:'boss' as const},detail:caveStatus(cave,caveRuns,opened,clock)},
       {pin:{id:reward,...caveTreasurePoint(cave),name:'Boss Reward Chest',kind:'chest' as const,tier:run?caveRewardTier(cave,run,worldSeed):cave.rarity,claimed:opened.includes(reward)},
         detail:opened.includes(reward)?'Opened':run?.readyAt?'Reward chest available':'Unlocks on boss defeat'},
@@ -222,7 +222,7 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
 
   if(inDen(position.z)){
     const pins=[
-      {pin:{...den.exit,id:'room-exit',name:'Exit '+floor.dungeon.name,kind:'gate' as const},detail:'Den exit'},
+      {pin:{...den.exit,id:'room-exit',name:'Exit to Velren Forest',kind:'gate' as const},detail:'Den exit'},
       {pin:{id:'room-boss',x:0,z:315,name:'Fang Guardian',kind:'boss' as const},detail:bossDefeated?'Defeated':'Available · Lv 7'},
       ...denChests.map(lootPin),
     ];

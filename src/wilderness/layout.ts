@@ -1,4 +1,4 @@
-import { frontierAt, frontierBlocked, frontierBounds, frontierCrossing, frontierHeight, frontierLandmarks, highlands, outdoorBounds } from './frontier.ts';
+import { frontierAt, frontierBlocked, frontierBounds, frontierCrossing, frontierHeight, frontierLandmarks, highlandBridge, highlands, marshBridge, marshes, marshHeight, marshWaterLevel, outdoorBounds } from './frontier.ts';
 import { aurelia, aureliaPlaces, aureliaReserved, aureliaRoad } from './aurelia.ts';
 import { bossCaves, caveAt } from './bossCaves.ts';
 import { briarWatch, towerFloorAt } from './briarWatch.ts';
@@ -55,6 +55,7 @@ export const branchTrails = [
   orcApproach,
   aureliaRoad,
   highlands.road,
+  marshes.road,
   ...explorationTrails,
 ] as const;
 export function trailDistance(x: number,z: number,trails:readonly (readonly (readonly [number,number])[])[]=branchTrails) {
@@ -75,7 +76,9 @@ export const inForest = (x: number, z: number) => forests.some(f => ((x-f.x)/f.r
 export const bank = (x: number, z: number) => Math.abs(x - river(z));
 export const clearing = (x: number, z: number) => Math.hypot((x+45)*0.85, z);
 export const height = (x: number, z: number):number => {
-  if(frontierAt(z)||z===highlands.north) return frontierHeight(x,z,height(x,-extent));
+  if(z<=marshes.south&&z>=marshes.north)
+    return marshHeight(x,z,frontierHeight(x,marshes.south,height(x,-extent)));
+  if(frontierAt(z)) return frontierHeight(x,z,height(x,-extent));
   if(inDen(z)||towerFloorAt(z)||caveAt(z)) return 0;
   const base = 1.7 + 1.3*Math.sin(x*.048)*Math.cos(z*.04) + .65*Math.sin((x+z)*.09);
   const ridge = hills.reduce((sum,h)=>sum+h.rise*Math.max(0,1-((x-h.x)**2+(z-h.z)**2)/h.radius**2)**2,0);
@@ -87,11 +90,13 @@ export const height = (x: number, z: number):number => {
   return aurelia.elevation+(terrain-aurelia.elevation)*blend;
 };
 export const onBridge = (x: number,z: number) => frontierCrossing(x,z) || bridges.some(b=>Math.abs(z-b.z)<2.03 && Math.abs(x-b.x)<13);
-export const surface = (x: number,z: number) => frontierCrossing(x,z)?frontierHeight(x,z,height(x,-extent),true):onBridge(x,z) ? Math.max(height(x,z),1.6) : height(x,z);
+export const surface = (x: number,z: number) => highlandBridge(x,z)?frontierHeight(x,z,height(x,-extent),true):marshBridge(x,z)?Math.max(1.75,height(x,z)):onBridge(x,z) ? Math.max(height(x,z),1.6) : height(x,z);
 export function walkable(x: number,z: number, obstacles: readonly {x:number;z:number;r:number}[]) {
   if(frontierBounds(x,z)||z<=-extent+1&&z>=-extent&&outdoorBounds(x,z)&&Math.abs(x)<109){
-    return !frontierBlocked(x,z)&&!obstacles.some(o=>Math.hypot(x-o.x,z-o.z)<o.r+.45) &&
-      Math.abs(height(x+.5,z)-height(x-.5,z))<1 && Math.abs(height(x,z+.5)-height(x,z-.5))<1;
+    if(obstacles.some(o=>Math.hypot(x-o.x,z-o.z)<o.r+.45)) return false;
+    if(frontierCrossing(x,z)) return true;
+    return !frontierBlocked(x,z)&&(z>marshes.south||height(x,z)>marshWaterLevel-.17)&&
+      Math.abs(height(x+.5,z)-height(x-.5,z))<1&&Math.abs(height(x,z+.5)-height(x,z-.5))<1;
   }
   return Math.abs(x)<extent-1 && Math.abs(z)<extent-1 &&
     (bank(x,z)>7.8 || onBridge(x,z)) &&

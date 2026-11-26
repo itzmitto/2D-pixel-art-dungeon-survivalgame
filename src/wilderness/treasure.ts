@@ -18,10 +18,14 @@ export const worldChests:Chest[]=[
   {id:'gravespur-cache',x:207,z:-181,rarity:'Mythic',weapon:'katana',gold:156,armor:8,guardian:'elite-gravefang'},
 ];
 worldChests.push(
+  {id:'mournshade-reed-cache',title:'Pale Reed Reliquary',x:-38,z:-592,rarity:'Epic',weapon:'staff',gold:170,armor:11,material:'Ancient Rune'},
+  {id:'mournshade-walk-cache',title:'Drowned Causeway Stash',x:10,z:-518,rarity:'Rare',weapon:'shield',gold:106,armor:9,material:'Swamp Essence'},
+  {id:'mournshade-hushfen-cache',title:'Hushfen Hunter’s Chest',x:28,z:-589,rarity:'Legendary',weapon:'katana',gold:244,armor:12,material:'Swamp Essence',
+    guardians:frontierCamps.filter(guard=>guard.id.startsWith('orc-hushfen')).map(guard=>guard.id)},
   {id:'elaris-frostpine-cache',title:'Frostpine Survey Cache',x:-38,z:-277,rarity:'Rare',weapon:'shield',gold:56,armor:6,material:'Mountain Crystal'},
   {id:'elaris-aqueduct-cache',title:'Moonfall Aqueduct Cache',x:23,z:-323,rarity:'Epic',weapon:'staff',gold:91,armor:7,material:'Mountain Crystal'},
-  {id:'elaris-slatefang-cache',title:'Slatefang War Chest',x:-24,z:-361,rarity:'Epic',weapon:'axe',gold:132,armor:8,material:'Troll Fang',guardians:frontierCamps.slice(0,3).map(guard=>guard.id)},
-  {id:'elaris-crownroad-cache',title:'Crownroad Garrison Chest',x:53,z:-380,rarity:'Epic',weapon:'greatsword',gold:146,armor:9,material:'Cursed Steel',guardians:frontierCamps.slice(3).map(guard=>guard.id)},
+  {id:'elaris-slatefang-cache',title:'Slatefang War Chest',x:-24,z:-361,rarity:'Epic',weapon:'axe',gold:132,armor:8,material:'Troll Fang',guardians:frontierCamps.filter(guard=>guard.id.startsWith('orc-slatefang')).map(guard=>guard.id)},
+  {id:'elaris-crownroad-cache',title:'Crownroad Garrison Chest',x:53,z:-380,rarity:'Epic',weapon:'greatsword',gold:146,armor:9,material:'Cursed Steel',guardians:frontierCamps.filter(guard=>guard.id.startsWith('orc-crownroad')).map(guard=>guard.id)},
   {id:'elaris-hidden-cache',title:'Oathbinder’s Hidden Chest',x:-37,z:-440,rarity:'Legendary',weapon:'katana',gold:185,armor:10,material:'Ancient Rune'},
 );
 export const denChests:Chest[]=[

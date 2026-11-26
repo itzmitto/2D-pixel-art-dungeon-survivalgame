@@ -3,7 +3,7 @@ import type { Rarity, WeaponId } from './weapons.ts';
 
 type Cave = {
   id:string; name:string; x:number;z:number;arena:number; width:number;depth:number;
-  kind:'warlord'|'frostGuardian'|'skeletonKing'|'darkArchmage'|'infernalGolem'|'ancientDragon'|'trollKing'|'cursedWarlord';
+  kind:'warlord'|'frostGuardian'|'skeletonKing'|'darkArchmage'|'infernalGolem'|'ancientDragon'|'trollKing'|'cursedWarlord'|'venomQueen';
   boss:string;level:number;recommended:number;rank:string;rarity:Rarity;upgrade?:'Legendary'|'Mythic';chance?:number;
   weapon:WeaponId;armor:ArmorId;gold:number;rating:number;crystals:number;potions:number;color:number;respawnMs:number;
 };
@@ -24,6 +24,8 @@ export const bossCaves=[
     recommended:25,rank:'C',rarity:'Epic',upgrade:'Legendary',chance:.45,weapon:'axe',armor:'blacksteel-amulet',gold:375,rating:11,crystals:7,potions:3,color:0xc9e18d,respawnMs:300_000},
   {id:'oathbreakers-vault',name:'Oathbreaker’s Vault',x:11,z:-433,arena:1788,width:22,depth:23,kind:'cursedWarlord',boss:'Cursed Warlord',level:40,
     recommended:40,rank:'B',rarity:'Legendary',weapon:'greatsword',armor:'abyssal-cape',gold:575,rating:14,crystals:11,potions:4,color:0xc49aff,respawnMs:300_000},
+  {id:'venomroot-grotto',name:'Venomroot Grotto',x:-22,z:-619,arena:1908,width:25,depth:25,kind:'venomQueen',boss:'Venom Queen',level:50,
+    recommended:50,rank:'A',rarity:'Legendary',upgrade:'Mythic',chance:.34,weapon:'katana',armor:'abyssal-amulet',gold:710,rating:16,crystals:15,potions:5,color:0x64e1b0,respawnMs:300_000},
 ] as const satisfies readonly Cave[];
 export type BossCave=typeof bossCaves[number];
 export type CaveRun={cycle:number;readyAt:number;rewardVersion?:2};

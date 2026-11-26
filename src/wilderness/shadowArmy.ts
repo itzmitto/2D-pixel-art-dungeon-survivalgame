@@ -72,9 +72,17 @@ export function shadowArmy<Enemy extends Hostile>(
   let nextIndex=0;
   const tint=new T.Color(), warmRigLimit=18;
   const stamp=new T.Object3D();
-  let time=0,lastPrune=0;
+  let time=0,lastPrune=0, lastX=player.position.x,lastZ=player.position.z, travelSpeed=0, travelYaw=player.rotation.y;
+  function formation(index:number){
+    const row=Math.floor(index/7), column=index%7;
+    const slot=column===0?0:Math.ceil(column/2)*(column%2?1:-1);
+    const abreast=travelSpeed>9?1.15:1.42, depth=2.35+row*1.63;
+    const p=player.position,s=Math.sin(travelYaw),c=Math.cos(travelYaw);
+    return {x:p.x-s*depth+c*slot*abreast,z:p.z-c*depth-s*slot*abreast};
+  }
   function spot(index:number,radius=2.55+Math.sqrt(index)*.85){
-    const p=player.position;
+    const p=player.position, desired=formation(index);
+    if(canWalk(desired.x,desired.z)&&clear(p.x,p.z,desired.x,desired.z)) return desired;
     for(let i=0;i<12;i++){
       const angle=i*2.399+index*2.399+player.rotation.y+Math.PI;
       const ring=Math.max(1.75,radius-i*.32);
@@ -195,6 +203,7 @@ export function shadowArmy<Enemy extends Hostile>(
       if(added||strongest) changed();
     },
     transition(){
+      lastX=player.position.x;lastZ=player.position.z;travelSpeed=0;travelYaw=player.rotation.y;
       projectiles.length=0;
       let i=0;
       for(const shadow of active.values()){
@@ -249,6 +258,12 @@ export function shadowArmy<Enemy extends Hostile>(
         save.shadowEssences=save.shadowEssences.filter(essence=>essence.expiresAt>now);
       }
       if(!active.size&&!projectiles.length) return;
+      const dx=player.position.x-lastX,dz=player.position.z-lastZ;
+      const moved=Math.hypot(dx,dz);
+      travelSpeed=T.MathUtils.damp(travelSpeed,moved/Math.max(dt,.001),6,dt);
+      const aim=moved>.015?Math.atan2(dx,dz):travelYaw;
+      travelYaw+=Math.atan2(Math.sin(aim-travelYaw),Math.cos(aim-travelYaw))*(1-Math.exp(-5*dt));
+      lastX=player.position.x;lastZ=player.position.z;
       const leader=player.position, aggressive=save.shadowCommand==='Aggressive';
       const reach=aggressive?27:13.2, fighting=save.shadowCommand!=='Follow';
       function around(x:number,z:number,radius:number,visit:(enemy:Enemy)=>void){
@@ -319,16 +334,17 @@ export function shadowArmy<Enemy extends Hostile>(
         state.seek-=dt;state.bite=Math.max(0,state.bite-dt);
         state.hurt=Math.max(0,state.hurt-dt);state.recovery=Math.max(0,state.recovery-dt);
         const distance=Math.hypot(p.x-leader.x,p.z-leader.z);
-        if(distance>reach+11) setDown(state,spot(n));
+        if(distance>Math.max(28,reach+10)||(distance>13&&state.seek<=0&&!clear(p.x,p.z,leader.x,leader.z))) setDown(state,spot(n));
         if(state.seek<=0&&!state.windup){
           state.seek=.32+(n%11)*.042;
           let best=reach;
           state.target=undefined;
           if(fighting) around(p.x,p.z,reach,enemy=>{
             const q=enemy.root.position,d=Math.hypot(q.x-p.x,q.z-p.z);
-            if(d>=best||Math.hypot(q.x-leader.x,q.z-leader.z)>reach||
+            const score=d+(enemy.hitFlash>0?-2.1:0);
+            if(score>=best||Math.hypot(q.x-leader.x,q.z-leader.z)>reach||
               (!aggressive&&enemy.hitFlash<=0&&Math.hypot(q.x-leader.x,q.z-leader.z)>8.3)||!clear(p.x,p.z,q.x,q.z)) return;
-            state.target=enemy;best=d;
+            state.target=enemy;best=score;
           });
         }
         const target=state.target;
@@ -367,14 +383,15 @@ export function shadowArmy<Enemy extends Hostile>(
             }
           }
         }
-        const angle=n*2.399+player.rotation.y+Math.PI, radius=2.45+Math.sqrt(n)*.86;
-        const goal=target?.hp?target.root.position:{x:leader.x+Math.sin(angle)*radius,z:leader.z+Math.cos(angle)*radius};
+        const desiredSlot=formation(n);
+        const goal=target?.hp?target.root.position:canWalk(desiredSlot.x,desiredSlot.z)?desiredSlot:
+          (state.seek<.16||distance>10?spot(n):p);
         const dx=goal.x-p.x,dz=goal.z-p.z,gap=Math.hypot(dx,dz), yaw=Math.atan2(dx,dz);
         let speed=0;
         const desired=target?.hp?Math.max(1.42,profile.range-(ranged?1.5:.62)):.69;
         if(!state.rise&&target?.hp&&gap<profile.range&&!state.bite&&!state.windup&&clear(p.x,p.z,goal.x,goal.z)) state.windup=profile.windup;
         if(!state.rise&&!state.windup&&gap>desired){
-          const step=Math.min(gap,(distance>11?11:target?.hp?6.7:5.5)*dt);
+          const step=Math.min(gap,(target?.hp?6.7:Math.min(23,Math.max(5.5,travelSpeed+Math.max(0,gap-1)*1.05)))*dt);
           for(const offset of [0,.61,-.61,1.20,-1.20]){
             const a=yaw+offset,x=p.x+Math.sin(a)*step,z=p.z+Math.cos(a)*step;
             if(!canWalk(x,z)||Math.hypot(x-leader.x,z-leader.z)<.78) continue;
@@ -408,7 +425,7 @@ export function shadowArmy<Enemy extends Hostile>(
           if(distance<8||n%2===Math.floor(time*30)%2||state.windup>0)
             rig.animate({time,phase:state.phase,gait:state.gait,windup:state.windup>0?.32+(1-state.windup/profile.windup)*.67:0,
               recovery:state.recovery/.31,hit:state.hurt/.28,leap:charge?state.recovery/.31*.76:profile.style==='dragon'&&state.windup>0?.59:0,dead:0,frozen:false,
-              alert:target?.hp?1:0,distance});
+              technique:profile.style==='slam'?'slam':profile.style==='sword'?'cleave':undefined,alert:target?.hp?1:0,distance});
         }
       }
     },

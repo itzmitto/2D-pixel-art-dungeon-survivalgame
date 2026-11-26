@@ -5,6 +5,8 @@ import { elementalIds, type Rarity, type WeaponId } from './weapons.ts';
 
 const regional = {...wolf,awareness:31,leash:47,recovery:1.45,windup:1.1,reach:4.3,respawn:0};
 export const regionalMonsters={
+  swampStalker:{...regional,name:'Swamp Stalker',level:34,levelRange:[30,49],scale:1.12,health:204,damage:18,speed:8.15,xp:795,gold:114,material:'Swamp Essence',resistance:{control:.82,damageOverTime:.51}},
+  venomQueen:{...regional,name:'Venom Queen',level:50,levelRange:[50,50],scale:2.05,health:788,damage:34,speed:5.55,xp:3290,gold:710,material:'Swamp Essence',resistance:bossResistance},
   mountainTroll:{...regional,name:'Mountain Troll',level:17,levelRange:[15,23],scale:1.55,health:125,damage:12,speed:2.8,xp:365,gold:58,material:'Troll Fang',resistance:{control:.62,damageOverTime:.94}},
   stoneGolem:{...regional,name:'Stone Golem',level:22,levelRange:[20,28],scale:1.62,health:150,damage:14,speed:2.55,xp:470,gold:71,material:'Ancient Stone',resistance:{control:.38,damageOverTime:.8}},
   cursedKnight:{...regional,name:'Cursed Knight',level:25,levelRange:[22,30],scale:1.26,health:142,damage:15,speed:4.1,xp:550,gold:89,material:'Cursed Steel',resistance:{control:.66,damageOverTime:.9}},

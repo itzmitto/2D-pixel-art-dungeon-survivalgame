@@ -55,10 +55,11 @@ export function caveScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number}
   const stamp=new T.Object3D(), tint=new T.Color(), random=randomSequence(1023), batch=rigidBatcher();
   const arenaProps:{x:number;z:number;r:number}[]=[];
   const views=bossCaves.map(cave=>{
-    const ice=cave.kind==='frostGuardian',crypt=cave.kind==='skeletonKing',arcane=cave.kind==='darkArchmage';
+    const ice=cave.kind==='frostGuardian',crypt=cave.kind==='skeletonKing',arcane=cave.kind==='darkArchmage'||cave.kind==='cursedWarlord';
+    const troll=cave.kind==='trollKing';
     const volcanic=cave.kind==='infernalGolem'||cave.kind==='ancientDragon',dragon=cave.kind==='ancientDragon';
     const light=ice?blue:cave.kind==='warlord'?amber:new T.MeshBasicMaterial({color:cave.color,toneMapped:false});
-    const ground=ice?frozen:crypt?stone:volcanic?rockGlow:basalt;
+    const ground=ice?frozen:crypt||troll?stone:volcanic?rockGlow:basalt;
     let sign:T.Sprite|undefined;
     const floats:T.Mesh[]=[], entryMotes=new T.InstancedMesh(dust,light,12);
     entryMotes.instanceMatrix.setUsage(T.DynamicDrawUsage);entryMotes.frustumCulled=false;
@@ -165,12 +166,15 @@ export function caveScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number}
           const gem=meshPart(arena,crystalForm,crystal,x,1.57,z);gem.scale.setScalar(1.1+(i%3)*.25);
           floats.push(gem);
           meshPart(arena,floorSeal,light,x,.029,z).scale.setScalar(1.34);
-        }else if(cave.kind==='warlord'||dragon){
+        }else if(cave.kind==='warlord'||dragon||troll){
           for(let k=0;k<4;k++){
             const fragment=meshPart(arena,bones,bone,x+(k%2)*.73,.076,z+k*.26);
             fragment.rotation.y=i+k*2.399;
           }
-          if(cave.kind==='warlord'){
+          if(troll){
+            meshPart(arena,slab,stone,x,.76,z).scale.set(.65,1.21,.8);
+            meshPart(arena,crystalForm,light,x,.33,z+.15).scale.setScalar(.48);
+          }else if(cave.kind==='warlord'){
             arenaProps.push({x,z:z-.62,r:.83});
             meshPart(arena,sword,brass,x+.52,.28,z+.28).rotation.set(.8,i,-.34);
             for(let k=0;k<4;k++){

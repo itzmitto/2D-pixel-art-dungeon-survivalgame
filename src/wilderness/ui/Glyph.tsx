@@ -3,6 +3,14 @@ import { useId } from 'react';
 
 type Art={color:string; silhouette:string; shade:string; detail:string};
 const art:Record<string,Art>={
+  'Mountain Crystal':{color:'#86d9ff',silhouette:'M8 49 16 24l10 12 3-21L42 4l9 16-6 20 11-5-2 14-18 10Z',shade:'M29 15 42 4l-5 24-12 28-9-10 12-9ZM42 33l9-13-5 25-10 13Z',detail:'m31 17 7 9 9-6M16 27l6 18m15-18-9 25'},
+  'Ancient Stone':{color:'#95a0b9',silhouette:'M7 38 15 19l18-8 20 7 5 20-13 16-23 2Z',shade:'m7 38 15-8 23 2 13 6-13 16-23 2Z',detail:'m20 24 8-4 5 5 8-8m-8 8-7 10 10 8 12-4m-12 4-5 9'},
+  'Troll Fang':{color:'#d8d3a2',silhouette:'M12 18 23 8l18 2 9 12-7 15Q28 55 10 59l-3-6q18-14 18-25Z',shade:'m12 18 12-9 17 2 7 10-13 5-12-1Zm23 10q-4 15-24 28 22-6 31-24Z',detail:'m18 17 8 3 7-4 9 3m-10 13-7 12'},
+  'Cursed Steel':{color:'#af9be9',silhouette:'M8 43 15 23l17 3 9-17 14 8 2 17-12 19-29 3Z',shade:'m16 24 16 3 9-17 7 6-9 23-15 3-8 13-8-12Z',detail:'m20 29 14 5 9-8m-5 12-7 10m15-13 7 1'},
+  'Swamp Essence':{color:'#6deabd',silhouette:'M31 5q4 12 13 17 15 10 12 23-5 16-25 15Q11 60 8 46q-2-12 11-23Z',shade:'M16 43q9 6 18-4 9-9 17-3 7 15-11 21-16 5-24-14Z',detail:'M19 40q4-9 10-11m2 16 6-5 6 5-6 7Zm-17-8 3-6'},
+  'Titan Core':{color:'#67c8ff',silhouette:'M17 12 34 4l17 9 10 19-9 19-19 10-20-9L3 31Z',shade:'M34 4l17 9 10 19-17 5-11 24-8-23L3 31l14-19Z',detail:'M33 13 47 30 33 50 18 31Zm0 0v37m-15-19h29m-14-8 7 8-7 10-7-10Z'},
+  'Ancient Rune':{color:'#dab1f8',silhouette:'M13 9 38 4l17 10 2 21-11 23-27 1L7 45Z',shade:'M38 4l17 10 2 21-11 23-7-11-3-25-23-13Z',detail:'m20 44 11-28 13 26M24 33l15-7m-9 20 8-9m-22 11 4 5 21-1'},
+
   longsword:{color:'#8baad9',silhouette:'M12 49l5-6 4 3 7-8-5-4 2-3 7 4L49 9l9-5-2 11-19 24 5 7-3 2-6-5-8 8 3 4-5 5Z',shade:'M32 35 56 7 52 17 36 39Z M14 49l9 7-3 2Z',detail:'m25 47 3 3m0-7 3 3m6-11L53 12m-25 25 10 8'},
   greatsword:{color:'#ff794d',silhouette:'M7 54l5-9 5 1 9-9-7-8 2-3 9 4L47 8 60 3l-2 18-19 19 1 9-4 2-6-8-9 9 1 5-8 5Z',shade:'m31 30 20-20 8-5-5 14-20 19Z M22 30l13 12 2 6-6-6Z',detail:'m32 35 5-8 4-1 3-7 6-2 5-9M14 48l5 4m-7 0 5 4m22-21 14-16'},
   axe:{color:'#85a8ff',silhouette:'M8 56l3-5 4 1 21-25-5-3-13 8-8-4 1-12 8-10 4 9 10 3 7-7 11-5 10 7-5 12-12 7-4-3-21 27 1 5-6 1Z',shade:'M10 28 12 17 19 9l1 6-5 7 4 5-2 5Z M44 12 51 6l10 7-5 12-4-4 3-6-6-3Z',detail:'m19 23 7-5 7 2 5-6 2 7 8-3-4 7m-24 21 3 3m2-9 3 3m2-9 3 3'},

@@ -15,12 +15,62 @@ export function regionalModels(){
   const azure=new T.MeshStandardMaterial({color:0x75caff,emissive:0x33aaff,emissiveIntensity:1.65});
   const violet=new T.MeshStandardMaterial({color:0xb998f1,emissive:0x7131d5,emissiveIntensity:1.2});
   const yellow=new T.MeshStandardMaterial({color:0xd0e792,emissive:0xb0c849,emissiveIntensity:.87});
+  const amphibian=mat(0x34534d), shell=mat(0x293841,.28), toxic=new T.MeshStandardMaterial({color:0x8ae8a3,emissive:0x42af70,emissiveIntensity:1.53});
   const batch=rigidBatcher();
   function form(parent:T.Object3D,geo:T.BufferGeometry,m:T.Material,x:number,y:number,z:number,w:number,h:number,d:number){
     const mesh=meshPart(parent,geo,m,x,y,z);mesh.scale.set(w,h,d);return mesh;
   }
+  function swimmer(queen:boolean){
+    const root=new T.Group(), body=joint(root,0,queen?.82:.67);
+    form(body,rock,amphibian,0,0,-.36,queen?.64:.40,.38,queen?1.21:.79);
+    form(body,rock,shell,0,.27,-.43,queen?.67:.40,.32,.87);
+    const tail=joint(body,0,-.11,-.92);
+    form(tail,rock,amphibian,0,0,-.43,.23,.18,.59);
+    form(tail,tusk,toxic,0,.03,-.96,.12,.39,.12).rotation.x=-1.37;
+    const head=joint(body,0,.03,.61);
+    form(head,rock,shell,0,.07,.16,.37,.27,.43);
+    const jaw=joint(head,0,-.15,.13);
+    form(jaw,rock,amphibian,0,-.01,.2,.29,.12,.42);
+    const limbs:{side:number;row:number;shoulder:T.Group;wrist:T.Group}[]=[];
+    for(const side of [-1,1]){
+      for(let eye=0;eye<(queen?3:1);eye++)
+        form(head,shard,toxic,side*(.20+eye*.042),.156+eye*.02,.43-eye*.12,.061,.042,.045);
+      for(let fang=0;fang<3;fang++)
+        form(jaw,tusk,bone,side*(.14+fang*.047),.048,.43-fang*.10,.031,.15,.031);
+      for(let row=0;row<(queen?3:2);row++){
+        const shoulder=joint(body,side*.34,0,.4-row*.55);
+        const wrist=joint(shoulder,side*.48,-.23,.11);
+        form(shoulder,rock,amphibian,side*.24,-.09,.042,.38,.12,.15).rotation.z=-side*.32;
+        form(wrist,rock,shell,side*.12,-.17,.06,.16,.28,.12).rotation.z=side*.35;
+        for(let claw=0;claw<3;claw++)
+          form(wrist,tusk,bone,side*(.14+claw*.062),-.35,.13+claw*.035,.05,.26,.051).rotation.x=1.83;
+        limbs.push({side,row,shoulder,wrist});
+      }
+      if(queen) for(let i=0;i<4;i++){
+        form(body,shard,toxic,side*(.23+.06*i),.35,-.19-i*.21,.18,.26,.16).rotation.z=-side*.41;
+      }
+    }
+    batch.bake(root);
+    return {root,animate({phase,gait,windup,recovery,hit,leap,dead,alert,technique}:import('./creatureGeometry.ts').CreaturePose){
+      const spit=technique==='spit'||technique==='miasma';
+      body.position.y=(queen?.82:.65)+(Math.abs(Math.sin(phase))*gait*.13)-windup*(spit?-.22:.22)+leap*.37-dead*.38;
+      body.rotation.z=dead*1.05+Math.cos(phase)*gait*.083+hit*.15;
+      body.rotation.x=spit?-windup*.28:windup*.34-recovery*.49;
+      head.rotation.x=spit?-windup*.38:recovery*.24;
+      jaw.rotation.x=windup*(spit?.75:.32)+recovery*.23;
+      tail.rotation.y=Math.sin(phase*.6)*(.23+gait*.35)+windup*.19;
+      for(const {side,row,shoulder,wrist} of limbs){
+        const stride=Math.sin(phase+row*2.1+side*1.57)*gait;
+        shoulder.rotation.y=stride*.41+side*(row===0?windup*.49:-.13);
+        shoulder.rotation.z=side*(stride*.21+windup*(row===0?-.32:.14));
+        wrist.rotation.x=-stride*.54+windup*.54-recovery*.64;
+      }
+      if(!alert&&!queen) body.position.y-=.14;
+    }};
+  }
   return {
     make(kind:RegionalKind){
+      if(kind==='swampStalker'||kind==='venomQueen') return swimmer(kind==='venomQueen');
       const troll=kind==='mountainTroll'||kind==='trollKing', titan=kind==='ancientTitan';
       const knight=kind==='cursedKnight'||kind==='cursedWarlord', golem=!troll&&!knight;
       const glow=troll?yellow:knight?violet:azure, material=troll?trollSkin:knight?iron:stone;
@@ -91,7 +141,7 @@ export function regionalModels(){
     },
     dispose(){
       batch.dispose();
-      for(const resource of [rock,shard,box,tusk,blade,cape,trollSkin,stone,iron,brass,leather,bone,cloth,azure,violet,yellow]) resource.dispose();
+      for(const resource of [rock,shard,box,tusk,blade,cape,trollSkin,stone,iron,brass,leather,bone,cloth,azure,violet,yellow,amphibian,shell,toxic]) resource.dispose();
     },
   };
 }
