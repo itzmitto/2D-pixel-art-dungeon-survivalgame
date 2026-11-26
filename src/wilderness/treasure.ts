@@ -12,6 +12,19 @@ export const worldChests:Chest[]=[
   {id:'greyfen-cache',x:169,z:-160,rarity:'Epic',weapon:'greatsword',gold:32,armor:4},
   {id:'gravespur-cache',x:207,z:-181,rarity:'Mythic',weapon:'katana',gold:156,armor:8,guardian:'elite-gravefang'},
 ];
+export const addedChestSites:Chest[]=[
+  {id:'ember-north-grove',x:-59,z:-16,rarity:'Common',weapon:'staff',gold:7,armor:1},
+  {id:'southwater-bank',x:59,z:113,rarity:'Common',weapon:'shield',gold:9,armor:1},
+  {id:'lantern-woodline',x:143,z:94,rarity:'Uncommon',weapon:'katana',gold:12,armor:2},
+  {id:'brokenfang-ledge',x:-77,z:-29,rarity:'Uncommon',weapon:'greatsword',gold:15,armor:2},
+  {id:'raven-cart-stash',x:-183,z:55,rarity:'Uncommon',weapon:'staff',gold:13,armor:2},
+  {id:'standing-stones-hollow',x:-123,z:75,rarity:'Rare',weapon:'axe',gold:23,armor:3},
+  {id:'south-pine-boulder',x:-94,z:132,rarity:'Rare',weapon:'shield',gold:24,armor:3},
+  {id:'hollowmouth-overlook',x:-194,z:-117,rarity:'Epic',weapon:'staff',gold:34,armor:4},
+  {id:'moonwatch-deep-woods',x:106,z:-116,rarity:'Epic',weapon:'katana',gold:36,armor:4},
+];
+worldChests.push(...addedChestSites);
+export const cacheBoulders=[{x:-94,z:129,r:1.65},{x:-195,z:-115,r:1.25}];
 export function chestBonus(chest:Chest,seed:number){
   let key=seed;
   for(const char of chest.id) key=Math.imul(key^char.charCodeAt(0),16777619);
@@ -57,6 +70,7 @@ export function chestModels(group:T.Group,chests:readonly Chest[],opened:readonl
   const rune=shapedPlate([[0,.105],[-.042,.012],[-.008,-.069],[.055,.017],[.011,.012]],.012,0);
   const foot=shapedPlate([[-.14,-.055],[-.151,.06],[.132,.056],[.12,-.031],[.015,-.071]],.14,.023);
   const floor=new T.BoxGeometry(1.36,.041,.91);
+  const well=new T.PlaneGeometry(1.23,.85).rotateX(-Math.PI/2);
   const wall=new T.BoxGeometry(1,1,1);
   const stem=new T.CylinderGeometry(.13,.10,.058,9).rotateX(Math.PI/2);
   const dark=new T.MeshStandardMaterial({color:0x1b1718,roughness:.97});
@@ -127,13 +141,17 @@ export function chestModels(group:T.Group,chests:readonly Chest[],opened:readonl
       meshPart(reveal,stem,coin,x,.05,z).rotation.x=angle+Math.PI/2;
     }
     meshPart(reveal,jewel,style.magic,.17,.13,-.18).scale.set(1.2,1.7,1.2);
+    const interior=new T.Mesh(well,new T.MeshBasicMaterial({
+      color:rarity[chest.rarity].color,transparent:true,depthWrite:false,blending:T.AdditiveBlending,
+    }));
+    interior.position.y=.19;interior.visible=false;root.add(interior);
     const shine=new T.Mesh(beam,new T.MeshBasicMaterial({color:rarity[chest.rarity].color,transparent:true,opacity:.24,depthWrite:false}));
     shine.position.y=1.48;root.add(shine);group.add(root);
     const isOpen=opened.includes(chest.id);
     lid.rotation.x=isOpen?-1.48:0;
     reveal.visible=false;shine.visible=false;
     batcher.bake(root);
-    return {chest,root,lid,shine,reveal,isOpen,opening:0,tier};
+    return {chest,root,lid,shine,interior,reveal,isOpen,opening:0,tier};
   });
   return {
     update(dt:number,bosses:readonly string[],openedIds:readonly string[],defeated:readonly string[]=[]){
@@ -145,6 +163,8 @@ export function chestModels(group:T.Group,chests:readonly Chest[],opened:readonl
         holder.isOpen=nowOpen;
         holder.opening=Math.max(0,holder.opening-dt);
         holder.lid.rotation.x=T.MathUtils.damp(holder.lid.rotation.x,nowOpen?-1.48:0,7,dt);
+        holder.interior.visible=nowOpen&&holder.lid.rotation.x<-.19;
+        holder.interior.material.opacity=.14+holder.opening*.27;
         holder.reveal.visible=holder.opening>0;
         holder.reveal.position.y=.22+Math.min(1.0,(2.65-holder.opening)*.87);
         holder.shine.visible=holder.root.visible&&holder.tier>=2&&(!nowOpen||holder.opening>0);
@@ -153,9 +173,9 @@ export function chestModels(group:T.Group,chests:readonly Chest[],opened:readonl
     },
     dispose(){
       batcher.dispose();
-      for(const resource of [beam,bulk,panel,saddle,corner,lock,keyhole,rivet,hinge,jewel,rune,foot,floor,wall,stem,dark,coin]) resource.dispose();
+      for(const resource of [beam,bulk,panel,saddle,corner,lock,keyhole,rivet,hinge,jewel,rune,foot,floor,well,wall,stem,dark,coin]) resource.dispose();
       for(const {own,trim,magic,lid,band} of styles){own.dispose();trim.dispose();magic.dispose();lid.dispose();band.dispose();}
-      for(const holder of holders) holder.shine.material.dispose();
+      for(const holder of holders){holder.shine.material.dispose();holder.interior.material.dispose();}
     },
   };
 }

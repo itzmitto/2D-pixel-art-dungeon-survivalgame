@@ -65,6 +65,8 @@ export function createEncounters(
   const fx=createMagicEffects(group);
   const chests:Chest[]=[...worldChests,
     {id:'den-hidden',x:20,z:350,rarity:'Rare',weapon:'katana',gold:31,armor:4},
+    {id:'den-entry-supplies',x:-4.7,z:380,rarity:'Common',weapon:'axe',gold:10,armor:1},
+    {id:'den-guardian-reliquary',x:13,z:314,rarity:'Epic',weapon:'shield',gold:38,armor:4,boss:den.boss},
     {id:'den-reward',x:0,z:311,rarity:'Legendary',weapon:'greatsword',gold:100,armor:7,boss:den.boss},
   ];
   const chestViews=chestModels(group,chests,save.opened);

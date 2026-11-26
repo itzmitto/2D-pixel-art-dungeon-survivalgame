@@ -1,3 +1,4 @@
+import { addedChestSites, cacheBoulders } from './treasure';
 import { huntScenery } from './huntScenery';
 import * as T from 'three';
 import { bank, bridges, clearing, extent, height, inForest, landmarkDistance, randomSequence, trailDistance } from './layout';
@@ -25,24 +26,32 @@ export function scenery(scene:T.Scene, seed:number) {
     batch.entries.push({matrix:form.matrix.clone(),color:color?.clone()});
   }
   const tint=new T.Color();
+  const nearCache=(x:number,z:number,r:number)=>addedChestSites.some(chest=>Math.hypot(x-chest.x,z-chest.z)<r+1.35);
   for(let i=0;i<5100;i++){
     const x=(rand()*2-1)*extent,z=(rand()*2-1)*extent;
     if((!inForest(x,z)&&rand()>.025)||trailDistance(x,z)<5||bank(x,z)<11||clearing(x,z)<14||landmarkDistance(x,z)<13) continue;
     const y=height(x,z),h=4+rand()*7,rot=rand()*6.3;
-    write(trunkGeo,wood,x,y+h*.28,z,h*.13,h*.62,h*.13,rot);
+    const reserved=nearCache(x,z,h*.08);
+    if(!reserved) write(trunkGeo,wood,x,y+h*.28,z,h*.13,h*.62,h*.13,rot);
     for(let j=0;j<3;j++){
       const r=h*(.29-j*.058);
-      write(treeGeo,foliage,x,y+h*(.60+j*.16),z,r,h*.53,r,rot+j,
-        tint.setHSL(.26+rand()*.06,.19,.34+rand()*.31));
+      tint.setHSL(.26+rand()*.06,.19,.34+rand()*.31);
+      if(!reserved) write(treeGeo,foliage,x,y+h*(.60+j*.16),z,r,h*.53,r,rot+j,tint);
     }
-    obstacles.push({x,z,r:h*.08});
+    if(!reserved) obstacles.push({x,z,r:h*.08});
   }
   const rocks:{x:number;z:number;r:number}[]=[];
   for(let i=0;i<480;i++){
     const x=(rand()*2-1)*extent,z=(rand()*2-1)*extent,r=.65+rand()*2.1;
     if(trailDistance(x,z)<4||clearing(x,z)<12||bank(x,z)<8||landmarkDistance(x,z)<12) continue;
-    write(rockGeo,stone,x,height(x,z)+r*.36,z,r,r*.76,r*.86,rand()*6);
+    const rotation=rand()*6;
+    if(nearCache(x,z,r)) continue;
+    write(rockGeo,stone,x,height(x,z)+r*.36,z,r,r*.76,r*.86,rotation);
     rocks.push({x,z,r:r*.88});
+  }
+  for(const {x,z,r} of cacheBoulders){
+    write(rockGeo,stone,x,height(x,z)+r*.44,z,r*1.26,r,r,.8);
+    rocks.push({x,z,r});
   }
   for(const {geometry,material,entries} of batches.values()){
     const mesh=new T.InstancedMesh(geometry,material,entries.length);
