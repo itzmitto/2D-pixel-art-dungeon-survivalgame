@@ -148,61 +148,89 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
   });
   const [clock,setClock]=useState(Date.now);
   useEffect(()=>{const timer=window.setInterval(()=>setClock(Date.now()),1000);return ()=>window.clearInterval(timer);},[]);
+  const localRange=(p:Pin)=>Math.round(Math.hypot(position.x-p.x,position.z-p.z));
+  const localPin=(pin:Pin,detail:string)=><g key={pin.id} role="button" tabIndex={0}
+    aria-label={pin.name+' · '+detail} onClick={()=>select(pin.id)} onKeyDown={event=>{
+      if(event.key==='Enter'||event.key===' '){event.preventDefault();select(pin.id);}
+    }} className={'atlas-pin '+pin.kind+(pin.claimed?' claimed':'')+(selection===pin.id?' selected':'')}
+    style={pin.tier?{'--pin-color':rarity[pin.tier].color} as React.CSSProperties:undefined}
+    transform={`translate(${pin.x} ${pin.z}) scale(.28)`}>
+    <title>{pin.name} · {detail}</title><circle r="5.6"/><path d={symbols[pin.kind]}/>
+  </g>;
+  const localSelection=(pins:readonly {pin:Pin;detail:string}[])=>{
+    const selected=pins.find(entry=>entry.pin.id===selection);
+    if(!selected) return null;
+    const {pin,detail}=selected;
+    return <div className="atlas-selection">
+      <strong>{pin.name}</strong><p>{detail} · {localRange(pin)} m away</p>
+      <button onClick={()=>onWaypoint({x:pin.x,z:pin.z,name:pin.name})}>Set Waypoint</button>
+      {waypoint&&<button className="atlas-clear-waypoint" onClick={()=>onWaypoint(null)}>Clear Waypoint</button>}
+    </div>;
+  };
+  const lootPin=(chest:typeof denChests[number])=>({
+    pin:{id:chest.id,name:chest.title??chest.rarity+' Treasure Chest',x:chest.x,z:chest.z,
+      kind:'chest' as const,tier:chest.rarity,claimed:opened.includes(chest.id)},
+    detail:chest.rarity+' equipment · '+(opened.includes(chest.id)?'Opened':'Unopened'),
+  });
   const cave=caveAt(position.z);
   if(cave){
-    const exit=caveExit(cave), run=caveRuns[cave.id];
+    const exit=caveExit(cave), run=caveRuns[cave.id], reward=caveRewardId(cave,run?.cycle??1);
+    const pins=[
+      {pin:{...exit,id:'room-exit',name:'Exit to Velren Forest',kind:'gate' as const},detail:'Cave exit'},
+      {pin:{id:'room-boss',x:0,z:cave.arena-7,name:cave.boss,kind:'boss' as const},detail:caveStatus(cave,caveRuns,opened,clock)},
+      {pin:{id:reward,x:0,z:cave.arena-10,name:'Boss Reward Chest',kind:'chest' as const,tier:cave.rarity,claimed:opened.includes(reward)},
+        detail:opened.includes(reward)?'Opened':run?.readyAt?'Reward chest available':'Unlocks on boss defeat'},
+    ];
     return <SystemPanel title={cave.name} section={'Boss cave · Rank '+cave.rank} close={close} style="atlas-panel atlas-den">
       <div className="atlas-den-meta">{cave.boss} · Lv {cave.level} · Recommended {cave.recommended} · {cave.rarity}</div>
       <p>{caveStatus(cave,caveRuns,opened,clock)}</p>
       <svg viewBox={`-23 ${cave.arena-23} 46 46`} role="img" aria-label={cave.name+' map'}>
         <ellipse cx="0" cy={cave.arena} rx={cave.kind==='warlord'?17:18} ry={cave.kind==='warlord'?19:19.7}
           fill={cave.kind==='warlord'?'#6e5256':'#405d76'} stroke="#c9a978" strokeWidth=".35"/>
-        <circle cx={exit.x} cy={exit.z} r="1.1" fill="#95e5ee"><title>Exit to Velren Forest</title></circle>
-        <g className="atlas-pin" transform={`translate(0 ${cave.arena-(run?.readyAt?10:7)}) scale(.32)`}>
-          <title>{run?.readyAt?(opened.includes(caveRewardId(cave,run.cycle))?'Reward claimed':'Reward chest'):cave.boss}</title>
-          <path d={run?.readyAt?symbols.chest:symbols.boss}/>
-        </g>
+        {pins.map(({pin,detail})=>localPin(pin,detail))}
         <PlayerMark position={position} scale={.22}/>
       </svg>
+      {localSelection(pins)}
     </SystemPanel>;
   }
   const floor=towerFloorAt(position.z);
-  if(floor) return <SystemPanel title={briarWatch.name} section={'Tower dungeon · Floor '+floor.number} close={close} style="atlas-panel atlas-den">
+  if(floor){
+    const pins=[
+      {pin:{...floor.exit,id:'room-exit',name:'Exit to Velren Forest',kind:'gate' as const},detail:'Tower exit'},
+      ...towerChests.filter(chest=>towerFloorAt(chest.z)===floor).map(lootPin),
+      ...(floor.number<5?[{pin:{...floor.stairs,id:'room-stairs',name:'Door to floor '+(floor.number+1),kind:'briar' as const},
+        detail:floorRemaining(floor,defeated)?'Locked · Defeat the guardians':'Unlocked'}]:
+        [{pin:{id:'room-boss',x:0,z:floor.z-5,name:'The Hollow Sentinel',kind:'boss' as const},detail:towerCleared?'Defeated':'Available · Lv 13'}]),
+    ];
+    return <SystemPanel title={briarWatch.name} section={'Tower dungeon · Floor '+floor.number} close={close} style="atlas-panel atlas-den">
     <div className="atlas-den-meta">{floor.title} · {floorRemaining(floor,defeated)} remaining</div>
     <svg viewBox={`-24 ${floor.z-22} 48 44`} role="img" aria-label={'Briar Watch floor '+floor.number+' map'}>
       <rect x="-24" y={floor.z-22} width="48" height="44" fill="#181621"/>
       {floor.rooms.map(room=><rect key={room.x+','+room.z} x={room.x-room.w/2} y={room.z-room.d/2} width={room.w} height={room.d}
         fill="#655565" stroke="#c9a978" strokeWidth=".35"/>)}
-      <circle cx={floor.exit.x} cy={floor.exit.z} r="1.1" fill="#95e5ee"><title>Exit to Velren Forest</title></circle>
-      {floor.number<5&&<circle cx={floor.stairs.x} cy={floor.stairs.z} r="1.1" fill={floorRemaining(floor,defeated)?'#aa6857':'#f1ca81'}>
-        <title>Stairs to floor {floor.number+1}</title></circle>}
-      {floor.number===5&&<g transform={`translate(0 ${floor.z-5}) scale(.31)`} className="atlas-pin boss">
-        <title>{towerCleared?'The Hollow Sentinel defeated':'The Hollow Sentinel'}</title><path d={symbols.boss}/>
-      </g>}
-      {towerChests.filter(chest=>towerFloorAt(chest.z)===floor).map(chest=>
-        <g key={chest.id} className="atlas-pin chest" transform={`translate(${chest.x} ${chest.z}) scale(.24)`}>
-          <title>{chest.rarity} chest · {opened.includes(chest.id)?'Claimed':'Unclaimed'}</title><path d={symbols.chest}/>
-        </g>)}
+      {pins.map(({pin,detail})=>localPin(pin,detail))}
       <PlayerMark position={position} scale={.22}/>
     </svg>
+    {localSelection(pins)}
   </SystemPanel>;
+  }
 
-  if(inDen(position.z)) return <SystemPanel title={den.name} section="World Atlas / Subterranean survey" close={close} style="atlas-panel atlas-den">
+  if(inDen(position.z)){
+    const pins=[
+      {pin:{...den.exit,id:'room-exit',name:'Exit to Velren Forest',kind:'gate' as const},detail:'Den exit'},
+      {pin:{id:'room-boss',x:0,z:315,name:'Fang Guardian',kind:'boss' as const},detail:bossDefeated?'Defeated':'Available · Lv 7'},
+      ...denChests.map(lootPin),
+    ];
+    return <SystemPanel title={den.name} section="World Atlas / Subterranean survey" close={close} style="atlas-panel atlas-den">
     <div className="atlas-den-meta">Rank {den.rank} · Recommended level {den.level} · {cleared?'Cleared':'Uncleared'}</div>
     <svg viewBox="-30 300 60 91" aria-label="Den map" role="img">
       <rect x="-30" y="300" width="60" height="91" fill="#10191e"/>
       {den.chambers.map(room=><rect key={room.z+','+room.x}
         x={room.x-room.w/2} y={room.z-room.d/2} width={room.w} height={room.d} fill="#665e55" stroke="#c3a574" strokeWidth=".27"/>)}
-      <circle cx={den.exit.x} cy={den.exit.z} r="1.1" fill="#8faccc"/>
-      {<g transform="translate(0 315) scale(.26)" fill="none" stroke="#f0d5a1" strokeWidth="1.5">
-        <path d={symbols.boss}/><title>{bossDefeated?'Fang Guardian defeated':'Fang Guardian · Boss arena'}</title>
-      </g>}
-      {denChests.map(chest=>
-        <g className="atlas-pin" key={chest.id} transform={`translate(${chest.x} ${chest.z}) scale(.21)`}>
-          <title>{chest.rarity} Chest · {opened.includes(chest.id)?'Claimed':'Unclaimed'}</title><path d={symbols.chest}/>
-        </g>)}
+      {pins.map(({pin,detail})=>localPin(pin,detail))}
       <PlayerMark position={position} scale={.27}/>
-    </svg><p>Gold arrow: hunter · Blue: exit {bossDefeated?'· Fang Guardian defeated':''}</p>
+    </svg>
+    {localSelection(pins)}
     {unlocked.length>0&&<div className="atlas-waystations den-travel">
       <span className="system-kicker">Activated Waystones</span>
       {unlocked.map(stone=><button key={stone.id} onClick={()=>reportTravel(travel(stone.id))}>
@@ -211,6 +239,7 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
       {travelError&&<p className="atlas-travel-error" role="status">{travelError}</p>}
     </div>}
   </SystemPanel>;
+  }
 
   const selectedRegion=regions.find(item=>item.id===region)??regions[0];
   const pins:Pin[]=[
@@ -273,7 +302,7 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
               <path d={symbols[item.kind]} transform={item.kind==='chest'?'scale(.67)':undefined}/>
               {(item.id===selection||view.size<210&&item.kind!=='chest'||item.kind==='campfire'||item.kind==='briar')&&<text y={item.kind==='gate'?16:-9} textAnchor="middle">{item.name}{item.kind==='gate'&&cleared?' ✓':''}</text>}
             </g>)}
-            {waypoint&&<g className="atlas-waypoint-mark" transform={`translate(${waypoint.x} ${waypoint.z})`} pointerEvents="none">
+            {waypoint&&waypoint.z<extent&&<g className="atlas-waypoint-mark" transform={`translate(${waypoint.x} ${waypoint.z})`} pointerEvents="none">
               <path d="M0-7 5 0 0 7-5 0Z" fill="#68dfff" stroke="#eefcff" strokeWidth="1"/>
             </g>}
             {filters.player&&<PlayerMark position={position}/>}
@@ -300,7 +329,7 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
         {unlocked.length>0&&<div className="atlas-waystations">
           <span className="system-kicker">Activated Waystones</span>
           {unlocked.map(stone=><button key={stone.id} aria-pressed={selection===stone.id} onClick={()=>{
-            setRegion('velren');select(stone.id);
+            setFilters(previous=>({...previous,waystone:true}));setRegion('velren');select(stone.id);
             setView(current=>{const size=Math.min(current.size,200);return {size,x:bound(stone.x,size/2),z:bound(stone.z,size/2)};});
           }}>{stone.name}</button>)}
         </div>}

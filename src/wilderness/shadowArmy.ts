@@ -140,7 +140,7 @@ export function shadowArmy<Enemy extends Hostile>(
       if(!save.health) return;
       const essence=available();
       if(!essence) return;
-      if(active.size>=shadowCapacity(save.level)){notify('Shadow capacity reached · Dismiss a shadow with K');return;}
+      const hasSlot=active.size<shadowCapacity(save.level);
       essence.attempts++;
       if(Math.random()>=shadowTuning.extraction[essence.grade]){
         const remaining=shadowTuning.attempts[essence.grade]-essence.attempts;
@@ -155,8 +155,12 @@ export function shadowArmy<Enemy extends Hostile>(
         level:essence.level,originLevel:essence.level,xp:0,baseHealth:essence.baseHealth,baseDamage:essence.baseDamage,
         active:true,health:shadowStats(essence).health,readyAt:0};
       save.shadows=[...save.shadows,record];
-      raise(record,essence);
-      notify('Shadow extracted · '+record.name);
+      if(hasSlot) raise(record,essence);
+      else{
+        fx.emit(essence,shadowProfiles[record.kind].color,'ring',.86,.65,{grow:2.14});
+        fx.scatter(essence,shadowProfiles[record.kind].color,7,.41);
+      }
+      notify('Shadow extracted · '+record.name+(hasSlot?'':' · Added to reserves'));
     },
     toggle(id:string){
       const state=active.get(id);
@@ -214,6 +218,7 @@ export function shadowArmy<Enemy extends Hostile>(
       if(Math.hypot(p.x-q.x,p.z-q.z)>reach||!clear(p.x,p.z,q.x,q.z)) return;
       state.record.health=Math.max(0,state.record.health-amount*(state.record.kind==='skeleton'?.76:1));
       state.hurt=.28;
+      if(state.record.kind==='skeleton') fx.emit(p,0x89ceff,'arc',.59,.22,{y:.82,yaw:state.rig.root.rotation.y,opacity:.57});
       if(state.record.health<=0){
         state.record.readyAt=Date.now()+shadowTuning.recoveryMs;
         fx.emit(p,0x5373cc,'mist',1.1,.37,{y:.6,grow:1.2});
@@ -243,6 +248,7 @@ export function shadowArmy<Enemy extends Hostile>(
         const now=Date.now();
         save.shadowEssences=save.shadowEssences.filter(essence=>essence.expiresAt>now);
       }
+      if(!active.size&&!projectiles.length) return;
       const leader=player.position, aggressive=save.shadowCommand==='Aggressive';
       const reach=aggressive?27:13.2, fighting=save.shadowCommand!=='Follow';
       function around(x:number,z:number,radius:number,visit:(enemy:Enemy)=>void){
@@ -334,7 +340,12 @@ export function shadowArmy<Enemy extends Hostile>(
             state.bite=profile.cooldown;state.recovery=.31;
             if(fighting&&target&&target.hp>0&&Math.hypot(target.root.position.x-p.x,target.root.position.z-p.z)<profile.range+.45&&
               clear(p.x,p.z,target.root.position.x,target.root.position.z)){
-              const damage=shadowStats(record).damage,q=target.root.position;
+              const q=target.root.position;
+              let damage=shadowStats(record).damage;
+              if(profile.style==='bite'){
+                const pack=nearbyAllies.get(spatialKey(p.x,p.z,2.5))??[];
+                if(pack.some(ally=>ally!==state&&ally.target===target&&shadowProfiles[ally.record.kind].style==='bite')) damage*=1.12;
+              }
               state.strikes++;
               if(ranged){
                 if(projectiles.length<18) projectiles.push({state,target,point:{x:p.x,z:p.z},trail:0,life:1.1,

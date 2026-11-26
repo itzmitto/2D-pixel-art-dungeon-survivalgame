@@ -148,7 +148,7 @@ export default function Wilderness() {
     <canvas ref={canvas} aria-label="Blackwater Wilds"/>
     <HunterHUD hero={hero} region={regionLabel(position.z)}/>
     <SystemNotifications notices={visibleNotices}/>
-    {waypoint&&!panel&&!floor&&!cave&&!inDen(position.z)&&<aside className="hud-waypoint">
+    {waypoint&&!panel&&floor===towerFloorAt(waypoint.z)&&cave===caveAt(waypoint.z)&&inDen(position.z)===inDen(waypoint.z)&&<aside className="hud-waypoint">
       <svg viewBox="0 0 24 24" aria-hidden="true" style={{transform:'rotate('+Math.atan2(waypoint.x-position.x,position.z-waypoint.z)+'rad)'}}>
         <path d="M12 2 20 19 12 15 4 19Z" fill="#9de5ff"/>
       </svg>

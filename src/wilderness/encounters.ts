@@ -577,7 +577,7 @@ export function createEncounters(
     encounterMarkers(){
       const groups=new Map<string,{id:string;x:number;z:number;count:number;level:number;elite:boolean}>();
       for(const enemy of enemies){
-        if(!enemy.roamGroup||enemy.hp<=0) continue;
+        if(!enemy.roamGroup||enemy.hp<=0||enemy.root.position.distanceTo(player.position)>roaming.activeDistance+4) continue;
         const {x,z}=enemy.root.position, id=enemy.roamGroup;
         const marker=groups.get(id);
         if(marker){marker.x+=x;marker.z+=z;marker.count++;marker.level=Math.max(marker.level,enemy.level);marker.elite||=enemy.elite;}

@@ -13,6 +13,7 @@ import { tint } from './HunterInventory';
 type Reward={icon:string;label:string;tier?:Rarity};
 export type Notice={kind:'level'|'item'|'boss'|'dungeon';title:string;detail:string;tier?:Rarity;rewards?:Reward[]};
 export const observe=(hero:Exploration)=>({
+  opened:new Set(hero.opened),
   shadows:new Map(hero.shadows.map(shadow=>[shadow.id,shadowRank(shadow.level)])),
   armorItems:new Set(hero.armorItems),level:hero.level,xp:hero.xp,items:new Set(hero.items.map(item=>item.id)),
   bosses:new Set(hero.defeatedBosses),dungeons:new Set(hero.completedDungeons),
@@ -67,7 +68,15 @@ export function noticesBetween(before:ReturnType<typeof observe>,hero:Exploratio
   if(hero.potions>before.potions) rewards.push({icon:'potion',label:'Health Potion × '+(hero.potions-before.potions)});
   if(hero.armor>before.armor) rewards.push({icon:'armor',label:'Armor '+before.armor+' → '+hero.armor});
   if(hero.gold>before.gold) rewards.push({icon:'coin',label:'+'+(hero.gold-before.gold)+' gold'});
-  if(rewards.length) notices.push({kind:'item',title:tier==='Legendary'||tier==='Mythic'?tier+' Loot Acquired':'Loot Acquired',detail:'',tier,rewards});
+  const caveLoot=bossCaves.find(cave=>{
+    const run=hero.caveRuns[cave.id];
+    if(!run) return false;
+    const id='reward-'+cave.id+'-'+run.cycle;
+    return hero.opened.includes(id)&&!before.opened.has(id);
+  });
+  if(rewards.length) notices.push({kind:'item',
+    title:caveLoot?caveLoot.rarity+' Cave Reward':tier==='Legendary'||tier==='Mythic'?tier+' Loot Acquired':'Loot Acquired',
+    detail:caveLoot?caveLoot.boss+' · Cycle '+hero.caveRuns[caveLoot.id]?.cycle:'',tier:caveLoot?.rarity??tier,rewards});
   return notices;
 }
 export function SystemNotifications({notices}:{notices:readonly Notice[]}){
