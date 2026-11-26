@@ -45,9 +45,8 @@ export function frontierScenery(scene:T.Scene, obstacles:{x:number;z:number;r:nu
   const log=new T.CylinderGeometry(.65,1,1,7), shard=new T.OctahedronGeometry(1);
   const cap=new T.SphereGeometry(1,8,4,0,Math.PI*2,0,Math.PI/2);
   const mistPlane=new T.PlaneGeometry(34,21).rotateX(-Math.PI/2);
-  const reed=new T.ConeGeometry(1,1,4);
   const arch=shapedPlate([[-1,0],[1,0],[1,1.85],[.72,2.64],[0,3.46],[-.72,2.64],[-1,1.85]],.19,.041);
-  const geometries:T.BufferGeometry[]=[rock,shardRock,blockRock,box,cone,log,shard,arch,cap,mistPlane,reed];
+  const geometries:T.BufferGeometry[]=[rock,shardRock,blockRock,box,cone,log,shard,arch,cap,mistPlane];
   const batch=rigidBatcher();
   const chunks:{root:T.Group;x:number;z:number;swamp:boolean}[]=[];
   function block(parent:T.Group,m:T.Material,x:number,y:number,z:number,sx:number,sy:number,sz:number,geo:T.BufferGeometry=box){
@@ -90,7 +89,8 @@ export function frontierScenery(scene:T.Scene, obstacles:{x:number;z:number;r:nu
     geo.setAttribute('terrainMask',new T.Float32BufferAttribute(masks,3));
     geo.setAttribute('color',new T.Float32BufferAttribute(colors,3));geo.computeVertexNormals();geometries.push(geo);
     const mesh=new T.Mesh(geo,groundMaterial);mesh.receiveShadow=true;root.add(mesh);
-    const trunks:Prop[]=[], pines:Prop[]=[], rocks:Prop[]=[], crystals:Prop[]=[], mushrooms:Prop[]=[], stalks:Prop[]=[], grasses:Prop[]=[];
+    const trunks:Prop[]=[], pines:Prop[]=[], rocks:Prop[]=[], crystals:Prop[]=[], mushrooms:Prop[]=[], stalks:Prop[]=[];
+    let reedTintSamples=0;
     const branches=new T.Group(), waterGeo=new T.PlaneGeometry(44,44).rotateX(-Math.PI/2).translate(startX+22,marshWaterLevel,startZ+22);
     if(swamp){geometries.push(waterGeo);root.add(new T.Mesh(waterGeo,bogWater));root.add(branches);}
     else waterGeo.dispose();
@@ -100,9 +100,10 @@ export function frontierScenery(scene:T.Scene, obstacles:{x:number;z:number;r:nu
         protectedSpots.some(p=>Math.hypot(x-p.x,z-p.z)<(p===fortress?25:5))) continue;
       const a=random()*6.28;
       if(swamp){
-        if(y>.43&&y<1.4) for(let j=0;j<6;j++){
-          const xx=x+(random()-.5)*1.08, zz=z+(random()-.5)*1.08,h=.27+random()*.65;
-          grasses.push([xx,height(xx,zz)+h*.43,zz,.033,h,.043,a+j]);
+        if(y>.43&&y<1.4){
+          // Keep the saved seed's downstream scenery placements stable.
+          for(let j=0;j<18;j++) random();
+          reedTintSamples+=6;
         }
         if(random()<.23){
           const h=2.2+random()*4.6,r=.19+random()*.23;
@@ -160,7 +161,9 @@ export function frontierScenery(scene:T.Scene, obstacles:{x:number;z:number;r:nu
     instances(root,trunks,log,wood);instances(root,pines,cone,needles);instances(root,rocks,rock,naturalStone);
     instances(root,crystals,shard,crystal,false);
     if(swamp){
-      instances(root,stalks,log,stem,false);instances(root,mushrooms,cap,caps,false);instances(root,grasses,reed,needles,false);batch.bake(branches);
+      instances(root,stalks,log,stem,false);instances(root,mushrooms,cap,caps,false);
+      for(let i=0;i<reedTintSamples;i++) random();
+      batch.bake(branches);
       for(let i=0;i<3;i++){
         const haze=new T.Mesh(mistPlane,mist);
         haze.position.set(startX+8+random()*28,.68+i*.21,startZ+6+random()*30);

@@ -1,299 +1,426 @@
 import * as T from 'three';
-import { bank, clearing, extent, height, inForest, trailDistance, randomSequence } from './layout';
-import { frontierAt, frontierCrossing, highlandRiver, highlands, marshes, marshWaterLevel, routeDistance } from './frontier';
-import { obstacleGrid } from './spatial';
+import { bank, clearing, extent, height, inForest, randomSequence, trailDistance } from './layout';
+import { frontierAt, frontierCrossing, highlandRiver, highlands, marshes, marshWaterLevel, outdoorBounds, routeDistance } from './frontier';
+import { obstacleGrid, type Obstacle } from './spatial';
 import { orcCamp, waystones } from './worldSites';
 import { aureliaReserved } from './aurelia';
 import { bossCaves } from './bossCaves';
 import { worldChests } from './treasure';
 import { fieldNoise } from './surfaceDetail';
+import { grassPresets, type GrassSettings } from './grassSettings';
 
-const actorCount=12, gustCount=7, span=18, capacity=950;
-const step=T.MathUtils.smoothstep;
-type Plant='tussock'|'sedge'|'fern'|'flower'|'shrub'|'seed'|'fungi'|'litter';
-type TerrainPoint={x:number;z:number;r:number};
+const span=16, capacity=4096, cacheLimit=112;
+const gridSize=span+1, edgeFade=12, boundsPadding=3.1;
+const maxActors=6, maxSpells=3;
+const smooth=T.MathUtils.smoothstep;
 
-function plantGeometry(kind:Plant,lod=0){
-  const vertices:number[]=[],colors:number[]=[],bends:number[]=[],folds:number[]=[],triangles:number[]=[];
-  const color=new T.Color();
-  function vertex(x:number,y:number,z:number,tint:number,fiber:number,fold=.5){
-    const index=vertices.length/3;
-    vertices.push(x,y,z);bends.push(fiber);folds.push(fold);
-    color.setHex(tint);colors.push(color.r,color.g,color.b);
-    return index;
-  }
-  function blade(a:number,width:number,tall:number,lean:number,root:number,tint:number,shape=0,start=0,drift=0){
-    const n=lod===2?2:lod===1?3:shape===2?6:5, rails=lod===2?2:3;
-    const s=Math.sin(a),c=Math.cos(a),base=vertices.length/3;
-    for(let i=0;i<=n;i++){
-      const t=i/n, arc=t*t*(1.14-.14*t);
-      const w=i===n?.0007:width*(1-t)**(shape===1?.52:.86)*(.57+.57*Math.sin(t*2.8+.31));
-      const y=start+t*tall-lean*.16*t**4;
-      const forward=root+lean*arc;
-      for(let j=0;j<rails;j++){
-        const side=2*j/(rails-1)-1, across=side*w+drift*t*t;
-        const ridge=forward+(1-Math.abs(side))*w*(.45-.26*t);
-        vertex(c*across+s*ridge,y,s*across-c*ridge,tint,t,j===1&&rails===3?1:.28);
-      }
-      if(i) for(let j=0;j<rails-1;j++){
-        const k=base+i*rails+j;
-        triangles.push(k-rails,k-rails+1,k,k,k-rails+1,k+1);
-      }
-    }
-  }
-  function leaf(x:number,y:number,z:number,a:number,length:number,width:number,rise:number,tint:number,fiber:number){
-    const c=Math.cos(a),s=Math.sin(a),b=vertices.length/3;
-    vertex(x,y,z,tint,fiber);
-    vertex(x+c*length*.45-s*width,y+rise*.55,z+s*length*.45+c*width,tint,fiber);
-    vertex(x+c*length*.49,y+rise*.93,z+s*length*.49,0xf0f9db,fiber,1);
-    vertex(x+c*length*.45+s*width,y+rise*.53,z+s*length*.45-c*width,tint,fiber);
-    vertex(x+c*length,y+rise,z+s*length,tint,fiber);
-    triangles.push(b,b+1,b+2,b,b+2,b+3,b+1,b+4,b+2,b+2,b+4,b+3);
-  }
-  if(kind==='tussock'||kind==='sedge'){
-    const n=lod===2?3:lod===1?5:8, sedge=kind==='sedge';
-    for(let i=0;i<n;i++){
-      const a=i*2.399+.27,h=.37+((i*71)%101)*.0076;
-      blade(a,(sedge?.026:.039)+(i%4)*.012,h*(sedge?1.32:1),.12+(i%5)*.149,.02+i*.024,
-        [0xddebd0,0xc0d6aa,0xf0ebcd,0xe3edd9][i%4],i%3,0,Math.sin(i*8.1)*.085);
-    }
-  }else if(kind==='fern'){
-    for(let i=0;i<7;i++){
-      const a=i*2.399,s=Math.sin(a),c=-Math.cos(a),h=.51+(i%3)*.093,r=.62+(i%2)*.19;
-      blade(a,.014,h,r,.012,0xb7c87a);
-      for(let j=1;j<9;j++){
-        const t=j/9,d=.012+r*t*t,y=h*t-r*.16*t**4,len=.30*Math.sin(t*Math.PI)**.85;
-        for(const side of [-1,1]) leaf(s*d,y,c*d,a-Math.PI/2+side*1.12,len,len*.25,.03,
-          j%2?0xa1c576:0xd0df99,t);
-      }
-    }
-  }else if(kind==='shrub'){
-    for(let i=0;i<14;i++){
-      const a=i*2.399,h=.20+(i%5)*.08,r=.15+(i%4)*.11;
-      blade(a,.014,h+.04,r,.015,0x93805d);
-      for(let j=1;j<=3;j++) for(const side of [-1,1]){
-        const t=j/4,d=r*t*t;
-        leaf(Math.sin(a)*d,h*t,-Math.cos(a)*d,a+side*.8,.18,.065,.07,
-          i%3?0x79995b:0xb1b979,t);
-      }
-    }
-  }else if(kind==='flower'||kind==='seed'){
-    for(let i=0;i<4;i++){
-      const a=i*2.399,h=.44+(i%3)*.16,r=.065+i*.103;
-      blade(a,.010,h,r,.025,0x91aa61);
-      const x=Math.sin(a)*(r+.025),z=-Math.cos(a)*(r+.025),y=h-r*.16;
-      if(kind==='seed'){
-        for(let k=0;k<9;k++) leaf(x,y+k*.021,z,a+k*2.4,.052,.023,.050,k%2?0xc5a470:0xe1ce92,1);
-      }else{
-        for(let j=0;j<6;j++) leaf(x,y,z,j*1.047,.104,.044,.012,
-          i%2?0xa991c1:0xebe1c4,1);
-        for(let j=0;j<5;j++) leaf(x,y+.017,z,j*1.257,.031,.019,.016,0xe3ad57,1);
-      }
-    }
-  }else if(kind==='fungi'){
-    for(let i=0;i<4;i++){
-      const a=i*2.4,x=Math.cos(a)*i*.11,z=Math.sin(a)*i*.11,h=.16+i*.045,w=.075+i*.019;
-      const top=vertex(x,h+w*.55,z,i%2?0xca936a:0xd4bc9a,0);
-      const base=vertices.length/3;
-      for(let j=0;j<9;j++){
-        const p=j*Math.PI/4,c=Math.cos(p),s=Math.sin(p);
-        vertex(x+c*w*.24,.008,z+s*w*.24,0x998977,0);
-        vertex(x+c*w*.28,h,z+s*w*.28,0xddd3af,0);
-        vertex(x+c*w,h-w*.13,z+s*w,i%2?0xb57552:0xc49a67,0);
-        if(j){const k=base+j*3;triangles.push(k-3,k,k-2,k-2,k,k+1,k-2,k+1,k-1,k-1,k+1,k+2,k-1,k+2,top);}
-      }
-    }
-  }else{
-    for(let i=0;i<7;i++){
-      const a=i*2.4;
-      leaf(Math.cos(a)*.36,.019,Math.sin(a)*.33,a+.5,.11+(i%3)*.07,.041,.026,i%2?0xa9824c:0x8e6544,0);
-    }
-    for(let i=0;i<3;i++){
-      const a=i*2.4;
-      leaf(0,.042,0,a,.61,.029,.017,0x6f5140,0);
-      leaf(Math.cos(a)*.28,.047,Math.sin(a)*.28,a+.57,.30,.019,.019,0x907056,0);
-    }
-  }
-  const geometry=new T.BufferGeometry().setAttribute('position',new T.Float32BufferAttribute(vertices,3))
-    .setAttribute('color',new T.Float32BufferAttribute(colors,3))
-    .setAttribute('flex',new T.Float32BufferAttribute(bends,1))
-    .setAttribute('rib',new T.Float32BufferAttribute(folds,1)).setIndex(triangles);
-  geometry.computeVertexNormals();
-  return geometry;
-}
+// Three ranges of one blade profile. Each drawn instance is one blade.
+const bladeVertices=new Float32Array([
+  -1,0,0, 1,0,0, -.84,.36,0, .84,.36,0, -.47,.70,0, .47,.70,0, 0,1,0,
+]);
+const bladeIndices=new Uint16Array([
+  0,1,2, 1,3,2, 2,3,4, 3,5,4, 4,5,6,
+  0,1,2, 1,3,2, 2,3,6,
+  0,1,6,
+]);
+const lodRanges=[[0,15],[15,9],[24,3]] as const;
 
-export function meadow(scene:T.Scene,player:T.Vector3,obstacles:readonly TerrainPoint[],seed:number){
-  const clock={value:0}, stride={value:new T.Vector4(0,0,1,0)};
-  const actors=Array.from({length:actorCount},()=>new T.Vector4());
-  const gusts=Array.from({length:gustCount},()=>new T.Vector4());
-  const elements=Array.from({length:gustCount},()=>new T.Vector2());
-  const grass=(['tussock','sedge'] as const).map(kind=>[0,1,2].map(lod=>plantGeometry(kind,lod)));
-  const forms=(['fern','flower','shrub','seed','fungi','litter'] as const).map(kind=>plantGeometry(kind));
-  const material=new T.MeshStandardMaterial({side:T.DoubleSide,roughness:.79,vertexColors:true});
-  material.onBeforeCompile=s=>{
-    Object.assign(s.uniforms,{windTime:clock,walker:stride,actors:{value:actors},gusts:{value:gusts},elements:{value:elements}});
-    s.vertexShader=`
-      attribute float flex,rib;
-      uniform float windTime;
-      uniform vec4 walker, actors[${actorCount}], gusts[${gustCount}];
-      uniform vec2 elements[${gustCount}];
-      varying vec4 vegetationLight;
-      varying vec2 vegetationShape;
-      vec2 pushAway(vec2 root,vec4 source){
-        vec2 v=root-source.xy;
-        float d=length(v);
-        return v/max(d,.27)*(1.-smoothstep(.15,max(.18,source.z),d))*source.w;
-      }
-    `+s.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
-      vec3 root=instanceMatrix[3].xyz;
-      float phase=fract(dot(root.xz,vec2(.372,.716)));
-      float broad=sin(dot(root.xz,vec2(.155,.099))-windTime*1.43);
-      float gust=pow(.5+.5*sin(dot(root.xz,vec2(.068,.054))-windTime*.89+
-        sin(root.z*.089-windTime*.22)),6.);
-      float eddy=sin(root.z*.57-root.x*.45+windTime*2.7)*.063;
-      float flutter=sin(windTime*(4.7+phase*2.8)+phase*23.+position.x*9.)*.037*flex;
-      vec2 sway=vec2(.86,.51)*(.076+broad*.107+gust*.53)+vec2(eddy+flutter,flutter-eddy);
-      vegetationLight=vec4(0.);
-      if(distance(root.xz,walker.xy)<39.){
-        sway+=pushAway(root.xz,walker);
-        for(int i=0;i<${actorCount};i++) sway+=pushAway(root.xz,actors[i]);
-        for(int i=0;i<${gustCount};i++){
-          vec4 event=gusts[i];
-          float distanceToEvent=distance(root.xz,event.xy);
-          float falloff=1.-smoothstep(event.z*.24,max(.06,event.z),distanceToEvent);
-          float ring=sin(distanceToEvent*4.7-windTime*12.);
-          sway+=pushAway(root.xz,event)*mix(.8,1.+.57*ring,step(3.,elements[i].x));
-          float strength=falloff*elements[i].y;
-          if(elements[i].x==1.) vegetationLight.x=max(vegetationLight.x,strength);
-          if(elements[i].x==2.) vegetationLight.y=max(vegetationLight.y,strength);
-          if(elements[i].x==3.) vegetationLight.z=max(vegetationLight.z,strength);
-          if(elements[i].x==4.) vegetationLight.w=max(vegetationLight.w,strength);
-        }
-      }
-      sway*=min(1.,2.6/max(.01,length(sway)));
-      vec2 axisX=instanceMatrix[0].xz,axisZ=instanceMatrix[2].xz;
-      float bend=max(0.,position.y)*flex;
-      transformed.xz+=vec2(dot(axisX,sway)/max(.06,dot(axisX,axisX)),
-        dot(axisZ,sway)/max(.06,dot(axisZ,axisZ)))*bend;
-      transformed.y-=min(.47,length(sway)*.25)*bend;
-      vegetationShape=vec2(position.y,rib);
-    `);
-    s.fragmentShader=`varying vec4 vegetationLight; varying vec2 vegetationShape;\n`+
-      s.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
-      float tip=smoothstep(.015,.76,vegetationShape.x);
-      diffuseColor.rgb*=mix(.37,1.15,tip)*mix(.88,1.12,vegetationShape.y);
-      diffuseColor.rgb=mix(diffuseColor.rgb,diffuseColor.rgb*vec3(.49,.23,.13)+vec3(.034,.014,.006),vegetationLight.x*.86);
-      diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.28,.47,.56)*(.33+tip*.67),vegetationLight.y*.73);
-      diffuseColor.rgb*=1.-vegetationLight.w*.19;`)
-      .replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
-      float transmit=max(0.,dot(normal,normalize(vec3(-.42,-.76,.33))));
-      totalEmissiveRadiance+=diffuseColor.rgb*(.09+.22*transmit)*tip;
-      totalEmissiveRadiance+=vec3(.27,.46,.79)*vegetationLight.z*(.18+.40*tip);
-      totalEmissiveRadiance+=vec3(.052,.013,.001)*vegetationLight.x*tip;`);
-  };
-  const blockers=obstacleGrid(obstacles), brush=new T.Object3D(), tint=new T.Color();
-  const patches=new Map<string,{mesh:T.InstancedMesh;flora:T.InstancedMesh[];count:number;biome:number}>();
-  const palettes=[
-    [0x456438,0x69794a,0x376946,0x7a8044,0x53693d],
-    [0x526654,0x757e53,0x64704a,0x80906d,0x49594c],
-    [0x466550,0x6c7740,0x396457,0x839059,0x536f44],
-  ];
-  function place(mesh:T.InstancedMesh,index:number,x:number,y:number,z:number,w:number,h:number,random:()=>number){
-    brush.position.set(x,y,z);brush.rotation.set(0,random()*Math.PI*2,0);
-    brush.scale.set(w,h,w*(.78+random()*.45));brush.updateMatrix();
-    mesh.setMatrixAt(index,brush.matrix);mesh.setColorAt(index,tint);
-  }
-  function build(cx:number,cz:number){
-    const x=cx*span,z=cz*span,region=frontierAt(z+span/2),biome=region===marshes?2:region===highlands?1:0;
-    const random=randomSequence(seed^Math.imul(cx,105497)^Math.imul(cz,518357));
-    const mesh=new T.InstancedMesh(grass[biome===2?1:0][0],material,capacity);
-    const flora=forms.map(form=>new T.InstancedMesh(form,material,18));
-    const counts=forms.map(()=>0);
-    let count=0;
-    for(let i=0;i<capacity;i++){
-      const px=x+span*random(),pz=z+span*random();
-      const rim=frontierAt(pz);
-      if(pz<marshes.north||pz>=extent||Math.abs(px)>=(rim?109:extent)||aureliaReserved(px,pz,1)) continue;
-      const patch=fieldNoise(px*.095,pz*.095),fine=fieldNoise(px*.34+42,pz*.34-21);
-      const trail=rim?routeDistance(px,pz,rim.road):trailDistance(px,pz);
-      const offRoad=step(trail+(fine-.5)*1.7,1.6,4.1);
-      if(!offRoad||frontierCrossing(px,pz)) continue;
-      const y=height(px,pz);
-      const shore=rim===marshes?step(y,marshWaterLevel-.09,marshWaterLevel+.51):
-        rim===highlands?(highlandRiver(px,pz)?0:1):step(bank(px,pz)+(fine-.5)*2,6.9,10.9);
-      if(!shore) continue;
-      const campClear=rim?1:Math.min(step(clearing(px,pz),6.7,15),step(Math.hypot(px-orcCamp.x,pz-orcCamp.z),9.5,14));
-      const forest=!rim&&inForest(px,pz);
-      const alpine=rim===highlands?1-step(y,15,40)*.87:1;
-      const density=(.41+patch*.63+fine*.29)*(forest?.88:1)*offRoad*shore*campClear*alpine;
-      if(random()>density||blockers(px,pz).some(o=>(o.x-px)**2+(o.z-pz)**2<o.r*o.r)||
-        waystones.some(p=>(p.x-px)**2+(p.z-pz)**2<4.6)||
-        worldChests.some(p=>(p.x-px)**2+(p.z-pz)**2<1.1)||
-        bossCaves.some(p=>(p.x-px)**2+(p.z-pz)**2<8)) continue;
-      const tall=step(patch+fine*.28,.43,.92);
-      const bladeHeight=(.20+random()*.45+tall*.75)*(rim===marshes?1.09:rim===highlands?.72:1);
-      const width=(.61+random()*.63)*(.87+tall*.28);
-      tint.setHex(palettes[biome][Math.floor(random()*5)]).multiplyScalar(.82+random()*.36);
-      place(mesh,count++,px,y-.040,pz,width,bladeHeight,random);
-      if(random()>.093||offRoad<.5) continue;
-      const r=random();
-      const type=r<.18?5:r<.34?4:r<.49?3:r<.65?2:r<.83?(forest||rim===marshes?0:3):forest?0:1;
-      if(counts[type]>=18) continue;
-      tint.setHex([0x7c9d61,0xfff1d9,0x819765,0xbaa66d,0xd8c8ac,0x94806c][type]).multiplyScalar(.82+random()*.25);
-      place(flora[type],counts[type]++,px,y-.012,pz,.63+random()*.69,.62+random()*.62,random);
-    }
-    if(!count){mesh.dispose();flora.forEach(m=>m.dispose());patches.set(cx+','+cz,{mesh,flora:[],count,biome});return;}
-    mesh.count=count;mesh.computeBoundingSphere();
-    if(mesh.boundingSphere) mesh.boundingSphere.radius+=2;
-    mesh.receiveShadow=true;scene.add(mesh);
-    const active=flora.filter((plant,i)=>{
-      plant.count=counts[i];
-      if(!plant.count){plant.dispose();return false;}
-      plant.computeBoundingSphere();
-      if(plant.boundingSphere) plant.boundingSphere.radius+=1;
-      plant.receiveShadow=true;scene.add(plant);return true;
+type Cell={key:number; x:number; z:number; bounds:T.Box3};
+type Chunk={
+  mesh:T.Mesh<T.InstancedBufferGeometry,T.ShaderMaterial>;
+  bounds:T.Box3;
+  total:number;
+  shown:number;
+  requested:number;
+  lod:number;
+  interactive:boolean;
+  used:number;
+};
+export type GrassActor=(x:number,z:number,radius:number,force:number)=>void;
+export type GrassSpell=(x:number,z:number,radius:number,force:number,element:number,strength:number)=>void;
+type GrassInfluences=(actor:GrassActor,spell:GrassSpell)=>void;
+
+export function meadow(scene:T.Scene,camera:T.PerspectiveCamera,player:T.Vector3,obstacles:readonly Obstacle[],seed:number,settings:GrassSettings){
+  const group=new T.Group();
+  group.name='Grass chunks';
+  scene.add(group);
+
+  const reserved=obstacleGrid([
+    ...obstacles,
+    ...waystones.map(p=>({...p,r:2.15})),
+    ...worldChests.map(p=>({...p,r:1.05})),
+    ...bossCaves.map(p=>({...p,r:2.83})),
+  ],8);
+  const cache=new Map<number,Chunk>(), emptyCells=new Set<number>();
+  const cells:Cell[]=[],active:Chunk[]=[],lastVisible:Chunk[]=[];
+  const grid=new Float32Array(gridSize*gridSize*3);
+  const scratch=new Float32Array(capacity*8);
+  const projection=new T.Matrix4(), frustum=new T.Frustum();
+
+  const clock={value:0}, center={value:new T.Vector2()}, drawDistance={value:0};
+  const walker={value:new T.Vector4()};
+  const bodies=Array.from({length:maxActors},()=>new T.Vector4());
+  const spells=Array.from({length:maxSpells},()=>new T.Vector4());
+  const aspects=Array.from({length:maxSpells},()=>new T.Vector2());
+  const bodyScores=new Float32Array(maxActors), spellScores=new Float32Array(maxSpells);
+  const bodyCount={value:0}, spellCount={value:0};
+  let quality=settings.quality, overrides=settings.budgets, preset=grassPresets[quality];
+  let originX=Infinity,originZ=Infinity,previousTime=0,sampleAt=0,hasInteraction=false,frame=0;
+
+  function material(interactive:boolean){
+    return new T.ShaderMaterial({
+      side:T.DoubleSide,forceSinglePass:true,fog:true,blending:T.NoBlending,
+      defines:interactive?{NEAR_GRASS:1}:{},
+      uniforms:{
+        ...T.UniformsUtils.clone(T.UniformsLib.fog),
+        windTime:clock,fieldCenter:center,drawDistance,walker,
+        bodies:{value:bodies},spells:{value:spells},spellAspect:{value:aspects},bodyCount,spellCount,
+      },
+      vertexShader:`
+        #include <fog_pars_vertex>
+        attribute vec4 bladeRoot, bladeStyle;
+        uniform float windTime, drawDistance;
+        uniform vec2 fieldCenter;
+        varying vec3 bladeColor;
+        #ifdef NEAR_GRASS
+          uniform vec4 walker, bodies[${maxActors}], spells[${maxSpells}];
+          uniform vec2 spellAspect[${maxSpells}];
+          uniform int bodyCount, spellCount;
+          vec2 pushBlades(vec2 at, vec4 source){
+            vec2 delta=at-source.xy;
+            float d2=dot(delta,delta);
+            float inside=1.-d2*source.z;
+            return inside>0.?delta*inversesqrt(max(.08,d2))*(inside*inside*source.w):vec2(0.);
+          }
+        #endif
+        void main(){
+          vec3 root=bladeRoot.xyz+modelMatrix[3].xyz;
+          float t=position.y;
+          float flex=t*t;
+          float appearance=fract(bladeStyle.w);
+          float biome=floor(bladeStyle.w);
+          vec2 axis=bladeStyle.xy;
+          vec2 field=root.xz-fieldCenter;
+          float range=1.-smoothstep((drawDistance-${edgeFade}.0)*(drawDistance-${edgeFade}.0),
+            drawDistance*drawDistance,dot(field,field));
+          float bladeHeight=bladeRoot.w*range;
+          float wave=sin(dot(root.xz,vec2(.19,.126))-windTime*1.66+appearance*1.8);
+          vec2 wind=vec2(.84,.53)*(.052+.101*wave);
+          vec3 enchantment=vec3(0.);
+          float charred=0.;
+          #ifdef NEAR_GRASS
+            float gust=sin(dot(root.xz,vec2(.063,.041))-windTime*.92);
+            gust=max(0.,gust);gust*=gust*gust;
+            wind+=vec2(.17,.095)*gust+vec2(.035,-.031)*sin(windTime*3.5+appearance*12.5);
+            wind+=pushBlades(root.xz,walker);
+            for(int i=0;i<bodyCount;i++) wind+=pushBlades(root.xz,bodies[i]);
+            for(int i=0;i<spellCount;i++){
+              vec4 spell=spells[i];
+              vec2 delta=root.xz-spell.xy;
+              float d2=dot(delta,delta);
+              float influence=1.-d2*spell.z;
+              if(influence<=0.) continue;
+              float element=spellAspect[i].x;
+              float power=influence*influence*spellAspect[i].y;
+              float ripple=element>=4.? .71+.29*sin(d2*.53-windTime*11.):1.;
+              wind+=delta*inversesqrt(max(.08,d2))*(influence*influence*spell.w*ripple);
+              if(element==1.){
+                charred=max(charred,power*.86);
+                enchantment+=vec3(.041,.010,.002)*power;
+              } else if(element==2.) enchantment+=vec3(.14,.25,.33)*power;
+              else if(element==3.) enchantment+=vec3(.23,.39,.70)*power;
+              else if(element==4.) enchantment+=vec3(.027,.068,.079)*power*ripple;
+              else if(element==6.) enchantment+=vec3(.069,.026,.114)*power;
+            }
+            wind=clamp(wind,vec2(-.65),vec2(.65));
+          #endif
+          vec2 blade=normalize(vec2(-axis.y,axis.x));
+          float across=position.x;
+          float curl=bladeStyle.z;
+          if(biome>2.5&&biome<4.5){
+            // Narrow stems flare into a seed head or flower on the upper section.
+            across*=mix(.18,1.36,step(.63,t));
+            t=mix(t,.73*t+.27,step(.20,t));
+            flex=t*t;
+          }
+          vec2 lean=blade*(curl*flex)+wind*flex;
+          vec2 positionXZ=root.xz+axis*across*range+lean*bladeHeight;
+          float elevated=root.y+(t-flex*(abs(wind.x)+abs(wind.y))*.18)*bladeHeight;
+          vec4 mvPosition=viewMatrix*vec4(positionXZ.x,elevated,positionXZ.y,1.);
+
+          vec3 green=mix(vec3(.041,.077,.025),vec3(.073,.123,.039),appearance);
+          vec3 olive=vec3(.121,.131,.056);
+          vec3 moss=vec3(.074,.113,.072);
+          vec3 tint=mix(green,olive,smoothstep(.55,.98,appearance)*.80);
+          if(biome==1.) tint=mix(tint,moss,.58);
+          if(biome==2.) tint=mix(tint,vec3(.077,.124,.065),.54);
+          if(biome==5.) tint=mix(tint,moss,.75);
+          if(biome>2.5&&biome<4.5){
+            vec3 crown=biome==3.?vec3(.22,.159,.076):
+              mix(vec3(.26,.19,.34),vec3(.35,.31,.18),appearance);
+            tint=mix(tint,crown,smoothstep(.69,.90,t));
+          }
+          float tip=t*(1.48-.48*t);
+          float moon=abs(dot(blade,vec2(-.66,.75)));
+          bladeColor=tint*(.48+tip*(.53+.29*moon));
+          bladeColor=mix(bladeColor,vec3(.030,.020,.012)*(.64+tip*.42),charred);
+          bladeColor+=enchantment*(.21+.79*tip);
+          gl_Position=projectionMatrix*mvPosition;
+          #include <fog_vertex>
+        }`,
+      fragmentShader:`
+        varying vec3 bladeColor;
+        #include <fog_pars_fragment>
+        void main(){
+          gl_FragColor=vec4(bladeColor,1.);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
+          #include <fog_fragment>
+        }`,
     });
-    patches.set(cx+','+cz,{mesh,flora:active,count,biome});
   }
-  function remove(patch:{mesh:T.InstancedMesh;flora:T.InstancedMesh[];count:number}){
-    if(!patch.count) return;
-    for(const mesh of [patch.mesh,...patch.flora]){mesh.removeFromParent();mesh.dispose();}
+  const nearMaterial=material(true), farMaterial=material(false);
+
+  function sampleDensity(x:number,z:number,y:number,patch:number,fine:number){
+    if(!outdoorBounds(x,z)||aureliaReserved(x,z,1)||frontierCrossing(x,z)) return 0;
+    const region=frontierAt(z);
+    const trail=region?routeDistance(x,z,region.road):trailDistance(x,z);
+    const roadside=smooth(trail+(fine-.5)*1.6,1.65,4.25);
+    if(!roadside) return 0;
+    if(region===marshes) return roadside*smooth(y,marshWaterLevel-.12,marshWaterLevel+.48)*(.52+patch*.47+fine*.19);
+    if(region===highlands){
+      return highlandRiver(x,z)?0:roadside*(1-smooth(y,14,36)*.92)*(.47+patch*.49+fine*.20);
+    }
+    const riverEdge=smooth(bank(x,z)+(fine-.5)*1.7,7.1,10.5);
+    const trampling=Math.min(smooth(clearing(x,z),6.7,14),
+      smooth(Math.hypot(x-orcCamp.x,z-orcCamp.z),9.5,14));
+    return roadside*riverEdge*trampling*(inForest(x,z)?.82:1)*(.48+patch*.52+fine*.21);
   }
+
+  function build(cell:Cell):Chunk|null{
+    const random=randomSequence(seed^Math.imul(cell.x,105497)^Math.imul(cell.z,518357)^0x19a4ef3);
+    const startX=cell.x*span,startZ=cell.z*span;
+    for(let j=0;j<gridSize;j++) for(let i=0;i<gridSize;i++){
+      const x=startX+i,z=startZ+j,y=height(x,z);
+      const patch=fieldNoise(x*.109,z*.109),fine=fieldNoise(x*.37+42,z*.37-21);
+      const offset=(j*gridSize+i)*3;
+      grid[offset]=y;
+      grid[offset+1]=sampleDensity(x,z,y,patch,fine);
+      grid[offset+2]=smooth(patch+fine*.29,.38,.96);
+    }
+
+    let count=0,minY=Infinity,maxY=-Infinity;
+    for(let i=0;i<capacity;i++){
+      const x=random()*span,z=random()*span;
+      const ix=x|0,iz=z|0,u=x-ix,v=z-iz,k=(iz*gridSize+ix)*3,row=gridSize*3;
+      const b0=(1-u)*(1-v),b1=u*(1-v),b2=(1-u)*v,b3=u*v;
+      const density=grid[k+1]*b0+grid[k+4]*b1+grid[k+row+1]*b2+grid[k+row+4]*b3;
+      if(random()>density) continue;
+      const worldX=startX+x,worldZ=startZ+z,region=frontierAt(worldZ);
+      if(!outdoorBounds(worldX,worldZ)||aureliaReserved(worldX,worldZ,.5)||reserved(worldX,worldZ).some(o=>(o.x-worldX)**2+(o.z-worldZ)**2<o.r*o.r)) continue;
+      const y=grid[k]*b0+grid[k+3]*b1+grid[k+row]*b2+grid[k+row+3]*b3-.05;
+      const patch=grid[k+2]*b0+grid[k+5]*b1+grid[k+row+2]*b2+grid[k+row+5]*b3;
+      const sedge=region===marshes;
+      const variation=random(), angle=random()*Math.PI*2;
+      let biome=sedge?2:region===highlands?1:0;
+      let h=(.18+random()*.31+patch*.77)*(sedge?1.13:biome===1?.74:1);
+      let width=(.023+random()*.035)*(1.16+patch*.37)*(sedge?.82:1);
+      if(variation>.965&&patch>.47){
+        biome=variation>.992&&!sedge?4:3;
+        h*=1.13;
+        width*=biome===4?1.03:.65;
+      }else if(variation>.925&&patch>.47&&!sedge){
+        biome=5;h*=.62;width*=1.86;
+      }
+      const n=count++*8;
+      scratch[n]=x;scratch[n+1]=y;scratch[n+2]=z;scratch[n+3]=h;
+      scratch[n+4]=Math.cos(angle)*width;scratch[n+5]=Math.sin(angle)*width;
+      scratch[n+6]=.10+random()*.77;scratch[n+7]=biome+random()*.999;
+      minY=Math.min(minY,y);maxY=Math.max(maxY,y+h);
+    }
+    if(!count) return null;
+
+    const geometry=new T.InstancedBufferGeometry();
+    geometry.setAttribute('position',new T.BufferAttribute(bladeVertices,3));
+    geometry.setIndex(new T.BufferAttribute(bladeIndices,1));
+    const data=new T.InstancedInterleavedBuffer(scratch.slice(0,count*8),8);
+    geometry.setAttribute('bladeRoot',new T.InterleavedBufferAttribute(data,4,0));
+    geometry.setAttribute('bladeStyle',new T.InterleavedBufferAttribute(data,4,4));
+    geometry.instanceCount=0;
+    // Includes the longest curved tip and maximum shader displacement.
+    geometry.boundingBox=new T.Box3(new T.Vector3(-boundsPadding,minY-.03,-boundsPadding),
+      new T.Vector3(span+boundsPadding,maxY+.03,span+boundsPadding));
+    geometry.boundingSphere=geometry.boundingBox.getBoundingSphere(new T.Sphere());
+    const mesh=new T.Mesh(geometry,farMaterial);
+    mesh.position.set(startX,0,startZ);mesh.updateMatrix();
+    mesh.matrixAutoUpdate=false;mesh.visible=false;
+    group.add(mesh);
+    return {mesh,bounds:geometry.boundingBox.clone().translate(mesh.position),total:count,shown:0,requested:0,lod:-1,interactive:false,used:frame};
+  }
+
+  function updateCells(x:number,z:number){
+    cells.length=0;
+    originX=x;originZ=z;
+    const radius=Math.ceil(preset.distance/span)+1;
+    for(let cz=z-radius;cz<=z+radius;cz++) for(let cx=x-radius;cx<=x+radius;cx++){
+      const minX=cx*span,minZ=cz*span;
+      if(minZ>=extent||minZ+span<=marshes.north||minX>=extent||minX+span<=-extent) continue;
+      if(minZ+span<=-extent&&(minX>=109||minX+span<=-109)) continue;
+      const maxY=minZ< -extent?64:27;
+      const bounds=new T.Box3(new T.Vector3(minX-boundsPadding,-2,minZ-boundsPadding),
+        new T.Vector3(minX+span+boundsPadding,maxY,minZ+span+boundsPadding));
+      cells.push({key:cx*4096+cz,x:cx,z:cz,bounds});
+    }
+  }
+
+  function evict(){
+    if(cache.size<=cacheLimit) return;
+    let oldest=Infinity, key:number|undefined;
+    for(const [id,chunk] of cache){
+      if(chunk.used===frame) continue;
+      const age=chunk.used;
+      if(age<oldest){oldest=age;key=id;}
+    }
+    if(key===undefined) return;
+    const chunk=cache.get(key);
+    if(chunk){chunk.mesh.removeFromParent();chunk.mesh.geometry.dispose();}
+    cache.delete(key);
+  }
+
+  function hide(){
+    for(const chunk of lastVisible) chunk.mesh.visible=false;
+    lastVisible.length=0;
+  }
+
+  function horizontalDistance(bounds:T.Box3,x:number,z:number){
+    const dx=Math.max(bounds.min.x-x,0,x-bounds.max.x), dz=Math.max(bounds.min.z-z,0,z-bounds.max.z);
+    return dx*dx+dz*dz;
+  }
+
+  function collectActor(x:number,z:number,radius:number,force:number){
+    const d2=(x-player.x)**2+(z-player.z)**2;
+    if(d2>(preset.interaction+radius)**2||force<.09) return;
+    const score=(1+force*radius)/(9+d2);
+    let slot=0;
+    for(let i=1;i<preset.actors;i++) if(bodyScores[i]<bodyScores[slot]) slot=i;
+    if(score<=bodyScores[slot]) return;
+    bodyScores[slot]=score;
+    bodies[slot].set(x,z,1/(radius*radius),force);
+  }
+
+  function collectSpell(x:number,z:number,radius:number,force:number,element:number,strength:number){
+    const d2=(x-player.x)**2+(z-player.z)**2;
+    if(d2>(preset.interaction+radius)**2||strength<.05) return;
+    const score=(1+strength*radius*(element===2||element===3?1.35:1))/(18+d2);
+    let slot=0;
+    for(let i=0;i<preset.spells;i++){
+      if(spellScores[i]<spellScores[slot]) slot=i;
+      if(spellScores[i]>0&&aspects[i].x===element&&(spells[i].x-x)**2+(spells[i].y-z)**2<2.25){
+        slot=i;break;
+      }
+    }
+    if(score<=spellScores[slot]) return;
+    spellScores[slot]=score;
+    spells[slot].set(x,z,1/(radius*radius),force);
+    aspects[slot].set(element,strength);
+  }
+
+  function setSettings(next:GrassSettings){
+    overrides=next.budgets;
+    if(quality===next.quality) return;
+    quality=next.quality;preset=grassPresets[quality];
+    originX=Infinity;sampleAt=0;
+    if(quality==='Off') hide();
+  }
+
   return {
-    update(time:number,speed:number,mounted:boolean,dashing:boolean,influences:(actors:T.Vector4[],gusts:T.Vector4[],elements:T.Vector2[])=>void){
-      const motion=Math.min(1.5,speed*.09)+(dashing?.94:0);
-      stride.value.set(player.x,player.z,(mounted?2.4:1.4)+motion*.86,
-        T.MathUtils.lerp(stride.value.w,motion*(mounted?1.02:.74),.24));
-      clock.value=time;influences(actors,gusts,elements);
-      if((Math.abs(player.x)<extent&&Math.abs(player.z)<extent)||frontierAt(player.z)){
-        const ox=Math.floor(player.x/span),oz=Math.floor(player.z/span);
-        const missing:{x:number;z:number;d:number}[]=[];
-        for(let z=oz-4;z<=oz+4;z++) for(let x=ox-4;x<=ox+4;x++){
-          const d=Math.hypot((x+.5)*span-player.x,(z+.5)*span-player.z);
-          if(d<74&&z*span<extent&&(z+1)*span>marshes.north&&!patches.has(x+','+z)) missing.push({x,z,d});
+    setSettings,
+    update(time:number,speed:number,mounted:boolean,dashing:boolean,influences:GrassInfluences){
+      const dt=Math.min(.1,Math.max(0,time-previousTime));
+      previousTime=time;frame++;
+      hide();
+      if(quality==='Off'||!outdoorBounds(player.x,player.z)) {hasInteraction=false;return;}
+
+      const {x,z}=player;
+      const cx=Math.floor(x/span),cz=Math.floor(z/span);
+      if(cx!==originX||cz!==originZ) updateCells(cx,cz);
+      camera.updateMatrixWorld();
+      frustum.setFromProjectionMatrix(projection.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse));
+      active.length=0;
+      let needed:Cell|undefined, nearest=Infinity, requested=0;
+      const reach=preset.distance**2;
+      const interactiveReach=preset.interaction**2;
+      let wantInteraction=false;
+      for(const cell of cells){
+        const chunk=cache.get(cell.key);
+        if(!chunk&&emptyCells.has(cell.key)) continue;
+        const bounds=chunk?.bounds??cell.bounds;
+        const distanceToBounds=horizontalDistance(bounds,x,z);
+        if(distanceToBounds>=reach||!frustum.intersectsBox(bounds)) continue;
+        const distance=Math.hypot((cell.x+.5)*span-x,(cell.z+.5)*span-z);
+        if(!chunk){
+          if(distance<nearest){needed=cell;nearest=distance;}
+          continue;
         }
-        missing.sort((a,b)=>a.d-b.d);
-        for(const {x,z} of missing.slice(0,patches.size?3:15)) build(x,z);
-      }
-      for(const [key,patch] of patches){
-        const [x,z]=key.split(',').map(Number);
-        const d=Math.hypot((x+.5)*span-player.x,(z+.5)*span-player.z);
-        if(d>101){remove(patch);patches.delete(key);continue;}
-        if(!patch.count) continue;
-        const {mesh,biome,count,flora}=patch;
-        mesh.visible=d<76;
-        if(mesh.visible){
-          const lod=d<24?0:d<43?1:2;
-          mesh.geometry=grass[biome===2?1:0][lod];
-          mesh.count=Math.ceil(count*(1-.79*step(d,24,75)));
+        const density=preset.density*(1-.86*smooth(distance,span*.76,preset.distance));
+        const count=Math.floor(chunk.total*density);
+        if(!count) continue;
+        const detail=distance+(chunk.lod===0?-1.5:0),middle=distance+(chunk.lod===2?1.5:0);
+        const lod=preset.near>0&&detail<preset.near?0:middle<preset.mid?1:2;
+        if(lod!==chunk.lod){
+          chunk.lod=lod;
+          chunk.mesh.geometry.setDrawRange(...lodRanges[lod]);
         }
-        for(const plant of flora) plant.visible=d<31;
+        const interactive=lod<2&&distanceToBounds<interactiveReach;
+        if(interactive!==chunk.interactive){
+          chunk.interactive=interactive;
+          chunk.mesh.material=interactive?nearMaterial:farMaterial;
+        }
+        wantInteraction ||= interactive;
+        chunk.used=frame;
+        chunk.requested=count;active.push(chunk);requested+=count;
       }
+      if(needed){
+        // Spread new terrain queries and GPU uploads over successive frames.
+        const chunk=build(needed);
+        if(chunk){
+          cache.set(needed.key,chunk);evict();
+        }else emptyCells.add(needed.key);
+      }
+
+      const budget=overrides[quality]??preset.budget;
+      const share=requested>budget?budget/requested:1;
+      for(const chunk of active){
+        const target=Math.floor(chunk.requested*share);
+        chunk.shown=Math.min(target,chunk.shown+chunk.total*dt*4.5);
+        chunk.mesh.geometry.instanceCount=Math.floor(chunk.shown);
+        if(chunk.mesh.geometry.instanceCount>0){
+          chunk.mesh.visible=true;
+          lastVisible.push(chunk);
+        }
+      }
+      clock.value=time;
+      center.value.set(x,z);drawDistance.value=preset.distance;
+      if(wantInteraction){
+        const moving=Math.min(1.32,speed*.077)+(dashing?.72:0);
+        const radius=(mounted?2.3:1.3)+moving*.70;
+        walker.value.set(x,z,1/(radius*radius),T.MathUtils.damp(walker.value.w,moving*(mounted?.84:.71),16,dt));
+        if(time>=sampleAt||!hasInteraction){
+          sampleAt=time+1/25;
+          bodyScores.fill(0);spellScores.fill(0);
+          influences(collectActor,collectSpell);
+          let b=0,s=0;
+          for(let i=0;i<preset.actors;i++) if(bodyScores[i]>0) b++;
+          for(let i=0;i<preset.spells;i++) if(spellScores[i]>0) s++;
+          bodyCount.value=b;spellCount.value=s;
+        }
+      }
+      hasInteraction=wantInteraction;
     },
     dispose(){
-      patches.forEach(remove);patches.clear();
-      for(const geometry of [...grass.flat(),...forms]) geometry.dispose();
-      material.dispose();
+      for(const chunk of cache.values()) chunk.mesh.geometry.dispose();
+      group.removeFromParent();group.clear();cache.clear();emptyCells.clear();
+      nearMaterial.dispose();farMaterial.dispose();
     },
   };
 }

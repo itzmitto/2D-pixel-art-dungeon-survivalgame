@@ -1,3 +1,4 @@
+import type { GrassActor } from './grass.ts';
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { CreatureRig } from './creatureGeometry.ts';
@@ -155,16 +156,15 @@ export function shadowArmy<Enemy extends Hostile>(
   }
   return {
     available,
-    vegetation(actors:T.Vector4[],index:number){
+    vegetation(actor:GrassActor){
+      const {x,z}=player.position;
       for(const shadow of active.values()){
-        if(index===actors.length) break;
         if(shadow.rise>0||shadow.gait<.09) continue;
         const p=shadow.rig.root.position;
-        if(p.distanceToSquared(player.position)>17**2) continue;
+        if((p.x-x)**2+(p.z-z)**2>25**2) continue;
         const scale=shadow.rig.root.scale.x;
-        actors[index++].set(p.x,p.z,Math.max(1.05,scale*1.2),.20+shadow.gait*.54);
+        actor(p.x,p.z,Math.max(1.05,scale*1.2),.20+shadow.gait*.54);
       }
-      return index;
     },
     remember(id:string,kind:ShadowKind,grade:ShadowGrade,level:number,baseHealth:number,baseDamage:number,point:Point){
       if(save.shadows.some(record=>record.id===id||grade==='boss'&&record.kind===kind)||

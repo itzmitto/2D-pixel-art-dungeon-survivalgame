@@ -1,3 +1,4 @@
+import type { GrassSpell } from './grass.ts';
 import * as T from 'three';
 import { surface } from './layout.ts';
 import type { Ability } from './weapons.ts';
@@ -340,20 +341,15 @@ export function createMagicEffects(group:T.Group) {
   }
   return {
     emit,scatter,lightning,slash,impact,treasure,
-    grassInfluences(output:T.Vector4[],elements:T.Vector2[],player:Point){
-      let i=0;
+    grassInfluences(spell:GrassSpell,player:Point){
       for(const effect of pools[0]){
-        if(i===output.length) break;
         if(effect.life<=0||effect.delay>0||!effect.element) continue;
         const {x,z}=effect.mesh.position;
-        if((x-player.x)**2+(z-player.z)**2>28**2) continue;
-        if(effect.element===1&&effect.shape!=='scorch'&&output.some((v,j)=>j<i&&elements[j].x===1&&(v.x-x)**2+(v.y-z)**2<2)) continue;
-        const strong=effect.life/effect.max, radius=Math.min(8,effect.mesh.scale.x+(effect.element===5?2.1:1.0));
+        if((x-player.x)**2+(z-player.z)**2>34**2) continue;
+        const strength=effect.life/effect.max, radius=Math.min(8,effect.mesh.scale.x+(effect.element===5?2.1:1.0));
         const force=effect.element===5?1.6:effect.element===4?.68:effect.element===2?.14:.34;
-        output[i].set(x,z,radius,strong*force);
-        elements[i++].set(effect.element,strong);
+        spell(x,z,radius,strength*force,effect.element,strength);
       }
-      for(;i<output.length;i++){output[i].set(0,0,1,0);elements[i].set(0,0);}
     },
     barrier(player:T.Vector3,active:boolean){
       barrier.visible=active;

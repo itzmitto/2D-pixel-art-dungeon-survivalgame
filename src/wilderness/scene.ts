@@ -18,6 +18,7 @@ import { browserFrameScheduler, createGameLoop } from '../game/core/loop';
 import { atmosphere } from './atmosphere';
 import { reflectionLighting } from './reflectionLighting';
 import { meadow } from './grass';
+import type { GrassSettings } from './grassSettings';
 import { onBridge, spawn, surface, walkable } from './layout';
 import { scenery } from './scenery';
 import { terrain } from './terrain';
@@ -39,6 +40,7 @@ export function startWilderness(
   onShadows:()=>void,
   onCombat:(notification:string,prompt:string,cooldown:number,bossHealth:number,shadowAvailable:boolean)=>void,
   onSaveChange:()=>void,
+  initialGrassSettings:GrassSettings,
 ) {
   const context=canvas.getContext('webgl2',{antialias:true});
   if(!context) throw new Error('WebGL2 is required for the wilderness.');
@@ -77,7 +79,7 @@ export function startWilderness(
   body.position.set(start.x,surface(start.x,start.z),start.z);
   body.rotation.y=start.yaw;
   onPosition(start);
-  const grass=meadow(scene,body.position,obstacles,save.seed);
+  const grass=meadow(scene,camera,body.position,obstacles,save.seed,initialGrassSettings);
   const animateNight=atmosphere(scene,fireY);
   const dragonAudio=dragonSound();
   const encounters=createEncounters(scene,camera,body,save,canWalk,onSaveChange,dragonAudio.cue);
@@ -244,7 +246,8 @@ export function startWilderness(
   window.addEventListener('keydown',e=>{
     if(e.ctrlKey||e.altKey||e.metaKey||travel) return;
     if(!e.repeat&&caveAt(body.position.z)?.kind==='ancientDragon') dragonAudio.unlock();
-    if(e.code!=='Escape'&&(e.target instanceof HTMLInputElement||e.target instanceof HTMLTextAreaElement)) return;
+    if(e.code!=='Escape'&&e.target instanceof HTMLElement&&
+      (e.target.matches('input,textarea')||e.target.closest('.graphics-panel'))) return;
     if(e.code==='KeyM'||e.code==='Tab'||e.code==='KeyP'||e.code===shadowKeys.panel||(e.code==='Escape'&&uiOpen())){
       e.preventDefault();
       keys.clear();
@@ -439,13 +442,13 @@ export function startWilderness(
       tower.update(time,body.position,save.defeated);
       water.update(time,body.position);
       capital.update(time,body.position);
-      grass.update(time,grassSpeed,mounted,encounters.dashing,encounters.grassInfluences);
       stones.update(time,body.position,save.waystones);
       animateCamp(time,body.position);
       animateRitual(time,body.position);
       animateNight(time,body.position);
       updateDen(time);
       encounters.render(frameDelta);
+      grass.update(time,grassSpeed,mounted,encounters.dashing,encounters.grassInfluences);
       renderer.render(scene,camera);
     },
   });
@@ -453,6 +456,7 @@ export function startWilderness(
   canvas.addEventListener('webglcontextrestored',()=>loop.start(),{signal});
   loop.start();
   return {
+    setGrassSettings:grass.setSettings,
     toggleShadow:encounters.toggleShadow,summonAllShadows:encounters.summonAllShadows,
     dismissAllShadows:encounters.dismissAllShadows,renameShadow:encounters.renameShadow,
     shadowCommand:encounters.shadowCommand,encounterMarkers:encounters.encounterMarkers,
