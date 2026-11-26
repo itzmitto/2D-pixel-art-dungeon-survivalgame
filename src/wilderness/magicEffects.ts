@@ -186,32 +186,57 @@ export function createMagicEffects(group:T.Group) {
     return effect;
   }));
   const particleMaterial=new T.ShaderMaterial({
+    uniforms:{particleStyle:{value:0}},
     vertexShader:`
       attribute vec4 particleColor;
       varying vec4 vColor;
+      varying vec3 vSurface,vView;
       void main(){
         vColor=particleColor;
-        gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.);
+        vec3 transformedNormal=mat3(instanceMatrix)*normal;
+        vSurface=normalize(normalMatrix*transformedNormal);
+        vec4 p=modelViewMatrix*instanceMatrix*vec4(position,1.);
+        vView=-p.xyz;
+        gl_Position=projectionMatrix*p;
       }`,
     fragmentShader:`
+      uniform float particleStyle;
       varying vec4 vColor;
+      varying vec3 vSurface,vView;
       void main(){
-        gl_FragColor=vColor;
+        vec3 n=normalize(vSurface);
+        float facet=.24+.76*max(0.,dot(n,normalize(vec3(-.42,.59,.76))));
+        float edge=pow(1.-abs(dot(n,normalize(vView))),3.);
+        vec3 color=vColor.rgb;
+        float opacity=vColor.a;
+        if(particleStyle==1.){
+          color*=.38+.74*facet;
+          color=mix(color,vec3(.67,.86,1.),edge*.51);
+          opacity*=.57+facet*.38;
+        } else if(particleStyle==2.){
+          color=mix(color*.46,vec3(.69,.87,1.),facet*.38+edge*.33);
+          opacity*=.47+edge*.53;
+        }
+        gl_FragColor=vec4(color,opacity);
         #include <colorspace_fragment>
       }`,
     transparent:true,depthWrite:false,blending:T.AdditiveBlending,toneMapped:false,
   });
-  function particleBatch(geometry:T.BufferGeometry){
+  function particleBatch(geometry:T.BufferGeometry,style:number){
     const capacity=100;
     const colors=new T.InstancedBufferAttribute(new Float32Array(capacity*4),4).setUsage(T.DynamicDrawUsage);
     geometry.setAttribute('particleColor',colors);
     const mesh=new T.InstancedMesh(geometry,particleMaterial,capacity);
     mesh.count=0;mesh.frustumCulled=false;mesh.renderOrder=3;
     mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
+    mesh.onBeforeRender=()=>{
+      particleMaterial.uniforms.particleStyle.value=style;
+      particleMaterial.uniformsNeedUpdate=true;
+    };
     group.add(mesh);
     return {mesh,colors};
   }
-  const particles={spark:particleBatch(geometries.spark),crystal:particleBatch(geometries.crystal),droplet:particleBatch(geometries.droplet)};
+  const particles={spark:particleBatch(geometries.spark,0),crystal:particleBatch(geometries.crystal,1),droplet:particleBatch(geometries.droplet,2)};
   const particleBatches=Object.values(particles);
   const boltPath=Array.from({length:9},()=>new T.Vector3());
   const bolts=Array.from({length:16},()=>{
@@ -394,7 +419,10 @@ export function createMagicEffects(group:T.Group) {
         p.life=Math.max(0,p.life-dt);
         const batched=p.shape==='spark'||p.shape==='crystal'||p.shape==='droplet';
         p.mesh.visible=!batched&&p.life>0;
-        if(!p.life) continue;
+        if(!p.life){
+          if(p.shape==='crystal'&&p.max>2) scatter(p.mesh.position,0x92d4ef,3,.42,'crystal');
+          continue;
+        }
         p.mesh.position.x+=p.dx*dt;p.mesh.position.z+=p.dz*dt;p.mesh.position.y+=p.lift*dt;
         if(p.shape==='tendril') p.mesh.rotation.y+=dt*3.9;
         if(p.shape==='droplet') p.lift-=dt*9.6;

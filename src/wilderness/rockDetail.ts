@@ -1,6 +1,6 @@
 import * as T from 'three';
-import { randomSequence } from './layout';
-import { surfaceNoise } from './surfaceDetail';
+import { randomSequence } from './layout.ts';
+import { surfaceNoise } from './surfaceDetail.ts';
 
 export function fracturedRock(seed:number,form:'boulder'|'slab'|'pillar'='boulder'){
   const random=randomSequence(seed);

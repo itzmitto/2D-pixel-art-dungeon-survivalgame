@@ -41,7 +41,7 @@
 .armory-exchange { margin-top:.7rem;font-size:.78rem;color:var(--cyan); }
 .equipment-layout { position:relative; min-height:300px;display:grid;place-items:center; }
 .knight-preview { display:grid;place-items:center;width:min(42%,14rem);min-height:16rem;background:repeating-radial-gradient(circle,#7dd7ed44 0 1px,transparent 2px 37px),radial-gradient(ellipse,#294a62aa 5%,transparent 70%); }
-.knight-preview canvas { width:100%;max-width:230px;height:auto; }
+.knight-preview canvas { width:100%;max-width:270px;height:auto; }
 .preview-fallback { width:4rem;height:4rem;display:grid;place-items:center;color:var(--cyan); }
 .equipment-points { position:absolute;inset:0;display:grid;grid-auto-flow:column;grid-template:repeat(5,1fr)/1fr 1fr;align-items:center;pointer-events:none; }
 .equipment-point { display:flex;gap:.4rem;align-items:center;position:relative;width:max-content;max-width:94%; }

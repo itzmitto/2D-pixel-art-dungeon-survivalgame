@@ -170,6 +170,7 @@ export function meadow(scene:T.Scene,player:T.Vector3,obstacles:readonly Terrain
           if(elements[i].x==4.) vegetationLight.w=max(vegetationLight.w,strength);
         }
       }
+      sway*=min(1.,2.6/max(.01,length(sway)));
       vec2 axisX=instanceMatrix[0].xz,axisZ=instanceMatrix[2].xz;
       float bend=max(0.,position.y)*flex;
       transformed.xz+=vec2(dot(axisX,sway)/max(.06,dot(axisX,axisX)),
