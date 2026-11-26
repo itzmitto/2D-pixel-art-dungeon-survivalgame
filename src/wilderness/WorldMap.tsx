@@ -1,5 +1,6 @@
+import { briarWatch, floorRemaining, towerFloorAt } from './briarWatch';
 import { waystones } from './worldSites';
-import { denChests, worldChests } from './treasure';
+import { denChests, towerChests, worldChests } from './treasure';
 import { memo, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { branchTrails, bridges, extent, hills, landmarks, path, river, southPath } from './layout';
 import { den, inDen } from './denLayout';
@@ -22,6 +23,7 @@ const symbols={
   ruin:'M-4 5v-9h2v3h4v-5h2V5z M-1 5v-3h2v3',
   bridge:'M-5 -3H5M-5 3H5M-3 -3v6m3-6v6m3-6v6',
   campfire:'M0 -6C5-1 4 3 0 4c-5-2-5-5 0-10zM-4 6l8-2m-8 0 8 2',
+  briar:'M-5 5v-9l-1-1v-2h3v2h2v-2h2v2h2v-2h3v2l-1 1v9zM-2 5V1l2-2 2 2v4',
   ritual:'M-6 5H6M-5 5v-8l2-2 2 2v8m2 0v-8l2-2 2 2v8M-3 1 0-2 3 1',
   orcCamp:'M-5 5 0-5 5 5zM-5-5l9 8m1-8-9 8M-5-5h2m8 0H3',
   waystone:'M-5 5H5M-3 3l1-8 2-2 2 2 1 8zM0-3l1.3 2L0 1l-1.3-2Z',
@@ -34,7 +36,7 @@ const symbols={
 };
 const descriptions:Record<keyof typeof symbols,string>={
   ruin:'Ancient ruin',bridge:'River crossing',campfire:'Safe campfire',camp:'Abandoned camp',
-  waystone:'Waystone',orcCamp:'Orc encampment',ritual:'Wizard encounter · Veil Hierophant',
+  waystone:'Waystone',orcCamp:'Orc encampment',briar:'Tower dungeon',ritual:'Wizard encounter · Veil Hierophant',
   chest:'Discovered treasure',cave:'Cave landmark',tower:'Tower landmark · interior closed',gate:'Dungeon gate',boss:'Boss arena',
 };
 const AtlasTerrain=memo(function AtlasTerrain(){
@@ -96,8 +98,8 @@ function PlayerMark({position,scale=1}:{position:Position;scale?:number}){
   </g>;
 }
 
-export function WorldMap({position,discovered,cleared,bossDefeated,opened,waystonesActive,seenChests,travel,close}:{
-  position:Position;discovered:number[];cleared:boolean;bossDefeated:boolean;opened:readonly string[];waystonesActive:readonly string[];seenChests:readonly string[];travel:(id:string)=>string;close:()=>void;
+export function WorldMap({position,discovered,cleared,bossDefeated,opened,waystonesActive,seenChests,towerCleared,defeated,travel,close}:{
+  position:Position;discovered:number[];cleared:boolean;bossDefeated:boolean;opened:readonly string[];towerCleared:boolean;defeated:readonly string[];waystonesActive:readonly string[];seenChests:readonly string[];travel:(id:string)=>string;close:()=>void;
 }){
   const mask=useId();
   const [region,setRegion]=useState<RegionId>('velren');
@@ -113,6 +115,27 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
     const x=current.size===span?position.x:current.x,z=current.size===span?position.z:current.z;
     return {size,x:bound(x,size/2),z:bound(z,size/2)};
   });
+  const floor=towerFloorAt(position.z);
+  if(floor) return <SystemPanel title={briarWatch.name} section={'Tower dungeon · Floor '+floor.number} close={close} style="atlas-panel atlas-den">
+    <div className="atlas-den-meta">{floor.title} · {floorRemaining(floor,defeated)} remaining</div>
+    <svg viewBox={`-24 ${floor.z-22} 48 44`} role="img" aria-label={'Briar Watch floor '+floor.number+' map'}>
+      <rect x="-24" y={floor.z-22} width="48" height="44" fill="#181621"/>
+      {floor.rooms.map(room=><rect key={room.x+','+room.z} x={room.x-room.w/2} y={room.z-room.d/2} width={room.w} height={room.d}
+        fill="#655565" stroke="#c9a978" strokeWidth=".35"/>)}
+      <circle cx={floor.exit.x} cy={floor.exit.z} r="1.1" fill="#95e5ee"><title>Exit to Velren Forest</title></circle>
+      {floor.number<5&&<circle cx={floor.stairs.x} cy={floor.stairs.z} r="1.1" fill={floorRemaining(floor,defeated)?'#aa6857':'#f1ca81'}>
+        <title>Stairs to floor {floor.number+1}</title></circle>}
+      {floor.number===5&&<g transform={`translate(0 ${floor.z-5}) scale(.31)`} className="atlas-pin boss">
+        <title>{towerCleared?'The Hollow Sentinel defeated':'The Hollow Sentinel'}</title><path d={symbols.boss}/>
+      </g>}
+      {towerChests.filter(chest=>towerFloorAt(chest.z)===floor&&(seenChests.includes(chest.id)||opened.includes(chest.id))).map(chest=>
+        <g key={chest.id} className="atlas-pin chest" transform={`translate(${chest.x} ${chest.z}) scale(.24)`}>
+          <title>{chest.rarity} chest · {opened.includes(chest.id)?'Claimed':'Unclaimed'}</title><path d={symbols.chest}/>
+        </g>)}
+      <PlayerMark position={position} scale={.22}/>
+    </svg>
+  </SystemPanel>;
+
   if(inDen(position.z)) return <SystemPanel title={den.name} section="World Atlas / Subterranean survey" close={close} style="atlas-panel atlas-den">
     <div className="atlas-den-meta">Rank {den.rank} · Recommended level {den.level} · {cleared?'Cleared':'Uncleared'}</div>
     <svg viewBox="-30 300 60 91" aria-label="Den map" role="img">
@@ -150,7 +173,7 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
   const selected=charted.find(item=>item.id===selection);
   const caption=(kind:keyof typeof symbols)=>kind==='gate'
     ? 'Rank '+den.rank+' · Level '+den.level+' · '+(cleared?'Cleared':'Uncleared')+(bossDefeated?' · Fang Guardian defeated':'')
-    : descriptions[kind];
+    : kind==='briar'?'Five floors · '+(towerCleared?'Completed':'The Hollow Sentinel awaits'):descriptions[kind];
   const activate=(event:KeyboardEvent<SVGGElement>,name:string)=>{
     if(event.key==='Enter'||event.key===' '){event.preventDefault();setRegion('velren');select(name);}
   };

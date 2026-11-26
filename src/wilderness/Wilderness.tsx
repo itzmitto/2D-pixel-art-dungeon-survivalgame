@@ -1,3 +1,4 @@
+import { briarWatch, towerFloorAt, floorRemaining } from './briarWatch';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { den } from './denLayout';
 import { monsters } from './huntData';
@@ -130,13 +131,24 @@ export default function Wilderness() {
   },[]);
 
   const equip=useCallback((type:WeaponId,id:string)=>controller.current?.equip(type,id),[]);
+  const floor=towerFloorAt(position.z);
+  const boss=floor?.number===5?monsters.sentinel:monsters.guardian;
+  const announcement=/^(Elite encountered|Boss encounter|Boss phase II|Briar Watch · Floor) · (.+)$/.exec(message.notification);
+  const visibleNotices=announcement
+    ? [...notices,{kind:announcement[1].startsWith('Boss')?'boss':'dungeon',title:announcement[1],detail:announcement[2]} as Notice]
+    : notices;
   const canRedeem=clearing(position.x,position.z)<9.5&&hero.fangs>0;
   return <main className="wild" data-overlay-closing={closing} aria-label="Vonkje">
     <canvas ref={canvas} aria-label="Blackwater Wilds"/>
-    <HunterHUD hero={hero} region={regionLabel(position.z)}/>
-    <SystemNotifications notices={notices}/>
+    <HunterHUD hero={hero} region={floor?briarWatch.name:regionLabel(position.z)}/>
+    <SystemNotifications notices={visibleNotices}/>
+    {floor&&<aside className="tower-hud">
+      <strong>Floor {floor.number} / 5 · {floor.title}</strong>
+      <span>{floorRemaining(floor,hero.defeated)} remaining</span>
+    </aside>}
     {!!message.bossHealth&&<div className="guardian-health">
-      <strong>Fang Guardian</strong><progress className="system-meter health" aria-label="Fang Guardian health" value={message.bossHealth} max={monsters.guardian.health}/>
+      <strong>{boss.name}{floor?.number===5&&message.bossHealth<=boss.health*.5?' · Phase II':''}</strong>
+      <progress className="system-meter health" aria-label={boss.name+' health'} value={message.bossHealth} max={boss.health}/>
     </div>}
     <nav className="system-nav"><button ref={mapButton} onClick={()=>showPanel(open.current==='map'?null:'map')} aria-expanded={panel==='map'}>Map · M</button>
       <button onClick={()=>showPanel(open.current==='bag'?null:'bag')} aria-expanded={panel==='bag'}>Inventory · Tab</button>
@@ -145,7 +157,7 @@ export default function Wilderness() {
     <footer>
       {clearing(position.x,position.z)<10 && <p>Ember Clearing · Campfire nearby</p>}
       {message.prompt && <p>{message.prompt}</p>}
-      {message.notification && <p role="status">{message.notification}</p>}
+      {message.notification && !announcement && <p role="status">{message.notification}</p>}
       {saveNotice && <p role="status">{saveNotice}</p>}
       {weaponLab && <p>Weapon Lab · Unsaved session</p>}
       <HunterHotbar hero={hero} locked={!!panel} cooldown={message.cooldown} equip={equip}/>
@@ -153,7 +165,7 @@ export default function Wilderness() {
     </footer>
     {panel==='status' && <CharacterStatus hero={hero} close={()=>showPanel(null)} spend={stat=>controller.current?.allocate(stat)}/>}
     {panel==='map' && <WorldMap position={position} discovered={discovered}
-      opened={hero.opened} waystonesActive={hero.waystones} seenChests={hero.seenChests} travel={id=>{
+      opened={hero.opened} towerCleared={hero.completedDungeons.includes(briarWatch.id)} defeated={hero.defeated} waystonesActive={hero.waystones} seenChests={hero.seenChests} travel={id=>{
         const error=controller.current?.travelTo(id)??'Travel is unavailable.';
         if(!error) showPanel(null);
         return error;

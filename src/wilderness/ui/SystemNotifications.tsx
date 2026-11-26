@@ -1,3 +1,4 @@
+import { briarWatch, floorRemaining, towerFloors } from '../briarWatch';
 import { armorPiece } from '../armor';
 import type { Exploration } from '../exploration';
 import { den } from '../denLayout';
@@ -11,7 +12,8 @@ type Reward={icon:string;label:string;tier?:Rarity};
 export type Notice={kind:'level'|'item'|'boss'|'dungeon';title:string;detail:string;tier?:Rarity;rewards?:Reward[]};
 export const observe=(hero:Exploration)=>({
   armorItems:new Set(hero.armorItems),level:hero.level,xp:hero.xp,items:new Set(hero.items.map(item=>item.id)),
-  bosses:hero.defeatedBosses.length,dungeons:hero.completedDungeons.length,
+  bosses:new Set(hero.defeatedBosses),dungeons:new Set(hero.completedDungeons),
+  floors:towerFloors.map(floor=>floorRemaining(floor,hero.defeated)),
   gold:hero.gold,potions:hero.potions,armor:hero.armor,fangs:hero.fangs,materials:{...hero.materials},
 });
 
@@ -25,9 +27,19 @@ export function noticesBetween(before:ReturnType<typeof observe>,hero:Exploratio
       '+'+xp+' XP · +'+gained*progression.pointsPerLevel+' stat points · +'+gained*progression.healthPerLevel+' maximum health'+
       (rank(before.level)===rank(hero.level)?'':' · Rank '+rank(before.level)+' → '+rank(hero.level))});
   }
-  if(hero.defeatedBosses.length>before.bosses) notices.push({kind:'boss',title:'Boss Defeated',detail:
-    monsters.guardian.name+(hero.completedDungeons.length>before.dungeons?' · '+den.name+' cleared':'')});
-  else if(hero.completedDungeons.length>before.dungeons) notices.push({kind:'dungeon',title:'Dungeon Cleared',detail:den.name});
+  for(const boss of hero.defeatedBosses){
+    if(before.bosses.has(boss)) continue;
+    notices.push({kind:'boss',title:'Boss Defeated',detail:boss===briarWatch.boss?monsters.sentinel.name:monsters.guardian.name});
+  }
+  for(const dungeon of hero.completedDungeons){
+    if(before.dungeons.has(dungeon)) continue;
+    notices.push({kind:'dungeon',title:dungeon===briarWatch.id?'Tower Completed':'Dungeon Cleared',
+      detail:dungeon===briarWatch.id?briarWatch.name:den.name});
+  }
+  for(const [i,floor] of towerFloors.slice(0,-1).entries()){
+    if(before.floors[i]>0&&floorRemaining(floor,hero.defeated)===0)
+      notices.push({kind:'dungeon',title:'Floor '+floor.number+' Cleared',detail:'Floor '+(floor.number+1)+' unlocked'});
+  }
   const rewards:Reward[]=[];
   let tier:Rarity|undefined;
   for(const item of hero.items){
@@ -49,7 +61,7 @@ export function noticesBetween(before:ReturnType<typeof observe>,hero:Exploratio
   if(hero.potions>before.potions) rewards.push({icon:'potion',label:'Health Potion × '+(hero.potions-before.potions)});
   if(hero.armor>before.armor) rewards.push({icon:'armor',label:'Armor '+before.armor+' → '+hero.armor});
   if(hero.gold>before.gold) rewards.push({icon:'coin',label:'+'+(hero.gold-before.gold)+' gold'});
-  if(rewards.length) notices.push({kind:'item',title:'Loot Acquired',detail:'',tier,rewards});
+  if(rewards.length) notices.push({kind:'item',title:tier==='Legendary'||tier==='Mythic'?tier+' Loot Acquired':'Loot Acquired',detail:'',tier,rewards});
   return notices;
 }
 export function SystemNotifications({notices}:{notices:readonly Notice[]}){

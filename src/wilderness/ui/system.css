@@ -260,3 +260,9 @@ body:has([data-overlay-closing=true]) .system-tooltip { opacity:0; }
 .armor-equipment-point { justify-self:stretch; display:grid; grid-template-columns:auto minmax(0,1fr); }
 .armor-equipment-point select { display:block; width:100%; min-width:0; font-size:.7rem; }
 @media(max-width:740px){ .armor-equipment-grid { grid-template-columns:1fr; } }
+.tower-hud {
+  position:absolute; top:6.5rem; left:.9rem; display:grid; gap:.18rem; padding:.47rem .66rem;
+  font-size:.78rem; color:#eee4ef; border:1px solid #b99ae099; clip-path:var(--cut);
+  background:linear-gradient(120deg,#2a1844e8,#0d0b1fee);
+}
+.tower-hud span { color:#d7b9f2; }

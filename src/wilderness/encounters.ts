@@ -1,3 +1,5 @@
+import { briarWatch, floorRemaining, towerFloorAt, towerFloors } from './briarWatch.ts';
+import { hollowSentinel } from './sentinel.ts';
 import { encounterCell, eliteName, roaming, roamingEncounter, roamingKind, type EncounterMember } from './roaming.ts';
 import { waystones } from './worldSites.ts';
 import { armorPiece, type ArmorId } from './armor.ts';
@@ -11,7 +13,7 @@ import { skeletonModels } from './skeletons.ts';
 import { den, inDen } from './denLayout.ts';
 import { enemyArmor, enemyXpReward, monsters, rarityOrder, rollDrop, type MonsterKind, type Drop } from './huntData.ts';
 import { elementalRarity, instanceWeapon } from './itemInstances.ts';
-import { chestBonus, chestModels, denChests, worldChests, type Chest } from './treasure.ts';
+import { chestBonus, chestModels, denChests, towerChests, worldChests, type Chest } from './treasure.ts';
 import { attackSpeed, effectiveStats, earnXP, elemental, maxHunterHealth, mitigation, physical, lootBonus } from './progression.ts';
 import * as T from 'three';
 import { inArc, swingTimer, wolfLoot } from './combatRules.ts';
@@ -66,6 +68,7 @@ export function createEncounters(
       attackDuration:weapon.attackDuration/speed, impactTime:weapon.impactTime/speed,cooldown:weapon.cooldown/speed};
   }
   const models=wolfModels(), skeletons=skeletonModels(), goblins=goblinModels(), orcs=orcModels(), wizards=wizardModels();
+  const sentinel=hollowSentinel();
   const group=new T.Group();
   scene.add(group);
   const rangeTimer=swingTimer();
@@ -102,7 +105,7 @@ export function createEncounters(
     fx.emit(player.position,0x83e5ff,'ring',1.36,.42,{grow:3.3,y:.19});
     fx.emit(player.position,0xd1f9ff,'arc',1.08,.29,{y:.91,yaw:player.rotation.y,aspect:1.8});
   }
-  const chests=[...worldChests,...denChests];
+  const chests=[...worldChests,...denChests,...towerChests];
   const chestViews=chestModels(group,chests,save.opened);
   const cooldowns=new Map<WeaponId,number>();
   let attackWeapon=weapons.longsword, queued:{weapon:Weapon;delay:number;yaw:number}|undefined;
@@ -124,12 +127,13 @@ export function createEncounters(
   const lootBeamGeometry=new T.CylinderGeometry(.028,.10,1.25,6,1,true);
   const lootMaterial=new T.MeshStandardMaterial({color:'#bd9868',emissive:'#916024',emissiveIntensity:.7,roughness:.36});
   type EnemySpec={ [K in keyof typeof monsters.wild]: typeof monsters.wild[K] extends number ? number :
-    typeof monsters.wild[K] extends string ? string : typeof monsters.wild[K] };
+    typeof monsters.wild[K] extends string ? string :
+    typeof monsters.wild[K] extends readonly number[] ? readonly number[] : typeof monsters.wild[K] };
   type Enemy = CreatureRig & {
     affinity:T.Mesh<T.BufferGeometry,T.MeshBasicMaterial>;
     target:SpellTarget; roaming:boolean; elite:boolean; level:number; announced:boolean; title?:T.Sprite; patrol:boolean;
     wolfRig:boolean; turn:number; wizard:boolean; barrier?:T.Mesh; ward:number;
-    spell?:'bolt'|'domain'|'shield'; wardCool:number; spellTarget?:{x:number;z:number}; slam?:{x:number;z:number};
+    spell?:'bolt'|'domain'|'shield'; wardCool:number; spellTarget?:{x:number;z:number}; slam?:{x:number;z:number}; sentinelMove?:'cleave'|'shock'|'shadow'; enraged?:boolean;
     posePhase:number; gait:number; anticipation:number; collapse:number; impactAge:number; retreat:number; strikes:number;
 
     id:string; kind:MonsterKind; spec:EnemySpec; home:T.Vector3; hp:number; hpBar:T.Group; fill:T.Mesh;
@@ -186,6 +190,9 @@ export function createEncounters(
     if(!spot) continue;
     createEnemy(id,kind,spot);
   }
+  for(const floor of towerFloors) for(const guard of floor.guards){
+    createEnemy(guard.id,guard.kind,guard,guard.elite?{kind:guard.kind,level:10,elite:true}:undefined);
+  }
   function createEnemy(id:string,kind:MonsterKind,spot:{x:number;z:number},member?:EncounterMember){
     const orc=kind==='brute'||kind==='assassin', wizard=kind==='wizard'||kind==='ritualElite';
     const base=monsters[kind], level=member?.level??base.level;
@@ -199,9 +206,9 @@ export function createEncounters(
       xp:Math.round(base.xp*threat*(member?.elite?2.17:1)),
       gold:Math.round(base.gold*threat*(member?.elite?1.85:1)),
     };
-    const actor:CreatureRig&{barrier?:T.Mesh}=rigPool.get(kind)?.pop()??(
+    const actor:CreatureRig&{barrier?:T.Mesh}=kind==='sentinel'?sentinel:rigPool.get(kind)?.pop()??(
       wizard?wizards.make(kind==='ritualElite'):kind==='skeleton'?skeletons.make():kind==='goblin'?goblins.make():
-      orc?orcs.make(kind==='brute'):models.make(kind==='wizard'||kind==='ritualElite'?'wild':kind));
+      orc?orcs.make(kind==='brute'):models.make(kind));
     if(actor.barrier) actor.barrier.visible=false;
     actor.root.visible=false;
     actor.root.scale.setScalar(spec.scale);
@@ -236,7 +243,7 @@ export function createEncounters(
     const enemy:Enemy={...actor,id,kind,spec,home,affinity,wizard,barrier:actor.barrier,
       roaming:Boolean(roamingKind(id)),elite,level,announced:false,patrol:!!member&&trailDistance(spot.x,spot.z)<5,
       target:{point:actor.root.position,alive:()=>enemy.hp>0,get effects(){return enemy.statuses;},
-        hit:(damage,element,heavy)=>hitEnemy(enemy,damage,element,heavy)},ward:0,wardCool:0,wolfRig:!wizard&&!orc&&kind!=='skeleton'&&kind!=='goblin',turn:0,posePhase:enemies.length*.92,gait:0,anticipation:0,collapse:1,
+        hit:(damage,element,heavy)=>hitEnemy(enemy,damage,element,heavy)},ward:0,wardCool:0,wolfRig:kind!=='sentinel'&&!wizard&&!orc&&kind!=='skeleton'&&kind!=='goblin',turn:0,posePhase:enemies.length*.92,gait:0,anticipation:0,collapse:1,
       impactAge:3,retreat:0,strikes:0,hp:(oldDefeats.has(id)||save.defeatedBosses.includes(id))?0:spec.health,hpBar,fill,
       statuses:statuses(spec.resistance),visualTick:0,lastVisual:null,cooldown:0,windup:0,heading:rand()*6.28,phase:rand()*10,hitFlash:0,charge:0,chargeWindup:false,chargeHit:false,loot,beam};
     if(elite){
@@ -297,7 +304,7 @@ export function createEncounters(
       if(!enemy.hp&&!enemy.loot.visible&&enemy.collapse>=1||distance>roaming.despawnDistance||
          distance>roaming.activeDistance+11&&!visibleAt(spot.x,spot.z)) removeRoamer(i);
     }
-    if(inDen(p.z)||!save.health) return;
+    if(inDen(p.z)||towerFloorAt(p.z)||!save.health) return;
     const now=Date.now();
     for(const [cell,until] of spawnCooldown) if(now>=until) spawnCooldown.delete(cell);
     for(const [id,spot] of pendingRoam){
@@ -330,7 +337,7 @@ export function createEncounters(
         }
         if(!spot) continue;
         placements.push(spot);
-        const id='roam-'+member.kind.toLowerCase()+'-'+crypto.randomUUID();
+        const id='roam-'+member.kind.toLowerCase()+'-'+Math.random().toString(36).slice(2)+'-'+now.toString(36);
         createEnemy(id,member.kind,spot,member);
       }
       if(placements.length) break;
@@ -399,7 +406,16 @@ export function createEncounters(
     enemy.hp=Math.max(0,enemy.hp-damage);
     enemy.hitFlash=.22;
     impact(enemy.root.position,damage,element,heavy);
-    if(enemy.hp) return;
+    if(enemy.hp){
+      if(enemy.kind==='sentinel'&&!enemy.enraged&&enemy.hp<=enemy.spec.health*.5){
+        enemy.enraged=true;
+        fx.emit(enemy.root.position,0xcf66ff,'ring',1.3,.72,{grow:8.5,opacity:.92});
+        fx.emit(enemy.root.position,0x9e55ef,'ray',1.33,.49,{y:2.1,aspect:3.7});
+        fx.scatter(enemy.root.position,0xb359ff,14,1.25);
+        notify('Boss phase II · The Hollow Sentinel');
+      }
+      return;
+    }
     enemy.collapse=0;
     if(enemy.barrier) enemy.barrier.visible=false;
     enemy.loot.position.copy(enemy.root.position);
@@ -411,18 +427,22 @@ export function createEncounters(
     const piece=enemyArmor(enemy.elite&&enemy.roaming?'elite':enemy.kind,enemy.id,save.seed,save.kills,save.level,save.armorItems);
     if(piece) save.drops[enemy.id].armorPiece=piece;
     enemy.loot.material.color.set(rarity[save.drops[enemy.id].rarity].color);
-    if(!enemy.roaming&&enemy.spec.respawn&&!enemy.id.startsWith('den-')) save.returns[enemy.id]=Date.now()+30_000+Math.floor(rand()*30_000);
+    if(!enemy.roaming&&enemy.spec.respawn&&!enemy.id.startsWith('den-')&&!enemy.id.startsWith('tower-')) save.returns[enemy.id]=Date.now()+30_000+Math.floor(rand()*30_000);
     oldDefeats.add(enemy.id);
     save.defeated=[...oldDefeats];
     save.kills++;
-    const boss=enemy.kind==='guardian';
+    const boss=enemy.kind==='guardian'||enemy.kind==='sentinel';
     if(boss) {
       if(!save.defeatedBosses.includes(enemy.id)) save.defeatedBosses.push(enemy.id);
-      if(!save.completedDungeons.includes(den.id)) save.completedDungeons.push(den.id);
+      const dungeon=enemy.kind==='sentinel'?briarWatch.id:den.id;
+      if(!save.completedDungeons.includes(dungeon)) save.completedDungeons.push(dungeon);
     }
     const reward=enemyXpReward(enemy.kind,enemy.spec.xp);
     earnXP(save,reward);
-    notify((boss?den.name+' cleared':enemy.spec.name+' defeated')+' · +'+reward+' XP');
+    const floor=towerFloorAt(enemy.home.z);
+    notify((enemy.kind==='sentinel'?'Briar Watch completed':boss?den.name+' cleared':
+      floor&&floorRemaining(floor,save.defeated)===0?'Floor '+floor.number+' cleared · Floor '+(floor.number+1)+' unlocked':enemy.spec.name+' defeated')+
+      ' · +'+reward+' XP');
 
   }
 
@@ -438,7 +458,7 @@ export function createEncounters(
       return false;
     }
     const barrierActive=magic.shield.active;
-    const damage=magic.shield.absorb(Math.max(.5,Math.round((guard ? Math.ceil(enemy.spec.damage*.46) : enemy.spec.damage*(charge?1.3:1))*(1-mitigation(effectiveStats(save),save.armor))*100)/100));
+    const damage=magic.shield.absorb(Math.max(.5,Math.round((guard ? Math.ceil(enemy.spec.damage*.46) : enemy.spec.damage*(enemy.enraged?1.17:1)*(charge?1.3:1))*(1-mitigation(effectiveStats(save),save.armor))*100)/100));
     if(barrierActive) splash();
     if(damage===0){notify('Water barrier absorbed the attack.');return false;}
     save.health=Math.max(0,Math.round((save.health-damage)*100)/100);
@@ -507,9 +527,10 @@ export function createEncounters(
     },
     transition(){spawnClock=0;arcane.clear();combatUntil=0;knockback.set(0,0);magic.reset();fx.clear();queued=undefined;rangeTimer.cancel();echoLife=shake=0;echo.visible=false;},
     get bossHealth(){
-      const boss=enemies.find(enemy=>enemy.kind==='guardian');
-      return boss&&boss.hp>0&&inDen(player.position.z)&&
-        Math.hypot(player.position.x-boss.root.position.x,player.position.z-boss.root.position.z)<34
+      const floor=towerFloorAt(player.position.z);
+      const kind=floor?.number===5?'sentinel':inDen(player.position.z)?'guardian':undefined;
+      const boss=enemies.find(enemy=>enemy.kind===kind);
+      return boss&&boss.hp>0&&Math.hypot(player.position.x-boss.root.position.x,player.position.z-boss.root.position.z)<34
         ? boss.hp : 0;
     },
     get weaponLocked(){return rangeTimer.busy || Boolean(queued) || magic.dashing;},
@@ -532,6 +553,7 @@ export function createEncounters(
     },
     interact(){
       if(!save.health){
+        arcane.clear();fx.clear();
         player.position.set(spawn.x,surface(spawn.x,spawn.z),spawn.z);
         player.rotation.y=0;
         save.health=maxHealth();
@@ -659,11 +681,16 @@ export function createEncounters(
           p.copy(enemy.home);enemy.collapse=1;enemy.gait=0;enemy.anticipation=0;oldDefeats.delete(enemy.id);collected.delete(enemy.id);
           save.defeated=[...oldDefeats];save.collected=[...collected];delete save.returns[enemy.id];changed();
         }
+        const gap=Math.hypot(player.position.x-p.x,player.position.z-p.z);
+        if(gap>roaming.activeDistance+3){
+          root.visible=false;enemy.hpBar.visible=false;enemy.affinity.visible=false;
+          if(enemy.title) enemy.title.visible=false;
+          continue;
+        }
         if(enemy.hp>0) enemy.statuses.update(dt,amount=>hitEnemy(enemy,amount),(dx,dz)=>{
           if(canWalk(p.x+dx,p.z)) p.x+=dx;
           if(canWalk(p.x,p.z+dz)) p.z+=dz;
         });
-        const gap=Math.hypot(player.position.x-p.x,player.position.z-p.z);
         const active=gap<(enemy.roaming?roaming.activeDistance:nearDistance)&&enemy.hp>0;
         if(enemy.title){
           enemy.title.visible=active&&gap<27;
@@ -727,10 +754,10 @@ export function createEncounters(
         let gait=0;
         const previousX=p.x, previousZ=p.z;
         if(enemy.statuses.halted){
-          enemy.windup=0; enemy.charge=0; enemy.chargeWindup=false;enemy.slam=undefined;enemy.spell=undefined;enemy.spellTarget=undefined;
+          enemy.windup=0; enemy.charge=0; enemy.chargeWindup=false;enemy.slam=undefined;enemy.spell=undefined;enemy.spellTarget=undefined;enemy.sentinelMove=undefined;
         } else if(enemy.charge>0){
           enemy.charge=Math.max(0,enemy.charge-dt);
-          const speed=enemy.kind==='assassin'?19:16;
+          const speed=enemy.kind==='sentinel'?(enemy.enraged?23:19):enemy.kind==='assassin'?19:16;
           const x=p.x+Math.sin(enemy.heading)*dt*speed,z=p.z+Math.cos(enemy.heading)*dt*speed;
           if(canWalk(x,z)&&spaceAround(enemy,x,z)){p.x=x;p.z=z;gait=1;}
           else enemy.charge=0;
@@ -739,8 +766,11 @@ export function createEncounters(
             hitPlayer(enemy,blocking,true);
             if(enemy.kind==='assassin'){fx.slash(p,null,enemy.heading,1.48);enemy.impactAge=0;}
           }
+          if(enemy.kind==='sentinel'&&enemy.charge>0&&enemy.impactAge>.08){
+            enemy.impactAge=0;fx.emit(p,0x8840e5,'arc',1.42,.19,{yaw:enemy.heading,y:1.03,opacity:.74});
+          }
           if(!enemy.charge){
-            enemy.cooldown=enemy.kind==='guardian'?1.8:1.45;
+            enemy.cooldown=enemy.kind==='sentinel'?(enemy.enraged?.87:1.32):enemy.kind==='guardian'?1.8:1.45;
             if(enemy.kind==='assassin') enemy.retreat=.70;
           }
         } else if(enemy.windup>0){
@@ -749,7 +779,27 @@ export function createEncounters(
             enemy.cooldown=spec.recovery;
             enemy.impactAge=0;
             if((enemy.kind==='goblin'||enemy.kind==='assassin')&&++enemy.strikes%2===0) enemy.retreat=.72;
-            if(enemy.spell){
+            if(enemy.sentinelMove){
+              const move=enemy.sentinelMove;
+              enemy.sentinelMove=undefined;
+              enemy.cooldown=enemy.enraged?1.03:1.52;
+              const color=enemy.enraged?0xd988ff:0xa86de7;
+              if(move==='shadow'){
+                enemy.charge=enemy.enraged?.55:.48;enemy.chargeHit=false;
+                fx.scatter(p,color,9,1.1);
+              }else if(move==='shock'){
+                const reach=enemy.enraged?7:6;
+                fx.emit(p,color,'ring',1.0,.57,{grow:reach/.57,y:.13,opacity:.94});
+                fx.emit(p,0xcd9fff,'ring',.77,.33,{grow:reach/.33,y:.18});
+                fx.scatter(p,color,12,.74);shake=Math.max(shake,.76);
+                if(gap<reach&&clearLine(p.x,p.z,player.position.x,player.position.z)) hitPlayer(enemy,blocking,true);
+              }else{
+                fx.emit(p,color,'arc',3.11,.36,{yaw:enemy.heading,y:1.1,aspect:1.43,grow:1.8});
+                fx.emit(p,0xe4b9ff,'arc',2.71,.26,{yaw:enemy.heading,y:.84,opacity:.78});
+                if(inArc(p,player.position,enemy.heading,enemy.enraged?5.2:4.7,1.02)&&
+                  clearLine(p.x,p.z,player.position.x,player.position.z)) hitPlayer(enemy,blocking);
+              }
+            } else if(enemy.spell){
               const spell=enemy.spell,elite=enemy.kind==='ritualElite';
               enemy.spell=undefined;
               if(spell==='shield'){
@@ -781,6 +831,22 @@ export function createEncounters(
             } else if(aggro && gap<spec.reach+.35 && Math.abs(player.position.y-p.y)<1.9 &&
               clearLine(p.x,p.z,player.position.x,player.position.z)) hitPlayer(enemy,blocking);
           }
+        } else if(enemy.kind==='sentinel'&&aggro&&enemy.cooldown===0&&gap<13&&
+          clearLine(p.x,p.z,player.position.x,player.position.z)){
+          enemy.heading=Math.atan2(player.position.x-p.x,player.position.z-p.z);
+          const cycle=enemy.strikes++%3;
+          const move=gap>7?'shadow':cycle===1?'shock':cycle===2&&gap>4?'shadow':'cleave';
+          enemy.sentinelMove=move;
+          const duration=move==='shock'?1.18:move==='shadow'?.87:.98;
+          enemy.windup=duration*(enemy.enraged?.72:1);
+          const color=enemy.enraged?0xf184cb:0xc37cff;
+          if(move==='shock') fx.emit(p,color,'ring',(enemy.enraged?7:6)/.88,enemy.windup,{opacity:.87,y:.11});
+          else if(move==='cleave') fx.emit(p,color,'arc',3.8,enemy.windup,{yaw:enemy.heading,y:.25,opacity:.65});
+          else for(let i=1;i<9;i++){
+            const x=p.x+Math.sin(enemy.heading)*i*1.2,z=p.z+Math.cos(enemy.heading)*i*1.2;
+            if(!canWalk(x,z)) break;
+            fx.emit({x,z},color,'ring',1.08,enemy.windup,{opacity:.64});
+          }
         } else if(enemy.wizard&&aggro&&enemy.cooldown===0&&gap<spec.reach&&
           clearLine(p.x,p.z,player.position.x,player.position.z)){
           const elite=enemy.kind==='ritualElite';
@@ -809,7 +875,7 @@ export function createEncounters(
             if(!canWalk(point.x,point.z)) break;
             fx.emit(point,0xe69c51,'ring',1.15,enemy.windup,{opacity:.55});
           }
-        } else if(!enemy.wizard&&aggro&&!enemy.retreat&&gap<spec.reach&&enemy.cooldown===0&&clearLine(p.x,p.z,player.position.x,player.position.z)){
+        } else if(!enemy.wizard&&enemy.kind!=='sentinel'&&aggro&&!enemy.retreat&&gap<spec.reach&&enemy.cooldown===0&&clearLine(p.x,p.z,player.position.x,player.position.z)){
           enemy.windup=spec.windup;
         } else if(!aggro||gap>spec.reach-.18||enemy.retreat||enemy.kind==='assassin'||enemy.wizard){
           const backAway=enemy.wizard&&aggro&&gap<7.5;
@@ -838,7 +904,7 @@ export function createEncounters(
             tryStep(0)||tryStep(.87)||tryStep(-.87);
           }
         }
-        if(enemy.windup>0&&!enemy.chargeWindup&&!enemy.slam) enemy.heading=Math.atan2(player.position.x-p.x,player.position.z-p.z);
+        if(enemy.windup>0&&!enemy.chargeWindup&&!enemy.slam&&!enemy.sentinelMove) enemy.heading=Math.atan2(player.position.x-p.x,player.position.z-p.z);
         const angle=enemy.heading-root.rotation.y;
         const facing=Math.atan2(Math.sin(angle),Math.cos(angle));
         root.rotation.y+=facing*(1-Math.exp(-10*dt));
@@ -854,14 +920,16 @@ export function createEncounters(
             : dt*(3.1+enemy.gait*9.4);
         }
         const leapDuration=enemy.kind==='guardian'?.65:.43;
-        const currentWindup=enemy.spell==='domain'?1.04:enemy.spell==='shield'?.63:enemy.slam?1.27:enemy.chargeWindup?(enemy.kind==='guardian'?1.15:enemy.kind==='assassin'?.51:.89):spec.windup;
+        const sentinelWindup=enemy.sentinelMove
+          ? (enemy.sentinelMove==='shock'?1.18:enemy.sentinelMove==='shadow'?.87:.98)*(enemy.enraged?.72:1) : 0;
+        const currentWindup=sentinelWindup||(enemy.spell==='domain'?1.04:enemy.spell==='shield'?.63:enemy.slam?1.27:enemy.chargeWindup?(enemy.kind==='guardian'?1.15:enemy.kind==='assassin'?.51:.89):spec.windup);
         enemy.anticipation=T.MathUtils.damp(enemy.anticipation,
           enemy.windup>0?Math.min(1,(1-enemy.windup/currentWindup)*1.5+.22):0,enemy.windup>0?12:20,dt);
         enemy.animate({time,phase:enemy.posePhase,gait:enemy.gait,
           windup:enemy.anticipation,
           recovery:Math.max(0,1-enemy.impactAge/.33),hit:enemy.hitFlash/.22,
           leap:enemy.charge>0&&enemy.kind!=='guardian'?Math.sin(Math.PI*enemy.charge/leapDuration):0,
-          dead:0,frozen:status==='frozen',turn:enemy.turn,alert:aggro?1:0,distance:gap});
+          dead:0,frozen:status==='frozen',turn:enemy.turn,alert:enemy.enraged?2:aggro?1:0,distance:gap});
 
       }
     },
@@ -920,7 +988,7 @@ export function createEncounters(
       chestViews.dispose();
       for(const enemy of enemies){enemy.loot.material.dispose();enemy.beam.material.dispose();enemy.title?.material.dispose();}
       for(const texture of labels.values()) texture.dispose();
-      levelNotice.dispose();eliteAura.dispose();
+      levelNotice.dispose();eliteAura.dispose();sentinel.dispose();
       for(const texture of numberTextures.values()) texture.dispose();
       for(const {sprite} of numbers) sprite.material.dispose();
     },
