@@ -56,8 +56,9 @@ export function shadowArmy<Enemy extends Hostile>(
     }
     if(caster) parts.push(new T.BoxGeometry(.083,2.65,.08).translate(.51,1.47,.14));
     if(beast) parts.push(new T.OctahedronGeometry(.39).scale(.51,.67,1.7).translate(0,1.42,-1.16));
-    const geometry=mergeGeometries(parts)!;
-    parts.forEach(part=>part.dispose());
+    const nonIndexed=parts.map(part=>part.index?part.toNonIndexed():part);
+    const geometry=mergeGeometries(nonIndexed)!;
+    new Set([...parts,...nonIndexed]).forEach(part=>part.dispose());
     return geometry;
   }
   const proxies=[proxyGeometry(true),proxyGeometry(false),proxyGeometry(false,true)].map(geometry=>{
@@ -210,7 +211,7 @@ export function shadowArmy<Enemy extends Hostile>(
       if(!state) return;
       const p=state.rig.root.position, q=enemy.root.position;
       if(Math.hypot(p.x-q.x,p.z-q.z)>reach||!clear(p.x,p.z,q.x,q.z)) return;
-      state.record.health=Math.max(0,state.record.health-amount);
+      state.record.health=Math.max(0,state.record.health-amount*(state.record.kind==='skeleton'?.76:1));
       state.hurt=.28;
       if(state.record.health<=0){
         state.record.readyAt=Date.now()+shadowTuning.recoveryMs;
@@ -422,7 +423,7 @@ export function shadowArmy<Enemy extends Hostile>(
           tint.setHex(profile.color).multiplyScalar(.21);mesh.setColorAt(i,tint);
         }
         if(!save.health||Math.hypot(p.x-q.x,p.z-q.z)>24) continue;
-        for(let i=0;i<(state.rise>0?7:2);i++){
+        for(let i=0;i<(state.rise>0?7:state.rig.root.visible?2:0);i++){
           const phase=(time*.52+i*.379+state.phase*.07)%1;
           emit(q,q.y+.3+phase*(state.rise>0?1.52:.86),phase,(state.rise>0?.83:.61)*Math.sin(phase*Math.PI));
         }

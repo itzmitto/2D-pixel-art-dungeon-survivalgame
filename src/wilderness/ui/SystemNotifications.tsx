@@ -1,3 +1,4 @@
+import { shadowRank } from '../shadowData';
 import { bossCaves } from '../bossCaves';
 import { briarWatch, floorRemaining, towerFloors } from '../briarWatch';
 import { armorPiece } from '../armor';
@@ -12,6 +13,7 @@ import { tint } from './HunterInventory';
 type Reward={icon:string;label:string;tier?:Rarity};
 export type Notice={kind:'level'|'item'|'boss'|'dungeon';title:string;detail:string;tier?:Rarity;rewards?:Reward[]};
 export const observe=(hero:Exploration)=>({
+  shadows:new Map(hero.shadows.map(shadow=>[shadow.id,shadowRank(shadow.level)])),
   armorItems:new Set(hero.armorItems),level:hero.level,xp:hero.xp,items:new Set(hero.items.map(item=>item.id)),
   bosses:new Set(hero.defeatedBosses),dungeons:new Set(hero.completedDungeons),
   floors:towerFloors.map(floor=>floorRemaining(floor,hero.defeated)),
@@ -41,6 +43,9 @@ export function noticesBetween(before:ReturnType<typeof observe>,hero:Exploratio
     if(before.floors[i]>0&&floorRemaining(floor,hero.defeated)===0)
       notices.push({kind:'dungeon',title:'Floor '+floor.number+' Cleared',detail:'Floor '+(floor.number+1)+' unlocked'});
   }
+  const promotions=hero.shadows.filter(shadow=>before.shadows.has(shadow.id)&&before.shadows.get(shadow.id)!==shadowRank(shadow.level));
+  if(promotions.length) notices.push({kind:'level',title:'Shadow Promotion',detail:
+    promotions.map(shadow=>shadow.name+' → '+shadowRank(shadow.level)).join(' · ')});
   const rewards:Reward[]=[];
   let tier:Rarity|undefined;
   for(const item of hero.items){

@@ -1,3 +1,4 @@
+import { shadowKeys } from './shadowData';
 import { bossCaves, caveAt, caveEntry, caveExit, caveRewardId, caveStatus, caveWalkable } from './bossCaves';
 import { briarWatch, floorRemaining, towerFloorAt, towerFloors, towerWalkable } from './briarWatch';
 import { armorPiece, type ArmorId, type ArmorSlot } from './armor';
@@ -223,20 +224,21 @@ export function startWilderness(
   resize();
   window.addEventListener('keydown',e=>{
     if(e.ctrlKey||e.altKey||e.metaKey||travel) return;
-    if(e.code==='KeyM'||e.code==='Tab'||e.code==='KeyP'||e.code==='KeyK'||(e.code==='Escape'&&uiOpen())){
+    if(e.code==='KeyM'||e.code==='Tab'||e.code==='KeyP'||e.code===shadowKeys.panel||(e.code==='Escape'&&uiOpen())){
       e.preventDefault();
       keys.clear();
       blocking=false;
       if(!e.repeat){
         if(e.code==='Tab') onInventory();
         else if(e.code==='KeyP') onStatus();
-        else if(e.code==='KeyK') onShadows();
+        else if(e.code===shadowKeys.panel) onShadows();
         else onMapKey(e.code==='Escape');
       }
       return;
     }
     if(!uiOpen()&&!e.repeat){
-      if(e.code==='KeyF'){e.preventDefault();encounters.extractShadow();}
+      if(e.code===shadowKeys.extract){e.preventDefault();encounters.extractShadow();}
+      if(e.code===shadowKeys.command){e.preventDefault();encounters.shadowCommand();}
       if(e.code==='KeyH'){e.preventDefault();handleHorse();}
       if(e.code==='KeyQ'&&!blocking){
         e.preventDefault();
@@ -418,6 +420,8 @@ export function startWilderness(
   loop.start();
   return {
     toggleShadow:encounters.toggleShadow,summonAllShadows:encounters.summonAllShadows,
+    dismissAllShadows:encounters.dismissAllShadows,renameShadow:encounters.renameShadow,
+    shadowCommand:encounters.shadowCommand,encounterMarkers:encounters.encounterMarkers,
     travelTo(id:string){
       if(travel||!save.health) return 'Travel is unavailable right now.';
       if(towerFloorAt(body.position.z)||caveAt(body.position.z)) return 'Use the dungeon exit before fast travel.';

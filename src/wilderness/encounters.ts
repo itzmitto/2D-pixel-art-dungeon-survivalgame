@@ -1,3 +1,5 @@
+import { spectralModels } from './shadowModels.ts';
+import { defaultShadowGrade } from './shadowData.ts';
 import { shadowArmy } from './shadowArmy.ts';
 import { caveAt, caveBossId, caveRewardId, type BossCave } from './bossCaves.ts';
 import { briarWatch, floorRemaining, towerFloorAt, towerFloors } from './briarWatch.ts';
@@ -116,7 +118,17 @@ export function createEncounters(
   const notify=(message:string)=>{
     notification=message; noticeUntil=time+notificationsSeconds; changed();
   };
-  const shadows=shadowArmy(group,player,save,kind=>models.make(kind,true),canWalk,clearLine,fx,notify,changed);
+  const spectral=spectralModels();
+  const shadows=shadowArmy<Enemy>(group,player,save,kind=>{
+    if(kind==='wild'||kind==='dire'||kind==='elite'||kind==='guardian') return models.make(kind,true);
+    if(kind==='sentinel'||kind==='frostGuardian'){
+      const rig=hollowSentinel(kind==='frostGuardian');spectral.own(rig.dispose);
+      return spectral.decorate(rig,kind);
+    }
+    const rig=kind==='skeleton'?skeletons.make():kind==='goblin'?goblins.make():
+      kind==='wizard'||kind==='ritualElite'?wizards.make(kind==='ritualElite'):orcs.make(kind!=='assassin',kind==='warlord');
+    return spectral.decorate(rig,kind);
+  },canWalk,clearLine,fx,notify,changed);
   const barGeometry=new T.PlaneGeometry(1.2,.115);
   const backing=new T.MeshBasicMaterial({color:'#251919',depthWrite:false});
   const red=new T.MeshBasicMaterial({color:'#ba5447',depthWrite:false});
@@ -135,7 +147,7 @@ export function createEncounters(
     typeof monsters.wild[K] extends readonly number[] ? readonly number[] : typeof monsters.wild[K] };
   type Enemy = CreatureRig & {
     affinity:T.Mesh<T.BufferGeometry,T.MeshBasicMaterial>;
-    target:SpellTarget; roaming:boolean; elite:boolean; level:number; announced:boolean; title?:T.Sprite; patrol:boolean;
+    target:SpellTarget; roaming:boolean; roamGroup?:string; elite:boolean; level:number; announced:boolean; title?:T.Sprite; patrol:boolean;
     wolfRig:boolean; turn:number; wizard:boolean; barrier?:T.Mesh; ward:number;
     spell?:'bolt'|'domain'|'shield'; wardCool:number; spellTarget?:{x:number;z:number}; slam?:{x:number;z:number}; sentinelMove?:'cleave'|'shock'|'shadow'; shadowTarget?:string; enraged?:boolean;
     posePhase:number; gait:number; anticipation:number; collapse:number; impactAge:number; retreat:number; strikes:number;
@@ -198,7 +210,7 @@ export function createEncounters(
   for(const floor of towerFloors) for(const guard of floor.guards){
     createEnemy(guard.id,guard.kind,guard,guard.elite?{kind:guard.kind,level:10,elite:true}:undefined);
   }
-  function createEnemy(id:string,kind:MonsterKind,spot:{x:number;z:number},member?:EncounterMember){
+  function createEnemy(id:string,kind:MonsterKind,spot:{x:number;z:number},member?:EncounterMember,roamGroup?:string){
     const orc=kind==='brute'||kind==='assassin'||kind==='warlord', wizard=kind==='wizard'||kind==='ritualElite'||kind==='frostGuardian';
     const base=monsters[kind], level=member?.level??base.level;
     const elite=Boolean(member?.elite)||kind==='elite'||kind==='ritualElite';
@@ -246,7 +258,7 @@ export function createEncounters(
     beam.visible=false;group.add(beam);
     if(save.drops[id]) loot.material.color.set(rarity[save.drops[id].rarity].color);
     const enemy:Enemy={...actor,id,kind,spec,home,affinity,wizard,barrier:actor.barrier,
-      roaming:Boolean(roamingKind(id)),elite,level,announced:false,patrol:!!member&&trailDistance(spot.x,spot.z)<5,
+      roaming:Boolean(roamingKind(id)),roamGroup,elite,level,announced:false,patrol:!!member&&trailDistance(spot.x,spot.z)<5,
       target:{point:actor.root.position,alive:()=>enemy.hp>0,get effects(){return enemy.statuses;},
         hit:(damage,element,heavy)=>hitEnemy(enemy,damage,element,heavy)},ward:0,wardCool:0,wolfRig:kind!=='sentinel'&&!wizard&&!orc&&kind!=='skeleton'&&kind!=='goblin',turn:0,posePhase:enemies.length*.92,gait:0,anticipation:0,collapse:1,
       impactAge:3,retreat:0,strikes:0,hp:(oldDefeats.has(id)||save.defeatedBosses.includes(id))?0:spec.health,hpBar,fill,
@@ -336,6 +348,7 @@ export function createEncounters(
       if(!valid(site.x,site.z)||living.some(enemy=>Math.hypot(enemy.home.x-site.x,enemy.home.z-site.z)<13)) continue;
       const members=roamingEncounter(site.x,site.z,Math.random).slice(0,room);
       const placements=[] as {x:number;z:number}[];
+      const roamGroup=now.toString(36)+'-'+Math.random().toString(36).slice(2);
       for(const member of members){
         let spot:{x:number;z:number}|undefined;
         for(let j=0;j<18;j++){
@@ -346,7 +359,7 @@ export function createEncounters(
         if(!spot) continue;
         placements.push(spot);
         const id='roam-'+member.kind.toLowerCase()+'-'+Math.random().toString(36).slice(2)+'-'+now.toString(36);
-        createEnemy(id,member.kind,spot,member);
+        createEnemy(id,member.kind,spot,member,roamGroup);
       }
       if(placements.length) break;
     }
@@ -426,6 +439,9 @@ export function createEncounters(
     }
     enemy.collapse=0;
     shadows.award(enemy.id,enemy.spec.xp);
+    const natural=defaultShadowGrade(enemy.kind),grade=natural==='ordinary'&&enemy.elite?'elite':natural;
+    const sourceId=enemy.id+'-'+(save.kills+1);
+    shadows.remember(sourceId,enemy.kind,grade,enemy.level,enemy.spec.health,enemy.spec.damage,enemy.root.position);
     if(enemy.barrier) enemy.barrier.visible=false;
     const cave=caveAt(enemy.home.z);
     if(cave&&enemy.id.startsWith('cave-')){
@@ -455,10 +471,6 @@ export function createEncounters(
     if(piece) save.drops[enemy.id].armorPiece=piece;
     enemy.loot.material.color.set(rarity[save.drops[enemy.id].rarity].color);
     if(!enemy.roaming&&enemy.spec.respawn&&!enemy.id.startsWith('den-')&&!enemy.id.startsWith('tower-')) save.returns[enemy.id]=Date.now()+30_000+Math.floor(rand()*30_000);
-    if(enemy.kind==='wild'||enemy.kind==='dire'){
-      const cycle=save.returns[enemy.id]??0;
-      shadows.remember(enemy.id+'-'+cycle,enemy.kind,enemy.level,enemy.spec.health,enemy.spec.damage,enemy.root.position);
-    }
     oldDefeats.add(enemy.id);
     save.defeated=[...oldDefeats];
     save.kills++;
@@ -561,6 +573,18 @@ export function createEncounters(
   return {
     feedback:notify,prepareCave,
     extractShadow:shadows.extract,toggleShadow:shadows.toggle,summonAllShadows:shadows.summonAll,
+    dismissAllShadows:shadows.dismissAll,renameShadow:shadows.rename,shadowCommand:shadows.command,
+    encounterMarkers(){
+      const groups=new Map<string,{id:string;x:number;z:number;count:number;level:number;elite:boolean}>();
+      for(const enemy of enemies){
+        if(!enemy.roamGroup||enemy.hp<=0) continue;
+        const {x,z}=enemy.root.position, id=enemy.roamGroup;
+        const marker=groups.get(id);
+        if(marker){marker.x+=x;marker.z+=z;marker.count++;marker.level=Math.max(marker.level,enemy.level);marker.elite||=enemy.elite;}
+        else groups.set(id,{id,x,z,count:1,level:enemy.level,elite:enemy.elite});
+      }
+      return [...groups.values()].map(marker=>({...marker,x:marker.x/marker.count,z:marker.z/marker.count}));
+    },
     get movementFactor(){return time<slowUntil?.64:1;},
     get inCombat(){
       return time<combatUntil||arcane.active||rangeTimer.busy||!!queued||magic.dashing||
@@ -729,7 +753,10 @@ export function createEncounters(
       }
       magic.update(dt);
       arcane.update(dt,blocking);
-      shadows.update(dt,enemies,(enemy,damage)=>hitEnemy(enemy as Enemy,damage));
+      shadows.update(dt,enemies,(enemy,damage,frost)=>{
+        if(frost) enemy.statuses.slow();
+        hitEnemy(enemy,damage,frost?'ice':null);
+      });
       waterTime-=dt;
       if(magic.shield.active&&waterTime<=0){
         waterTime=.16;
@@ -1097,7 +1124,7 @@ export function createEncounters(
       models.dispose();skeletons.dispose();goblins.dispose();orcs.dispose();wizards.dispose();
       affinityGeometry.dispose();Object.values(affinities).forEach(material=>material.dispose());
       for(const resource of [barGeometry,backing,red,alert,lootGeometry,drawstring,lootFang,lootCoin,bagTie,boneLoot,metalLoot,lootBeamGeometry,lootMaterial,sparkGeometry,sparks.material,echoMaterial]) resource.dispose();
-      shadows.dispose();fx.dispose();
+      shadows.dispose();spectral.dispose();fx.dispose();
       chestViews.dispose();
       for(const enemy of enemies){enemy.loot.material.dispose();enemy.beam.material.dispose();enemy.title?.material.dispose();}
       for(const texture of labels.values()) texture.dispose();
