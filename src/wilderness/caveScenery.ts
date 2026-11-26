@@ -1,7 +1,7 @@
 import * as T from 'three';
 import { bossCaves, caveAt, caveExit, caveLootLabel, caveWalkable } from './bossCaves.ts';
 import { height, randomSequence } from './layout.ts';
-import { joint, loft, meshPart, rigidBatcher, shapedPlate } from './creatureGeometry.ts';
+import { loft, meshPart, rigidBatcher, shapedPlate } from './creatureGeometry.ts';
 
 export function caveScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number}[]){
   const slab=new T.DodecahedronGeometry(1,0).scale(1,.72,1);
@@ -53,11 +53,13 @@ export function caveScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number}
   const labelTextures:T.CanvasTexture[]=[], labelMaterials:T.SpriteMaterial[]=[];
   const dust=new T.OctahedronGeometry(.08);
   const stamp=new T.Object3D(), tint=new T.Color(), random=randomSequence(1023), batch=rigidBatcher();
+  const arenaProps:{x:number;z:number;r:number}[]=[];
   const views=bossCaves.map(cave=>{
     const ice=cave.kind==='frostGuardian',crypt=cave.kind==='skeletonKing',arcane=cave.kind==='darkArchmage';
     const volcanic=cave.kind==='infernalGolem'||cave.kind==='ancientDragon',dragon=cave.kind==='ancientDragon';
     const light=ice?blue:cave.kind==='warlord'?amber:new T.MeshBasicMaterial({color:cave.color,toneMapped:false});
     const ground=ice?frozen:crypt?stone:volcanic?rockGlow:basalt;
+    let sign:T.Sprite|undefined;
     const floats:T.Mesh[]=[], entryMotes=new T.InstancedMesh(dust,light,12);
     entryMotes.instanceMatrix.setUsage(T.DynamicDrawUsage);entryMotes.frustumCulled=false;
     const entry=new T.Group(), arena=new T.Group();
@@ -89,7 +91,7 @@ export function caveScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number}
         const texture=new T.CanvasTexture(label);texture.colorSpace=T.SRGBColorSpace;labelTextures.push(texture);
         const material=new T.SpriteMaterial({map:texture,depthWrite:false,transparent:true});labelMaterials.push(material);
         const sprite=new T.Sprite(material);
-        sprite.position.set(0,5.29,1.36);sprite.scale.set(9.3,1.91,1);entry.add(sprite);
+        sprite.position.set(0,5.29,1.36);sprite.scale.set(9.3,1.91,1);entry.add(sprite);sign=sprite;
       }
     }
     for(const side of [-1,1]){
@@ -149,6 +151,7 @@ export function caveScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number}
       for(let i=0;i<7;i++){
         const x=side*(cave.width*.67+(i%2)*1.45),z=cave.arena-10+i*3.20;
         if(crypt){
+          arenaProps.push({x,z,r:.83});
           meshPart(arena,sarcophagus,stone,x,.35,z).rotation.y=.41*side;
           meshPart(arena,rune,brass,x,.64,z).rotation.x=-Math.PI/2;
           for(const offset of [-.57,.64]){
@@ -157,6 +160,7 @@ export function caveScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number}
             meshPart(arena,crystalForm,amber,x+offset,.31,z+.87).scale.setScalar(.19);
           }
         }else if(arcane){
+          arenaProps.push({x,z,r:.61});
           const pedestal=meshPart(arena,pillar,stone,x,.01,z);pedestal.scale.y=.30;
           const gem=meshPart(arena,crystalForm,crystal,x,1.57,z);gem.scale.setScalar(1.1+(i%3)*.25);
           floats.push(gem);
@@ -167,6 +171,7 @@ export function caveScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number}
             fragment.rotation.y=i+k*2.399;
           }
           if(cave.kind==='warlord'){
+            arenaProps.push({x,z:z-.62,r:.83});
             meshPart(arena,sword,brass,x+.52,.28,z+.28).rotation.set(.8,i,-.34);
             for(let k=0;k<4;k++){
               const stake=meshPart(arena,pillar,timber,x+(k-1.6)*.49,.014,z-.62);
@@ -201,11 +206,12 @@ export function caveScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number}
     const motes=new T.InstancedMesh(dust,light,26);
     motes.instanceMatrix.setUsage(T.DynamicDrawUsage);motes.frustumCulled=false;
     arena.remove(...floats);batch.bake(arena);arena.add(motes,...floats);arena.visible=false;scene.add(arena);
-    return {cave,entry,arena,motes,entryMotes,floats};
+    return {cave,entry,arena,motes,entryMotes,floats,sign};
   });
   const roomLight=new T.PointLight(0x9ad6ff,36,35,2);
   roomLight.visible=false;scene.add(roomLight);
   return {
+    blocked:(x:number,z:number)=>arenaProps.some(prop=>Math.abs(prop.z-z)<1.3&&Math.hypot(x-prop.x,z-prop.z)<prop.r),
     update(time:number,p:T.Vector3){
       const inside=caveAt(p.z);
       mistMat.uniforms.time.value=lavaMat.uniforms.time.value=time;
@@ -215,8 +221,10 @@ export function caveScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number}
         roomLight.intensity=37+Math.sin(time*2.3)*3.0+Math.cos(time*4.05)*1.4;
         roomLight.position.set(0,6,inside.arena+3);
       }
-      for(const {cave,entry,arena,motes,entryMotes,floats} of views){
-        entry.visible=!inside&&Math.hypot(p.x-cave.x,p.z-cave.z)<98;
+      for(const {cave,entry,arena,motes,entryMotes,floats,sign} of views){
+        const proximity=Math.hypot(p.x-cave.x,p.z-cave.z);
+        entry.visible=!inside&&proximity<98;
+        if(sign) sign.visible=proximity<32;
         arena.visible=inside===cave;
         if(entry.visible){
           entryMotes.visible=Math.hypot(p.x-cave.x,p.z-cave.z)<36;

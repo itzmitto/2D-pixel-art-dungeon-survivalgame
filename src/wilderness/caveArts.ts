@@ -43,6 +43,7 @@ export function caveArts<Enemy extends Actor>(
     const mesh=meshPart(group,blockGeometry,blockMaterial);mesh.visible=false;
     return {mesh,life:0};
   });
+  const waves:{owner:Enemy;point:Point;radius:number;front:number;strength:number}[]=[];
   const air=new Map<Enemy,{time:number;point:Point;fire:boolean}>();
   let blocking=false;
   function pulse(point:Point,color:number,radius:number){
@@ -84,7 +85,7 @@ export function caveArts<Enemy extends Actor>(
       if(kind==='skeletonKing'&&distance>7&&move==='royal') move='death';
       if(kind==='infernalGolem'&&distance>9&&move==='magma') move='rush';
       if(kind==='ancientDragon'&&distance>9&&(move==='tail'||move==='claw')) move=sequence%2?'air':'breath';
-      const duration=(move==='meteor'||move==='air'?1.36:move==='death'||move==='land'||move==='magma'?1.19:1.01)*(enemy.enraged?.79:1);
+      const duration=(move==='meteor'||move==='air'?1.36:move==='death'||move==='magma'?1.19:1.01)*(enemy.enraged?.79:1);
       const marks:Point[]=[];
       const target={x:q.x,z:q.z};
       if(move==='meteor'||move==='air'){
@@ -93,6 +94,8 @@ export function caveArts<Enemy extends Actor>(
       }else if(move==='burn'||move==='explode'||move==='prison'){
         marks.push(target);
         mark(target,move==='prison'?3.38:4.35,color,duration);
+      }else if(move==='magma'){
+        marks.push(along(p,yaw,3));mark(marks[0],4.65,color,duration);
       }else if(move==='death'||move==='firewave'||move==='tail'||move==='barrier'||move==='summon'){
         mark(p,move==='barrier'?1.63:move==='summon'?3.1:move==='tail'?7.4:9.4,color,duration);
       }else{
@@ -113,7 +116,8 @@ export function caveArts<Enemy extends Actor>(
       switch(move){
         case 'royal':case 'claw':case 'tail': {
           const range=move==='tail'?7.4:move==='claw'?5.25:6;
-          const facing=move==='tail'?yaw: yaw;
+          const facing=yaw;
+          if(move==='tail') pulse(p,color,range);
           fx.emit(p,color,'arc',range*.68,.47,{yaw:facing,y:move==='tail'?.74:1.19,aspect:1.25,grow:2.1});
           if((move==='tail'?gap(p,q)<range:cone(p,q,facing,range,1.12))&&clear(p.x,p.z,q.x,q.z))
             damage(enemy,blocking,move==='tail',move==='claw'?.86:1);
@@ -137,17 +141,20 @@ export function caveArts<Enemy extends Actor>(
         case 'death':case 'firewave':case 'land': {
           const radius=move==='land'?8.7:9.4;
           pulse(p,color,radius);
-          hazard(enemy,{x:p.x,z:p.z},radius,.19,'blast',move==='death'?.83:.91);
+          waves.push({owner:enemy,point:{x:p.x,z:p.z},radius,front:0,strength:move==='death'?.83:.91});
           break;
         }
         case 'barrage':barrage(enemy,yaw,enemy.enraged?[-.36,-.18,0,.18,.36]:[-.23,0,.23],.63,18);break;
         case 'barrier':enemy.ward=4.2;enemy.wardCool=12.5;pulse(p,color,2.85);break;
         case 'explode':pulse(target,color,4.35);hazard(enemy,target,4.35,0,'blast',.90);break;
         case 'meteor':
-          for(const [i,point] of marks.entries()) if(walk(point.x,point.z)) hazard(enemy,point,2.70,.42+i*.20,'meteor',.90);
+          for(const [i,point] of marks.entries()) if(walk(point.x,point.z)){
+            const delay=.42+i*.20;
+            mark(point,2.70,color,delay);hazard(enemy,point,2.70,delay,'meteor',.90);
+          }
           break;
         case 'magma': {
-          const point=along(p,yaw,3);
+          const point=marks[0]??along(p,yaw,3);
           pulse(point,color,4.65);
           hazard(enemy,point,4.65,0,'blast',1.02);
           break;
@@ -161,7 +168,10 @@ export function caveArts<Enemy extends Actor>(
           break;
         case 'air':
           air.set(enemy,{time:0,point:{...target},fire:false});
-          for(const [i,point] of marks.entries()) if(walk(point.x,point.z)) hazard(enemy,point,2.48,1.04+i*.18,'meteor',.8);
+          for(const [i,point] of marks.entries()) if(walk(point.x,point.z)){
+            const delay=1.04+i*.18;
+            mark(point,2.48,color,delay);hazard(enemy,point,2.48,delay,'meteor',.8);
+          }
           break;
       }
     },
@@ -189,6 +199,13 @@ export function caveArts<Enemy extends Actor>(
         if(flight.time>=2.3){
           air.delete(enemy);this.resolve(enemy,{move:'land',duration:.7,yaw:enemy.heading,marks:[]});
         }
+      }
+      for(let i=waves.length-1;i>=0;i--){
+        const wave=waves[i],previous=wave.front,d=gap(wave.point,player.position);
+        wave.front+=wave.radius*dt/.55;
+        if(wave.owner.hp>0&&d<wave.front+.45&&d>=Math.max(0,previous-.56)&&clear(wave.point.x,wave.point.z,player.position.x,player.position.z)){
+          damage(wave.owner,false,true,wave.strength);waves.splice(i,1);
+        }else if(!wave.owner.hp||wave.front>wave.radius+.66) waves.splice(i,1);
       }
       const hitOwners=new Set<Enemy>();
       for(let i=volleys.length-1;i>=0;i--){
@@ -236,7 +253,7 @@ export function caveArts<Enemy extends Actor>(
         if(field.life<=0) areas.splice(i,1);
       }
     },
-    clear(){areas.length=volleys.length=0;air.clear();for(const bone of bones){bone.life=0;bone.mesh.visible=false;}},
+    clear(){areas.length=volleys.length=waves.length=0;air.clear();for(const bone of bones){bone.life=0;bone.mesh.visible=false;}},
     dispose(){blockGeometry.dispose();blockMaterial.dispose();},
   };
 }

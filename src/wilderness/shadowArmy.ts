@@ -332,7 +332,7 @@ export function shadowArmy<Enemy extends Hostile>(
           });
         }
         const target=state.target;
-        const ranged=profile.style==='spell'||profile.style==='frost';
+        const ranged=profile.style==='spell'||profile.style==='frost'||profile.style==='dragon';
         const charge=profile.style==='dash'||profile.style==='charge';
         if(state.windup>0){
           state.windup=Math.max(0,state.windup-dt);
@@ -349,7 +349,7 @@ export function shadowArmy<Enemy extends Hostile>(
               state.strikes++;
               if(ranged){
                 if(projectiles.length<18) projectiles.push({state,target,point:{x:p.x,z:p.z},trail:0,life:1.1,
-                  radius:state.strikes%3===0?3.4:0});
+                  radius:state.strikes%3===0?(profile.style==='dragon'?4.2:3.4):0});
               }else{
                 const yaw=Math.atan2(q.x-p.x,q.z-p.z);
                 if(charge){
@@ -407,7 +407,7 @@ export function shadowArmy<Enemy extends Hostile>(
           full++;
           if(distance<8||n%2===Math.floor(time*30)%2||state.windup>0)
             rig.animate({time,phase:state.phase,gait:state.gait,windup:state.windup>0?.32+(1-state.windup/profile.windup)*.67:0,
-              recovery:state.recovery/.31,hit:state.hurt/.28,leap:charge?state.recovery/.31*.76:0,dead:0,frozen:false,
+              recovery:state.recovery/.31,hit:state.hurt/.28,leap:charge?state.recovery/.31*.76:profile.style==='dragon'&&state.windup>0?.59:0,dead:0,frozen:false,
               alert:target?.hp?1:0,distance});
         }
       }
@@ -428,7 +428,7 @@ export function shadowArmy<Enemy extends Hostile>(
       for(const state of active.values()){
         const q=state.rig.root.position, kind=state.record.kind, profile=shadowProfiles[kind];
         if(save.health&&!state.rig.root.visible){
-          const mesh=proxies[profile.category==='Beast'||kind==='guardian'?0:profile.category==='Caster'||kind==='frostGuardian'?2:1];
+          const mesh=proxies[profile.category==='Beast'||kind==='guardian'||kind==='ancientDragon'?0:profile.category==='Caster'||kind==='frostGuardian'||kind==='darkArchmage'?2:1];
           stamp.position.copy(q);stamp.rotation.set(0,state.rig.root.rotation.y,0);stamp.scale.copy(state.rig.root.scale);stamp.updateMatrix();
           const i=mesh.count++;
           mesh.setMatrixAt(i,stamp.matrix);

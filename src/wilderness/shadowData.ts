@@ -1,6 +1,6 @@
 import { rank } from './progression.ts';
 
-export const shadowKinds=['wild','dire','skeleton','goblin','brute','assassin','wizard','elite','ritualElite','guardian','warlord','frostGuardian','sentinel'] as const;
+export const shadowKinds=['wild','dire','skeleton','goblin','brute','assassin','wizard','elite','ritualElite','guardian','warlord','frostGuardian','sentinel','skeletonKing','darkArchmage','infernalGolem','ancientDragon'] as const;
 export type ShadowKind=typeof shadowKinds[number];
 export type ShadowGrade='ordinary'|'elite'|'boss';
 export const shadowCommands=['Defensive','Aggressive','Follow'] as const;
@@ -10,7 +10,7 @@ export type ShadowSoldier={id:string;kind:ShadowKind;grade:ShadowGrade;name:stri
   baseHealth:number;baseDamage:number;active:boolean;health:number;readyAt:number};
 export type ShadowEssence={id:string;kind:ShadowKind;grade:ShadowGrade;attempts:number;level:number;baseHealth:number;baseDamage:number;x:number;z:number;expiresAt:number};
 export const shadowTuning={
-  fraction:.60,essenceMs:90_000,recoveryMs:24_000,maxLevel:60,
+  fraction:.60,essenceMs:90_000,recoveryMs:24_000,maxLevel:120,
   limits:{E:4,D:8,C:12,B:20,A:30,S:40,SS:60,SSS:100},
   extraction:{ordinary:1,elite:.8,boss:.5},
   attempts:{ordinary:1,elite:1,boss:3},
@@ -34,6 +34,10 @@ export const shadowProfiles={
   guardian:{name:'Shadow Fang Guardian',category:'Boss',range:4.5,cooldown:1.8,windup:.47,color:0x679aff,style:'charge'},
   warlord:{name:'Shadow Orc Warlord',category:'Boss',range:3.25,cooldown:2.27,windup:.70,color:0x4c98f9,style:'slam'},
   frostGuardian:{name:'Shadow Frost Guardian',category:'Boss',range:12.5,cooldown:2.13,windup:.62,color:0x8ceeff,style:'frost'},
+  skeletonKing:{name:'Shadow Skeleton King',category:'Boss',range:3.8,cooldown:2.12,windup:.62,color:0x7ecaff,style:'slam'},
+  darkArchmage:{name:'Shadow Dark Archmage',category:'Boss',range:13.5,cooldown:2.16,windup:.58,color:0x8a90ff,style:'spell'},
+  infernalGolem:{name:'Shadow Infernal Golem',category:'Boss',range:3.9,cooldown:2.42,windup:.70,color:0x5daeff,style:'slam'},
+  ancientDragon:{name:'Shadow Ancient Dragon',category:'Boss',range:10.5,cooldown:2.48,windup:.71,color:0x40c8ff,style:'dragon'},
   sentinel:{name:'Shadow Hollow Sentinel',category:'Boss',range:3.35,cooldown:2.18,windup:.69,color:0x718bff,style:'slam'},
 } as const;
 export const shadowName=(kind:ShadowKind)=>shadowProfiles[kind].name;
@@ -96,7 +100,7 @@ export function readEssences(raw:unknown):ShadowEssence[]{
   const unique=new Map<string,ShadowEssence>();
   for(const value of raw.slice(-96)){
     if(!value||typeof value!=='object'||!validSource(value)||!Number.isFinite(value.x)||Math.abs(value.x)>=240||
-      !Number.isFinite(value.z)||Math.abs(value.z)>=1200||!Number.isSafeInteger(value.expiresAt)||value.expiresAt<=Date.now()) continue;
+      !Number.isFinite(value.z)||Math.abs(value.z)>=1600||!Number.isSafeInteger(value.expiresAt)||value.expiresAt<=Date.now()) continue;
     const grade=readGrade(value.kind,value.grade);
     const attempts=Number.isInteger(value.attempts)?Math.max(0,value.attempts):0;
     if(attempts>=shadowTuning.attempts[grade]) continue;

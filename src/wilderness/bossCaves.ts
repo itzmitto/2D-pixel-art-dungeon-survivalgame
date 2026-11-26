@@ -11,7 +11,7 @@ export const bossCaves=[
   {id:'ironfang-vault',name:'Bloodfang Cavern',x:-146,z:-111,arena:948,width:17,depth:19,kind:'warlord',boss:'Orc Warlord',level:20,
     recommended:20,rank:'C',rarity:'Epic',weapon:'axe',armor:'blacksteel-chestplate',gold:290,rating:10,crystals:5,potions:2,color:0xffa268,respawnMs:300_000},
   {id:'rimeheart-grotto',name:'Frozen Abyss',x:185,z:185,arena:1068,width:18,depth:19.7,kind:'frostGuardian',boss:'Frost Guardian',level:35,
-    recommended:35,rank:'B',rarity:'Epic',upgrade:'Legendary',chance:.40,weapon:'staff',armor:'abyssal-helmet',gold:480,rating:13,crystals:9,potions:4,color:0x8edaff,respawnMs:300_000},
+    recommended:35,rank:'B',rarity:'Epic',upgrade:'Legendary',chance:.40,weapon:'staff',armor:'blacksteel-helmet',gold:480,rating:13,crystals:9,potions:4,color:0x8edaff,respawnMs:300_000},
   {id:'forgotten-crypt',name:'Forgotten Crypt',x:-136,z:142,arena:1188,width:20,depth:21,kind:'skeletonKing',boss:'Skeleton King',level:45,
     recommended:45,rank:'A',rarity:'Legendary',weapon:'greatsword',armor:'abyssal-chestplate',gold:680,rating:15,crystals:13,potions:5,color:0xd6aa64,respawnMs:300_000},
   {id:'arcane-sanctum',name:'Arcane Sanctum',x:102,z:-150,arena:1308,width:22,depth:22,kind:'darkArchmage',boss:'Dark Archmage',level:60,
@@ -31,7 +31,7 @@ export function caveWalkable(x:number,z:number){
 }
 export const caveEntry=(cave:BossCave)=>({x:0,z:cave.arena+cave.depth-6.7});
 export const caveExit=(cave:BossCave)=>({x:0,z:cave.arena+cave.depth-2.5});
-export const caveArrival=(cave:BossCave)=>({x:cave.x,z:cave.z+2.7});
+export const caveArrival=(cave:BossCave)=>({x:cave.x,z:cave.z});
 export const caveBossPoint=(cave:BossCave)=>({x:0,z:cave.arena-(cave.kind==='ancientDragon'?10:7)});
 export const caveTreasurePoint=(cave:BossCave)=>({x:0,z:cave.arena-(cave.kind==='ancientDragon'?15:10)});
 export const caveBossId=(cave:BossCave,cycle:number)=>'cave-'+cave.id+'-'+cycle;
@@ -43,6 +43,9 @@ export function caveRewardTier(cave:BossCave,run:CaveRun,seed:number):Rarity{
   let hash=seed^run.cycle;
   for(const char of cave.id) hash=Math.imul(hash^char.charCodeAt(0),16777619);
   return 'upgrade' in cave&&(hash>>>0)%100<100*cave.chance?cave.upgrade:cave.rarity;
+}
+export function caveRewardArmor(cave:BossCave,run:CaveRun,seed:number):ArmorId{
+  return cave.kind==='frostGuardian'&&caveRewardTier(cave,run,seed)!=='Epic'?'abyssal-helmet':cave.armor;
 }
 export function caveStatus(cave:BossCave,runs:CaveRuns,opened:readonly string[],now=Date.now()){
   const run=runs[cave.id];

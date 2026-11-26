@@ -1,5 +1,5 @@
 import { rarity, type Rarity } from './weapons';
-import { bossCaves, caveAt, caveExit, caveRewardId, caveStatus, type CaveRuns } from './bossCaves';
+import { bossCaves, caveAt, caveBossPoint, caveExit, caveLootLabel, caveRewardId, caveStatus, caveTreasurePoint, type CaveRuns } from './bossCaves';
 import { briarWatch, floorRemaining, towerFloorAt } from './briarWatch';
 import { waystones } from './worldSites';
 import { denChests, towerChests, worldChests } from './treasure';
@@ -177,16 +177,16 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
     const exit=caveExit(cave), run=caveRuns[cave.id], reward=caveRewardId(cave,run?.cycle??1);
     const pins=[
       {pin:{...exit,id:'room-exit',name:'Exit to Velren Forest',kind:'gate' as const},detail:'Cave exit'},
-      {pin:{id:'room-boss',x:0,z:cave.arena-7,name:cave.boss,kind:'boss' as const},detail:caveStatus(cave,caveRuns,opened,clock)},
-      {pin:{id:reward,x:0,z:cave.arena-10,name:'Boss Reward Chest',kind:'chest' as const,tier:cave.rarity,claimed:opened.includes(reward)},
+      {pin:{id:'room-boss',...caveBossPoint(cave),name:cave.boss,kind:'boss' as const},detail:caveStatus(cave,caveRuns,opened,clock)},
+      {pin:{id:reward,...caveTreasurePoint(cave),name:'Boss Reward Chest',kind:'chest' as const,tier:cave.rarity,claimed:opened.includes(reward)},
         detail:opened.includes(reward)?'Opened':run?.readyAt?'Reward chest available':'Unlocks on boss defeat'},
     ];
     return <SystemPanel title={cave.name} section={'Boss cave · Rank '+cave.rank} close={close} style="atlas-panel atlas-den">
-      <div className="atlas-den-meta">{cave.boss} · Lv {cave.level} · Recommended {cave.recommended} · {cave.rarity}</div>
+      <div className="atlas-den-meta">{cave.boss} · Lv {cave.level} · Recommended {cave.recommended} · {caveLootLabel(cave)}</div>
       <p>{caveStatus(cave,caveRuns,opened,clock)}</p>
-      <svg viewBox={`-23 ${cave.arena-23} 46 46`} role="img" aria-label={cave.name+' map'}>
-        <ellipse cx="0" cy={cave.arena} rx={cave.kind==='warlord'?17:18} ry={cave.kind==='warlord'?19:19.7}
-          fill={cave.kind==='warlord'?'#6e5256':'#405d76'} stroke="#c9a978" strokeWidth=".35"/>
+      <svg viewBox={`${-cave.width-4} ${cave.arena-cave.depth-4} ${2*cave.width+8} ${2*cave.depth+8}`} role="img" aria-label={cave.name+' map'}>
+        <ellipse cx="0" cy={cave.arena} rx={cave.width} ry={cave.depth}
+          fill={'#'+cave.color.toString(16)} fillOpacity={.36} stroke="#c9a978" strokeWidth=".35"/>
         {pins.map(({pin,detail})=>localPin(pin,detail))}
         <PlayerMark position={position} scale={.22}/>
       </svg>
@@ -360,7 +360,7 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
             <button onClick={()=>onWaypoint({x:selected.x,z:selected.z,name:selected.name})}>Set Waypoint</button>
           </>}
           {waypoint&&<button className="atlas-clear-waypoint" onClick={()=>onWaypoint(null)}>Clear Waypoint</button>}
-          {selectedCave&&<p>{selectedCave.rarity} rewards{caveRuns[selectedCave.id]?.readyAt||
+          {selectedCave&&<p>{caveLootLabel(selectedCave)} rewards{caveRuns[selectedCave.id]?.readyAt||
             opened.some(id=>id.startsWith('reward-'+selectedCave.id+'-'))?' · Boss defeated before':''}</p>}
           {selected?.kind==='waystone'&&(waystonesActive.includes(selected.id)
             ? <button onClick={()=>reportTravel(travel(selected.id))}>Travel here · Free</button>

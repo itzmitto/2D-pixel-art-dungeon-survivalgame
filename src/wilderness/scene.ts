@@ -61,7 +61,8 @@ export function startWilderness(
   const stones=waystoneModels(scene);
   obstacles.push(...waystones.map(({x,z})=>({x,z,r:.95})));
   const nearby = obstacleGrid(obstacles);
-  const canWalk = (x:number,z:number) => caveAt(z)?caveWalkable(x,z):towerFloorAt(z) ? towerWalkable(x,z) : inDen(z) ? denWalkable(x,z) : walkable(x,z,nearby(x,z));
+  let bossObstacle:(x:number,z:number)=>boolean=()=>false;
+  const canWalk = (x:number,z:number) => caveAt(z)?caveWalkable(x,z)&&!caves.blocked(x,z)&&!bossObstacle(x,z):towerFloorAt(z) ? towerWalkable(x,z) : inDen(z) ? denWalkable(x,z) : walkable(x,z,nearby(x,z));
   const updateDen=denScenery(scene);
   const start = canWalk(save.position.x,save.position.z) ? save.position : {...spawn,yaw:0};
   body.position.set(start.x,surface(start.x,start.z),start.z);
@@ -70,6 +71,7 @@ export function startWilderness(
   const grass=meadow(scene,body.position,rocks,save.seed);
   const animateNight=atmosphere(scene,fireY);
   const encounters=createEncounters(scene,camera,body,save,canWalk,onSaveChange);
+  bossObstacle=encounters.blockedByBoss;
   const loadedCave=caveAt(start.z);
   if(loadedCave) encounters.prepareCave(loadedCave,false);
   let travel:{target:Position;remaining:number;arrived:boolean}|undefined;

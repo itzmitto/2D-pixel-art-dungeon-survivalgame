@@ -3,7 +3,7 @@ import { meshPart, shapedPlate, type CreatureRig } from './creatureGeometry.ts';
 import { shadowProfiles, type ShadowKind } from './shadowData.ts';
 
 export function spectralModels(){
-  const materials=new Map<ShadowKind,{form:T.MeshStandardMaterial;glow:T.MeshBasicMaterial}>();
+  const materials=new Map<ShadowKind,{form:T.MeshStandardMaterial;cloth:T.MeshStandardMaterial;glow:T.MeshBasicMaterial}>();
   const owned: (()=>void)[]=[];
   const rune=shapedPlate([[0,.18],[-.20,.035],[-.075,.010],[-.018,-.19],[.045,-.057],[.175,-.018],[.072,.025]],.012,.007);
   const glint=shapedPlate([[-.056,-.012],[-.047,.012],[.054,.019],[.042,-.017]],.008,.003);
@@ -20,14 +20,15 @@ export function spectralModels(){
             float edge=pow(1.-max(dot(normalize(vViewPosition),normal),0.),3.2);
             totalEmissiveRadiance+=shadowRim*(.05+edge*.43);`);
         };
-        set={form,glow};materials.set(kind,set);
+        const cloth=form.clone();cloth.side=T.DoubleSide;cloth.onBeforeCompile=form.onBeforeCompile;
+        set={form,cloth,glow};materials.set(kind,set);
       }
-      const {form,glow}=set;
+      const {form,cloth,glow}=set;
       rig.root.traverse(node=>{
         if(!(node instanceof T.Mesh)||Array.isArray(node.material)||node.material.transparent) return;
         const original=node.material;
         node.material=original instanceof T.MeshStandardMaterial&&original.emissiveIntensity>.42&&original.emissive.getHex()
-          ||original instanceof T.MeshBasicMaterial&&original.color.getHex()>0x413850?glow:form;
+          ||original instanceof T.MeshBasicMaterial&&original.color.getHex()>0x413850?glow:original.side===T.DoubleSide?cloth:form;
       });
       const caster=kind==='wizard'||kind==='ritualElite'||kind==='frostGuardian';
       const brute=kind==='brute'||kind==='warlord'||kind==='assassin';
@@ -42,7 +43,7 @@ export function spectralModels(){
     own(dispose:()=>void){owned.push(dispose);},
     dispose(){
       owned.forEach(dispose=>dispose());
-      for(const {form,glow} of materials.values()){form.dispose();glow.dispose();}
+      for(const {form,cloth,glow} of materials.values()){form.dispose();cloth.dispose();glow.dispose();}
       rune.dispose();glint.dispose();
     },
   };

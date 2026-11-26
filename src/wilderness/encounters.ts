@@ -1,7 +1,9 @@
+import { elementalBossModels } from './elementalBossModels.ts';
+import { caveArts, isAdvancedBoss, type BossCast } from './caveArts.ts';
 import { spectralModels } from './shadowModels.ts';
 import { defaultShadowGrade } from './shadowData.ts';
 import { shadowArmy } from './shadowArmy.ts';
-import { caveAt, caveBossId, caveRewardId, type BossCave } from './bossCaves.ts';
+import { caveAt, caveBossId, caveBossPoint, caveRewardArmor, caveRewardId, caveRewardTier, caveTreasurePoint, type BossCave } from './bossCaves.ts';
 import { briarWatch, floorRemaining, towerFloorAt, towerFloors } from './briarWatch.ts';
 import { hollowSentinel } from './sentinel.ts';
 import { encounterCell, eliteName, roaming, roamingEncounter, roamingKind, type EncounterMember } from './roaming.ts';
@@ -72,6 +74,7 @@ export function createEncounters(
       attackDuration:weapon.attackDuration/speed, impactTime:weapon.impactTime/speed,cooldown:weapon.cooldown/speed};
   }
   const models=wolfModels(), skeletons=skeletonModels(), goblins=goblinModels(), orcs=orcModels(), wizards=wizardModels();
+  const elementals=elementalBossModels();
   const sentinel=hollowSentinel(), frostGuardian=hollowSentinel(true);
   const group=new T.Group();
   scene.add(group);
@@ -119,14 +122,16 @@ export function createEncounters(
     notification=message; noticeUntil=time+notificationsSeconds; changed();
   };
   const spectral=spectralModels();
+  const arts=caveArts<Enemy>(group,player,fx,canWalk,clearLine,hitPlayer,summonUndead,notify);
   const shadows=shadowArmy<Enemy>(group,player,save,kind=>{
     if(kind==='wild'||kind==='dire'||kind==='elite'||kind==='guardian') return models.make(kind,true);
     if(kind==='sentinel'||kind==='frostGuardian'){
       const rig=hollowSentinel(kind==='frostGuardian');spectral.own(rig.dispose);
       return spectral.decorate(rig,kind);
     }
-    const rig=kind==='skeleton'?skeletons.make():kind==='goblin'?goblins.make():
-      kind==='wizard'||kind==='ritualElite'?wizards.make(kind==='ritualElite'):orcs.make(kind!=='assassin',kind==='warlord');
+    const rig=kind==='skeleton'||kind==='skeletonKing'?skeletons.make(kind==='skeletonKing'):kind==='goblin'?goblins.make():
+      kind==='wizard'||kind==='ritualElite'||kind==='darkArchmage'?wizards.make(kind!=='wizard',kind==='darkArchmage'):
+      kind==='infernalGolem'?elementals.makeGolem():kind==='ancientDragon'?elementals.makeDragon():orcs.make(kind!=='assassin',kind==='warlord');
     return spectral.decorate(rig,kind);
   },canWalk,clearLine,fx,notify,changed);
   const barGeometry=new T.PlaneGeometry(1.2,.115);
@@ -149,7 +154,7 @@ export function createEncounters(
     affinity:T.Mesh<T.BufferGeometry,T.MeshBasicMaterial>;
     target:SpellTarget; roaming:boolean; roamGroup?:string; elite:boolean; level:number; announced:boolean; title?:T.Sprite; patrol:boolean;
     wolfRig:boolean; turn:number; wizard:boolean; barrier?:T.Mesh; ward:number;
-    spell?:'bolt'|'domain'|'shield'; wardCool:number; spellTarget?:{x:number;z:number}; slam?:{x:number;z:number}; sentinelMove?:'cleave'|'shock'|'shadow'; shadowTarget?:string; enraged?:boolean;
+    spell?:'bolt'|'domain'|'shield'; wardCool:number; spellTarget?:{x:number;z:number}; slam?:{x:number;z:number}; sentinelMove?:'cleave'|'shock'|'shadow';bossCast?:BossCast;summonedBy?:string; shadowTarget?:string; enraged?:boolean;
     posePhase:number; gait:number; anticipation:number; collapse:number; impactAge:number; retreat:number; strikes:number;
 
     id:string; kind:MonsterKind; spec:EnemySpec; home:T.Vector3; hp:number; hpBar:T.Group; fill:T.Mesh;
@@ -211,7 +216,7 @@ export function createEncounters(
     createEnemy(guard.id,guard.kind,guard,guard.elite?{kind:guard.kind,level:10,elite:true}:undefined);
   }
   function createEnemy(id:string,kind:MonsterKind,spot:{x:number;z:number},member?:EncounterMember,roamGroup?:string){
-    const orc=kind==='brute'||kind==='assassin'||kind==='warlord', wizard=kind==='wizard'||kind==='ritualElite'||kind==='frostGuardian';
+    const orc=kind==='brute'||kind==='assassin'||kind==='warlord', wizard=kind==='wizard'||kind==='ritualElite'||kind==='frostGuardian'||kind==='darkArchmage';
     const base=monsters[kind], level=member?.level??base.level;
     const elite=Boolean(member?.elite)||kind==='elite'||kind==='ritualElite';
     const threat=member?1+Math.max(0,level-base.level)*.115:1;
@@ -224,7 +229,8 @@ export function createEncounters(
       gold:Math.round(base.gold*threat*(member?.elite?1.85:1)),
     };
     const actor:CreatureRig&{barrier?:T.Mesh}=kind==='sentinel'?sentinel:kind==='frostGuardian'?frostGuardian:rigPool.get(kind)?.pop()??(
-      wizard?wizards.make(kind==='ritualElite'):kind==='skeleton'?skeletons.make():kind==='goblin'?goblins.make():
+      wizard?wizards.make(kind!=='wizard',kind==='darkArchmage'):kind==='skeleton'||kind==='skeletonKing'?skeletons.make(kind==='skeletonKing'):
+      kind==='infernalGolem'?elementals.makeGolem():kind==='ancientDragon'?elementals.makeDragon():kind==='goblin'?goblins.make():
       orc?orcs.make(kind!=='assassin',kind==='warlord'):models.make(kind));
     if(actor.barrier) actor.barrier.visible=false;
     actor.root.visible=false;
@@ -260,7 +266,7 @@ export function createEncounters(
     const enemy:Enemy={...actor,id,kind,spec,home,affinity,wizard,barrier:actor.barrier,
       roaming:Boolean(roamingKind(id)),roamGroup,elite,level,announced:false,patrol:!!member&&trailDistance(spot.x,spot.z)<5,
       target:{point:actor.root.position,alive:()=>enemy.hp>0,get effects(){return enemy.statuses;},
-        hit:(damage,element,heavy)=>hitEnemy(enemy,damage,element,heavy)},ward:0,wardCool:0,wolfRig:kind!=='sentinel'&&!wizard&&!orc&&kind!=='skeleton'&&kind!=='goblin',turn:0,posePhase:enemies.length*.92,gait:0,anticipation:0,collapse:1,
+        hit:(damage,element,heavy)=>hitEnemy(enemy,damage,element,heavy)},ward:0,wardCool:0,wolfRig:kind!=='sentinel'&&!isAdvancedBoss(kind)&&!wizard&&!orc&&kind!=='skeleton'&&kind!=='goblin',turn:0,posePhase:enemies.length*.92,gait:0,anticipation:0,collapse:1,
       impactAge:3,retreat:0,strikes:0,hp:(oldDefeats.has(id)||save.defeatedBosses.includes(id))?0:spec.health,hpBar,fill,
       statuses:statuses(spec.resistance),visualTick:0,lastVisual:null,cooldown:0,windup:0,heading:rand()*6.28,phase:rand()*10,hitFlash:0,charge:0,chargeWindup:false,chargeHit:false,loot,beam};
     if(elite){
@@ -420,6 +426,22 @@ export function createEncounters(
     const angle=Math.atan2(q.x-p.x,q.z-p.z)+(enemy.id.charCodeAt(enemy.id.length-1)%2?1:-1)*.63;
     return {x:p.x+Math.sin(angle)*2.3,z:p.z+Math.cos(angle)*2.3};
   }
+  let summonCounter=0;
+  function summonUndead(owner:Enemy){
+    const survivors=enemies.filter(enemy=>enemy.summonedBy===owner.id&&enemy.hp>0).length;
+    const p=owner.root.position, cap=owner.enraged?3:2;
+    for(let i=survivors;i<cap;i++){
+      for(let attempt=0;attempt<7;attempt++){
+        const angle=owner.heading+(i+1)*2.399+attempt*.48;
+        const x=p.x+Math.sin(angle)*3.05,z=p.z+Math.cos(angle)*3.05;
+        if(!canWalk(x,z)||!spaceAround(owner,x,z)||Math.hypot(x-player.position.x,z-player.position.z)<2) continue;
+        const unit=createEnemy(owner.id+'-bone-'+(++summonCounter),'skeleton',{x,z},{kind:'skeleton',level:17,elite:false});
+        unit.summonedBy=owner.id;unit.hp=42;
+        fx.emit(unit.root.position,0x9effba,'ring',.66,.61,{grow:2.05,opacity:.91});
+        break;
+      }
+    }
+  }
   function hitEnemy(enemy:Enemy, amount:number,element:Weapon['ability']=null,heavy=false){
     if(enemy.hp<=0) return;
     combatUntil=time+4;
@@ -428,16 +450,18 @@ export function createEncounters(
     enemy.hitFlash=.22;
     impact(enemy.root.position,damage,element,heavy);
     if(enemy.hp){
-      if((enemy.kind==='sentinel'||enemy.kind==='warlord'||enemy.kind==='frostGuardian')&&!enemy.enraged&&enemy.hp<=enemy.spec.health*.5){
+      if((enemy.kind==='sentinel'||enemy.kind==='warlord'||enemy.kind==='frostGuardian'||isAdvancedBoss(enemy.kind))&&!enemy.enraged&&enemy.hp<=enemy.spec.health*.5){
         enemy.enraged=true;
-        fx.emit(enemy.root.position,0xcf66ff,'ring',1.3,.72,{grow:8.5,opacity:.92});
-        fx.emit(enemy.root.position,0x9e55ef,'ray',1.33,.49,{y:2.1,aspect:3.7});
-        fx.scatter(enemy.root.position,0xb359ff,14,1.25);
+        const phaseColor=caveAt(enemy.home.z)?.color??0xcf66ff;
+        fx.emit(enemy.root.position,phaseColor,'ring',1.3,.72,{grow:8.5,opacity:.92});
+        fx.emit(enemy.root.position,phaseColor,'ray',1.33,.49,{y:2.1,aspect:3.7});
+        fx.scatter(enemy.root.position,phaseColor,14,1.25);
         notify('Boss phase II · '+enemy.spec.name);
       }
       return;
     }
     enemy.collapse=0;
+    if(enemy.summonedBy){shadows.forget(enemy.id);fx.scatter(enemy.root.position,0x7ac7a4,6,.57);return;}
     shadows.award(enemy.id,enemy.spec.xp);
     const natural=defaultShadowGrade(enemy.kind),grade=natural==='ordinary'&&enemy.elite?'elite':natural;
     const sourceId=enemy.id+'-'+(save.kills+1);
@@ -489,7 +513,7 @@ export function createEncounters(
 
   }
 
-  function hitPlayer(enemy:Enemy, blocking:boolean, charge=false){
+  function hitPlayer(enemy:Enemy, blocking:boolean, charge=false,strength=1){
     if(!save.health) return false;
     combatUntil=time+4;
     const guard=blocking&&inArc(player.position,enemy.root.position,player.rotation.y,3,1.25);
@@ -501,7 +525,7 @@ export function createEncounters(
       return false;
     }
     const barrierActive=magic.shield.active;
-    const damage=magic.shield.absorb(Math.max(.5,Math.round((guard ? Math.ceil(enemy.spec.damage*.46) : enemy.spec.damage*(enemy.enraged?1.17:1)*(charge?1.3:1))*(1-mitigation(effectiveStats(save),save.armor))*100)/100));
+    const damage=magic.shield.absorb(Math.max(.5,Math.round((guard ? Math.ceil(enemy.spec.damage*.46) : enemy.spec.damage*(enemy.enraged?1.17:1)*(charge?1.3:1))*strength*(1-mitigation(effectiveStats(save),save.armor))*100)/100));
     if(barrierActive) splash();
     if(damage===0){notify('Water barrier absorbed the attack.');return false;}
     save.health=Math.max(0,Math.round((save.health-damage)*100)/100);
@@ -537,22 +561,22 @@ export function createEncounters(
   function prepareCave(cave:BossCave,advance=true){
     let run=save.caveRuns[cave.id];
     if(!run){
-      run={cycle:1,readyAt:0};save.caveRuns[cave.id]=run;
+      run={cycle:1,readyAt:0,rewardVersion:2};save.caveRuns[cave.id]=run;
     }
     if(advance&&run.readyAt&&Date.now()>=run.readyAt&&save.opened.includes(caveRewardId(cave,run.cycle))){
-      run={cycle:run.cycle+1,readyAt:0};save.caveRuns[cave.id]=run;
+      run={cycle:run.cycle+1,readyAt:0,rewardVersion:2};save.caveRuns[cave.id]=run;
     }
     const id=caveBossId(cave,run.cycle), rewardId=caveRewardId(cave,run.cycle);
     for(let i=enemies.length-1;i>=0;i--){
       const enemy=enemies[i];
       if(enemy.id.startsWith('cave-'+cave.id+'-')&&enemy.id!==id) removeRoamer(i);
     }
-    if(!run.readyAt&&!enemies.some(enemy=>enemy.id===id)) createEnemy(id,cave.kind,{x:0,z:cave.arena-7});
+    if(!run.readyAt&&!enemies.some(enemy=>enemy.id===id)) createEnemy(id,cave.kind,caveBossPoint(cave));
     const previous=caveRewards.get(cave.id);
     if(previous?.chest.id!==rewardId){
       if(previous){previous.view.dispose();group.remove(previous.group);}
-      const chest:Chest={id:rewardId,x:0,z:cave.arena-10,rarity:cave.rarity,weapon:cave.weapon,armorPiece:cave.armor,
-        gold:cave.gold,armor:cave.kind==='warlord'?10:13};
+      const chest:Chest={id:rewardId,...caveTreasurePoint(cave),rarity:caveRewardTier(cave,run,save.seed),weapon:cave.weapon,
+        armorPiece:caveRewardArmor(cave,run,save.seed),gold:cave.gold,armor:cave.rating};
       const holder=new T.Group();group.add(holder);
       caveRewards.set(cave.id,{chest,group:holder,view:chestModels(holder,[chest],save.opened)});
     }
@@ -571,7 +595,7 @@ export function createEncounters(
   const atCamp=()=> Math.hypot(player.position.x+45,player.position.z)<4 ||
     Math.hypot(player.position.x-154,player.position.z-103)<4;
   return {
-    feedback:notify,prepareCave,
+    feedback:notify,prepareCave,blockedByBoss:arts.blocks,
     extractShadow:shadows.extract,toggleShadow:shadows.toggle,summonAllShadows:shadows.summonAll,
     dismissAllShadows:shadows.dismissAll,renameShadow:shadows.rename,shadowCommand:shadows.command,
     encounterMarkers(){
@@ -618,7 +642,13 @@ export function createEncounters(
       fx.emit(point,0x805eff,'ring',.43,.48,{grow:6.4,y:.19,delay:.07});
       fx.scatter(point,0x91e7ff,15,.98);
     },
-    transition(){spawnClock=.6;shadows.transition();slowUntil=0;arcane.clear();combatUntil=0;knockback.set(0,0);magic.reset();fx.clear();queued=undefined;rangeTimer.cancel();echoLife=shake=0;echo.visible=false;},
+    transition(){spawnClock=.6;arts.clear();
+      for(let i=enemies.length-1;i>=0;i--) if(enemies[i].summonedBy) removeRoamer(i);
+      for(const enemy of enemies) if(isAdvancedBoss(enemy.kind)){
+        enemy.bossCast=undefined;enemy.windup=0;enemy.charge=0;enemy.cooldown=.62;
+        enemy.root.position.y=surface(enemy.root.position.x,enemy.root.position.z);
+      }
+      shadows.transition();slowUntil=0;arcane.clear();combatUntil=0;knockback.set(0,0);magic.reset();fx.clear();queued=undefined;rangeTimer.cancel();echoLife=shake=0;echo.visible=false;},
     get bossHealth(){
       const floor=towerFloorAt(player.position.z);
       const kind=caveAt(player.position.z)?.kind??(floor?.number===5?'sentinel':inDen(player.position.z)?'guardian':undefined);
@@ -646,7 +676,7 @@ export function createEncounters(
     },
     interact(){
       if(!save.health){
-        arcane.clear();fx.clear();
+        arcane.clear();arts.clear();fx.clear();
         player.position.set(spawn.x,surface(spawn.x,spawn.z),spawn.z);
         player.rotation.y=0;
         save.health=maxHealth();shadows.transition();
@@ -684,10 +714,10 @@ export function createEncounters(
           save.potions+=bonus.potions;
           const cave=caveAt(chest.z);
           const material=cave?'Magic Crystal':bonus.material;
-          const count=cave?(cave.kind==='frostGuardian'?9:5):bonus.count;
+          const count=cave?.crystals??bonus.count;
           save.materials[material]=(save.materials[material]??0)+count;
           if(cave){
-            save.potions+=cave.kind==='frostGuardian'?4:2;
+            save.potions+=cave.potions;
             fx.emit(chest,0xffc779,'ray',1.14,.92,{y:1.48,aspect:3.6,opacity:.59});
           }
           fx.treasure(chest,Number.parseInt(rarity[chest.rarity].color.slice(1),16),rarityOrder.indexOf(chest.rarity));
@@ -759,6 +789,11 @@ export function createEncounters(
       }
       magic.update(dt);
       arcane.update(dt,blocking);
+      arts.update(dt,blocking);
+      for(let i=enemies.length-1;i>=0;i--){
+        const enemy=enemies[i];
+        if(enemy.summonedBy&&(!enemies.some(owner=>owner.id===enemy.summonedBy&&owner.hp>0)||!enemy.hp&&enemy.collapse>=1)) removeRoamer(i);
+      }
       shadows.update(dt,enemies,(enemy,damage,frost)=>{
         if(frost) enemy.statuses.slow();
         hitEnemy(enemy,damage,frost?'ice':null);
@@ -868,15 +903,17 @@ export function createEncounters(
         enemy.hitFlash=Math.max(0,enemy.hitFlash-dt);
         let gait=0;
         const previousX=p.x, previousZ=p.z;
-        const shadow=enemy.cooldown===0&&!enemy.wizard&&!enemy.windup&&!enemy.charge&&gap>spec.reach
+        const shadow=enemy.cooldown===0&&!isAdvancedBoss(enemy.kind)&&!enemy.wizard&&!enemy.windup&&!enemy.charge&&gap>spec.reach
           ? shadows.guardTarget(enemy,spec.reach+.27):undefined;
         if(enemy.statuses.halted){
-          enemy.windup=0; enemy.charge=0; enemy.chargeWindup=false;enemy.slam=undefined;enemy.spell=undefined;enemy.spellTarget=undefined;enemy.sentinelMove=undefined;enemy.shadowTarget=undefined;
+          enemy.windup=0; enemy.charge=0; enemy.chargeWindup=false;enemy.slam=undefined;enemy.spell=undefined;enemy.spellTarget=undefined;enemy.sentinelMove=undefined;enemy.shadowTarget=undefined;enemy.bossCast=undefined;
+        } else if(arts.flying(enemy)){
+          gait=.44;
         } else if(shadow){
           enemy.shadowTarget=shadow;enemy.windup=spec.windup;
         } else if(enemy.charge>0){
           enemy.charge=Math.max(0,enemy.charge-dt);
-          const speed=(enemy.kind==='sentinel'||enemy.kind==='warlord')?(enemy.enraged?23:19):enemy.kind==='assassin'?19:16;
+          const speed=enemy.kind==='infernalGolem'?19:(enemy.kind==='sentinel'||enemy.kind==='warlord')?(enemy.enraged?23:19):enemy.kind==='assassin'?19:16;
           const x=p.x+Math.sin(enemy.heading)*dt*speed,z=p.z+Math.cos(enemy.heading)*dt*speed;
           if(canWalk(x,z)&&spaceAround(enemy,x,z)){p.x=x;p.z=z;gait=1;}
           else enemy.charge=0;
@@ -901,6 +938,12 @@ export function createEncounters(
             if(enemy.shadowTarget){
               shadows.hit(enemy.shadowTarget,enemy,spec.damage,spec.reach+.38);
               enemy.shadowTarget=undefined;
+            }else if(enemy.bossCast){
+              const cast=enemy.bossCast;enemy.bossCast=undefined;
+              arts.resolve(enemy,cast);
+              if(cast.move==='rush'){enemy.charge=.62;enemy.chargeHit=false;}
+              if(cast.move==='air') enemy.cooldown=2.15;
+              else if(cast.move==='meteor') enemy.cooldown=1.8;
             }else if(enemy.sentinelMove){
               const move=enemy.sentinelMove;
               enemy.sentinelMove=undefined;
@@ -955,6 +998,10 @@ export function createEncounters(
             } else if(aggro && gap<spec.reach+.35 && Math.abs(player.position.y-p.y)<1.9 &&
               clearLine(p.x,p.z,player.position.x,player.position.z)) hitPlayer(enemy,blocking);
           }
+        } else if(isAdvancedBoss(enemy.kind)&&aggro&&enemy.cooldown===0&&gap<(enemy.kind==='infernalGolem'?14:enemy.kind==='skeletonKing'?12:24)&&
+          clearLine(p.x,p.z,player.position.x,player.position.z)){
+          const cast=arts.start(enemy,enemy.strikes++);
+          if(cast){enemy.bossCast=cast;enemy.heading=cast.yaw;enemy.windup=cast.duration;}
         } else if((enemy.kind==='sentinel'||enemy.kind==='warlord')&&aggro&&enemy.cooldown===0&&gap<13&&
           clearLine(p.x,p.z,player.position.x,player.position.z)){
           enemy.heading=Math.atan2(player.position.x-p.x,player.position.z-p.z);
@@ -971,7 +1018,7 @@ export function createEncounters(
             if(!canWalk(x,z)) break;
             fx.emit({x,z},color,'ring',1.08,enemy.windup,{opacity:.64});
           }
-        } else if(enemy.wizard&&aggro&&enemy.cooldown===0&&gap<spec.reach&&
+        } else if(enemy.wizard&&!isAdvancedBoss(enemy.kind)&&aggro&&enemy.cooldown===0&&gap<spec.reach&&
           clearLine(p.x,p.z,player.position.x,player.position.z)){
           const cold=enemy.kind==='frostGuardian', elite=cold||enemy.kind==='ritualElite';
           enemy.strikes++;
@@ -1005,7 +1052,7 @@ export function createEncounters(
             if(!canWalk(point.x,point.z)) break;
             fx.emit(point,0xe69c51,'ring',1.15,enemy.windup,{opacity:.55});
           }
-        } else if(!enemy.wizard&&enemy.kind!=='sentinel'&&enemy.kind!=='warlord'&&aggro&&!enemy.retreat&&gap<spec.reach&&enemy.cooldown===0&&clearLine(p.x,p.z,player.position.x,player.position.z)){
+        } else if(!enemy.wizard&&!isAdvancedBoss(enemy.kind)&&enemy.kind!=='sentinel'&&enemy.kind!=='warlord'&&aggro&&!enemy.retreat&&gap<spec.reach&&enemy.cooldown===0&&clearLine(p.x,p.z,player.position.x,player.position.z)){
           enemy.windup=spec.windup;
         } else if(!aggro||gap>spec.reach-.18||enemy.retreat||enemy.kind==='assassin'||enemy.wizard){
           const backAway=enemy.wizard&&aggro&&gap<7.5;
@@ -1038,7 +1085,7 @@ export function createEncounters(
             tryStep(0)||tryStep(.87)||tryStep(-.87);
           }
         }
-        if(enemy.windup>0&&!enemy.chargeWindup&&!enemy.slam&&!enemy.sentinelMove){
+        if(enemy.windup>0&&!enemy.chargeWindup&&!enemy.slam&&!enemy.sentinelMove&&!enemy.bossCast){
           const q=enemy.shadowTarget?shadows.guardPoint(enemy.shadowTarget)??player.position:player.position;
           enemy.heading=Math.atan2(q.x-p.x,q.z-p.z);
         }
@@ -1046,7 +1093,7 @@ export function createEncounters(
         const facing=Math.atan2(Math.sin(angle),Math.cos(angle));
         root.rotation.y+=facing*(1-Math.exp(-10*dt));
         enemy.turn=T.MathUtils.damp(enemy.turn,T.MathUtils.clamp(facing*1.7,-1,1),9,dt);
-        p.y=surface(p.x,p.z);
+        p.y=surface(p.x,p.z)+arts.altitude(enemy);
         const travelled=Math.hypot(p.x-previousX,p.z-previousZ);
         const speed=travelled/Math.max(.001,dt);
         const stride=enemy.wolfRig?Math.min(1,speed/Math.max(3.8,spec.speed)):gait;
@@ -1056,16 +1103,16 @@ export function createEncounters(
             ? travelled*Math.PI*2/((.52+enemy.gait*1.60)*spec.scale)
             : dt*(3.1+enemy.gait*9.4);
         }
-        const leapDuration=(enemy.kind==='sentinel'||enemy.kind==='warlord')?(enemy.enraged?.55:.48):enemy.kind==='guardian'?.65:.43;
+        const leapDuration=enemy.kind==='infernalGolem'?.62:(enemy.kind==='sentinel'||enemy.kind==='warlord')?(enemy.enraged?.55:.48):enemy.kind==='guardian'?.65:.43;
         const sentinelWindup=enemy.sentinelMove
           ? (enemy.sentinelMove==='shock'?1.18:enemy.sentinelMove==='shadow'?.87:.98)*(enemy.enraged?.72:1) : 0;
-        const currentWindup=sentinelWindup||(enemy.spell==='domain'?1.04:enemy.spell==='shield'?.63:enemy.slam?1.27:enemy.chargeWindup?(enemy.kind==='guardian'?1.15:enemy.kind==='assassin'?.51:.89):spec.windup);
+        const currentWindup=enemy.bossCast?.duration||sentinelWindup||(enemy.spell==='domain'?1.04:enemy.spell==='shield'?.63:enemy.slam?1.27:enemy.chargeWindup?(enemy.kind==='guardian'?1.15:enemy.kind==='assassin'?.51:.89):spec.windup);
         enemy.anticipation=T.MathUtils.damp(enemy.anticipation,
           enemy.windup>0?Math.min(1,(1-enemy.windup/currentWindup)*1.5+.22):0,enemy.windup>0?12:20,dt);
         enemy.animate({time,phase:enemy.posePhase,gait:enemy.gait,
           windup:enemy.anticipation,
           recovery:Math.max(0,1-enemy.impactAge/.33),hit:enemy.hitFlash/.22,
-          leap:enemy.charge>0&&enemy.kind!=='guardian'?Math.sin(Math.PI*enemy.charge/leapDuration):0,
+          leap:arts.flying(enemy)?Math.max(.35,arts.altitude(enemy)/3.3):enemy.charge>0&&enemy.kind!=='guardian'?Math.sin(Math.PI*enemy.charge/leapDuration):0,
           dead:0,frozen:status==='frozen',turn:enemy.turn,alert:enemy.enraged?2:aggro?1:0,distance:gap});
 
       }
@@ -1130,7 +1177,7 @@ export function createEncounters(
       models.dispose();skeletons.dispose();goblins.dispose();orcs.dispose();wizards.dispose();
       affinityGeometry.dispose();Object.values(affinities).forEach(material=>material.dispose());
       for(const resource of [barGeometry,backing,red,alert,lootGeometry,drawstring,lootFang,lootCoin,bagTie,boneLoot,metalLoot,lootBeamGeometry,lootMaterial,sparkGeometry,sparks.material,echoMaterial]) resource.dispose();
-      shadows.dispose();spectral.dispose();fx.dispose();
+      shadows.dispose();spectral.dispose();elementals.dispose();arts.dispose();fx.dispose();
       chestViews.dispose();
       for(const enemy of enemies){enemy.loot.material.dispose();enemy.beam.material.dispose();enemy.title?.material.dispose();}
       for(const texture of labels.values()) texture.dispose();

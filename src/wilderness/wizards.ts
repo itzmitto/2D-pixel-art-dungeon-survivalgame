@@ -89,7 +89,9 @@ export function wizardModels(){
         for(let i=0;i<5;i++) relics.push(meshPart(root,crystal,light,0,1,0));
       }
       const shoes=[-1,1].map(side=>meshPart(pelvis,foot,wood,side*.115,-1.075));
-      root.remove(...relics);batch.bake(root);root.add(...relics);
+      if(relics.length) root.remove(...relics);
+      batch.bake(root);
+      if(relics.length) root.add(...relics);
       const barrier=new T.Mesh(orb,veil);barrier.position.y=1.17;barrier.scale.set(.92,1.46,.92);
       barrier.visible=false;root.add(barrier);
       return {root,barrier,animate(p){
