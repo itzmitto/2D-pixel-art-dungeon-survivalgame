@@ -1,3 +1,4 @@
+import { shadowArmy } from './shadowArmy.ts';
 import { caveAt, caveBossId, caveRewardId, type BossCave } from './bossCaves.ts';
 import { briarWatch, floorRemaining, towerFloorAt, towerFloors } from './briarWatch.ts';
 import { hollowSentinel } from './sentinel.ts';
@@ -115,6 +116,7 @@ export function createEncounters(
   const notify=(message:string)=>{
     notification=message; noticeUntil=time+notificationsSeconds; changed();
   };
+  const shadows=shadowArmy(group,player,save,kind=>models.make(kind,true),canWalk,clearLine,fx,notify,changed);
   const barGeometry=new T.PlaneGeometry(1.2,.115);
   const backing=new T.MeshBasicMaterial({color:'#251919',depthWrite:false});
   const red=new T.MeshBasicMaterial({color:'#ba5447',depthWrite:false});
@@ -135,7 +137,7 @@ export function createEncounters(
     affinity:T.Mesh<T.BufferGeometry,T.MeshBasicMaterial>;
     target:SpellTarget; roaming:boolean; elite:boolean; level:number; announced:boolean; title?:T.Sprite; patrol:boolean;
     wolfRig:boolean; turn:number; wizard:boolean; barrier?:T.Mesh; ward:number;
-    spell?:'bolt'|'domain'|'shield'; wardCool:number; spellTarget?:{x:number;z:number}; slam?:{x:number;z:number}; sentinelMove?:'cleave'|'shock'|'shadow'; enraged?:boolean;
+    spell?:'bolt'|'domain'|'shield'; wardCool:number; spellTarget?:{x:number;z:number}; slam?:{x:number;z:number}; sentinelMove?:'cleave'|'shock'|'shadow'; shadowTarget?:string; enraged?:boolean;
     posePhase:number; gait:number; anticipation:number; collapse:number; impactAge:number; retreat:number; strikes:number;
 
     id:string; kind:MonsterKind; spec:EnemySpec; home:T.Vector3; hp:number; hpBar:T.Group; fill:T.Mesh;
@@ -292,6 +294,7 @@ export function createEncounters(
     enemy.loot.material.dispose();enemy.beam.material.dispose();
     const pool=rigPool.get(enemy.kind)??[];
     if(enemy.roaming&&pool.length<4){pool.push({root:enemy.root,animate:enemy.animate,barrier:enemy.barrier});rigPool.set(enemy.kind,pool);}
+    shadows.forget(enemy.id);
     enemy.hp=0;
     targets.splice(targets.indexOf(enemy.target),1);
     enemies.splice(index,1);
@@ -422,6 +425,7 @@ export function createEncounters(
       return;
     }
     enemy.collapse=0;
+    shadows.award(enemy.id,enemy.spec.xp);
     if(enemy.barrier) enemy.barrier.visible=false;
     const cave=caveAt(enemy.home.z);
     if(cave&&enemy.id.startsWith('cave-')){
@@ -451,6 +455,10 @@ export function createEncounters(
     if(piece) save.drops[enemy.id].armorPiece=piece;
     enemy.loot.material.color.set(rarity[save.drops[enemy.id].rarity].color);
     if(!enemy.roaming&&enemy.spec.respawn&&!enemy.id.startsWith('den-')&&!enemy.id.startsWith('tower-')) save.returns[enemy.id]=Date.now()+30_000+Math.floor(rand()*30_000);
+    if(enemy.kind==='wild'||enemy.kind==='dire'){
+      const cycle=save.returns[enemy.id]??0;
+      shadows.remember(enemy.id+'-'+cycle,enemy.kind,enemy.level,enemy.spec.health,enemy.spec.damage,enemy.root.position);
+    }
     oldDefeats.add(enemy.id);
     save.defeated=[...oldDefeats];
     save.kills++;
@@ -552,6 +560,7 @@ export function createEncounters(
     Math.hypot(player.position.x-154,player.position.z-103)<4;
   return {
     feedback:notify,prepareCave,
+    extractShadow:shadows.extract,toggleShadow:shadows.toggle,summonAllShadows:shadows.summonAll,
     get movementFactor(){return time<slowUntil?.64:1;},
     get inCombat(){
       return time<combatUntil||arcane.active||rangeTimer.busy||!!queued||magic.dashing||
@@ -579,7 +588,7 @@ export function createEncounters(
       fx.emit(point,0x805eff,'ring',.43,.48,{grow:6.4,y:.19,delay:.07});
       fx.scatter(point,0x91e7ff,15,.98);
     },
-    transition(){spawnClock=.6;slowUntil=0;arcane.clear();combatUntil=0;knockback.set(0,0);magic.reset();fx.clear();queued=undefined;rangeTimer.cancel();echoLife=shake=0;echo.visible=false;},
+    transition(){spawnClock=.6;shadows.transition();slowUntil=0;arcane.clear();combatUntil=0;knockback.set(0,0);magic.reset();fx.clear();queued=undefined;rangeTimer.cancel();echoLife=shake=0;echo.visible=false;},
     get bossHealth(){
       const floor=towerFloorAt(player.position.z);
       const kind=caveAt(player.position.z)?.kind??(floor?.number===5?'sentinel':inDen(player.position.z)?'guardian':undefined);
@@ -610,7 +619,7 @@ export function createEncounters(
         arcane.clear();fx.clear();
         player.position.set(spawn.x,surface(spawn.x,spawn.z),spawn.z);
         player.rotation.y=0;
-        save.health=maxHealth();
+        save.health=maxHealth();shadows.transition();
         notify('Returned to Ember Clearing.');
         return;
       }
@@ -672,7 +681,7 @@ export function createEncounters(
         loot?(loot.kind==='wild'?'E · Collect wolf loot':'E · Collect monster loot'):
         chest?(chest.guardians?.some(id=>!oldDefeats.has(id))?'Sealed chest · Defeat the guardians':'E · Open '+chest.rarity+' Chest'):
         atCamp()&&save.health<maxHealth()?'E · Rest at campfire':'';
-      return {notification,prompt};
+      return {notification,prompt,shadowAvailable:!!shadows.available()};
     },
     update(dt:number,blocking:boolean){
       time+=dt;
@@ -717,6 +726,7 @@ export function createEncounters(
       }
       magic.update(dt);
       arcane.update(dt,blocking);
+      shadows.update(dt,enemies,(enemy,damage)=>hitEnemy(enemy as Enemy,damage));
       waterTime-=dt;
       if(magic.shield.active&&waterTime<=0){
         waterTime=.16;
@@ -819,8 +829,12 @@ export function createEncounters(
         enemy.hitFlash=Math.max(0,enemy.hitFlash-dt);
         let gait=0;
         const previousX=p.x, previousZ=p.z;
+        const shadow=enemy.cooldown===0&&!enemy.wizard&&!enemy.windup&&!enemy.charge&&gap>spec.reach
+          ? shadows.guardTarget(enemy,spec.reach+.27):undefined;
         if(enemy.statuses.halted){
-          enemy.windup=0; enemy.charge=0; enemy.chargeWindup=false;enemy.slam=undefined;enemy.spell=undefined;enemy.spellTarget=undefined;enemy.sentinelMove=undefined;
+          enemy.windup=0; enemy.charge=0; enemy.chargeWindup=false;enemy.slam=undefined;enemy.spell=undefined;enemy.spellTarget=undefined;enemy.sentinelMove=undefined;enemy.shadowTarget=undefined;
+        } else if(shadow){
+          enemy.shadowTarget=shadow;enemy.windup=spec.windup;
         } else if(enemy.charge>0){
           enemy.charge=Math.max(0,enemy.charge-dt);
           const speed=(enemy.kind==='sentinel'||enemy.kind==='warlord')?(enemy.enraged?23:19):enemy.kind==='assassin'?19:16;
@@ -845,7 +859,10 @@ export function createEncounters(
             enemy.cooldown=spec.recovery;
             enemy.impactAge=0;
             if((enemy.kind==='goblin'||enemy.kind==='assassin')&&++enemy.strikes%2===0) enemy.retreat=.72;
-            if(enemy.sentinelMove){
+            if(enemy.shadowTarget){
+              shadows.hit(enemy.shadowTarget,enemy,spec.damage,spec.reach+.38);
+              enemy.shadowTarget=undefined;
+            }else if(enemy.sentinelMove){
               const move=enemy.sentinelMove;
               enemy.sentinelMove=undefined;
               enemy.cooldown=enemy.enraged?1.03:1.52;
@@ -859,6 +876,8 @@ export function createEncounters(
                 fx.emit(p,0xcd9fff,'ring',.77,.33,{grow:reach/.33,y:.18});
                 fx.scatter(p,color,12,.74);shake=Math.max(shake,.76);
                 if(gap<reach&&clearLine(p.x,p.z,player.position.x,player.position.z)) hitPlayer(enemy,blocking,true);
+                const shadow=shadows.guardTarget(enemy,reach);
+                if(shadow) shadows.hit(shadow,enemy,spec.damage,reach);
               }else{
                 fx.emit(p,color,'arc',3.11,.36,{yaw:enemy.heading,y:1.1,aspect:1.43,grow:1.8});
                 fx.emit(p,0xe4b9ff,'arc',2.71,.26,{yaw:enemy.heading,y:.84,opacity:.78});
@@ -866,7 +885,7 @@ export function createEncounters(
                   clearLine(p.x,p.z,player.position.x,player.position.z)) hitPlayer(enemy,blocking);
               }
             } else if(enemy.spell){
-              const spell=enemy.spell,elite=enemy.kind==='ritualElite';
+              const spell=enemy.spell,cold=enemy.kind==='frostGuardian',elite=cold||enemy.kind==='ritualElite';
               enemy.spell=undefined;
               if(spell==='shield'){
                 enemy.ward=elite?5.3:4.1;enemy.wardCool=elite?13:16;
@@ -980,7 +999,10 @@ export function createEncounters(
             tryStep(0)||tryStep(.87)||tryStep(-.87);
           }
         }
-        if(enemy.windup>0&&!enemy.chargeWindup&&!enemy.slam&&!enemy.sentinelMove) enemy.heading=Math.atan2(player.position.x-p.x,player.position.z-p.z);
+        if(enemy.windup>0&&!enemy.chargeWindup&&!enemy.slam&&!enemy.sentinelMove){
+          const q=enemy.shadowTarget?shadows.guardPoint(enemy.shadowTarget)??player.position:player.position;
+          enemy.heading=Math.atan2(q.x-p.x,q.z-p.z);
+        }
         const angle=enemy.heading-root.rotation.y;
         const facing=Math.atan2(Math.sin(angle),Math.cos(angle));
         root.rotation.y+=facing*(1-Math.exp(-10*dt));
@@ -1015,7 +1037,7 @@ export function createEncounters(
         reward.group.visible=caveAt(player.position.z)?.id===id&&!!save.caveRuns[id]?.readyAt;
         if(reward.group.visible) reward.view.update(dt,save.defeatedBosses,save.opened,save.defeated);
       }
-      fx.update(dt);
+      fx.update(dt);shadows.render();
       fx.barrier(player.position,magic.shield.active);
       echoLife=Math.max(0,echoLife-dt);
       echo.visible=echoLife>0;
@@ -1069,7 +1091,7 @@ export function createEncounters(
       models.dispose();skeletons.dispose();goblins.dispose();orcs.dispose();wizards.dispose();
       affinityGeometry.dispose();Object.values(affinities).forEach(material=>material.dispose());
       for(const resource of [barGeometry,backing,red,alert,lootGeometry,drawstring,lootFang,lootCoin,bagTie,boneLoot,metalLoot,lootBeamGeometry,lootMaterial,sparkGeometry,sparks.material,echoMaterial]) resource.dispose();
-      fx.dispose();
+      shadows.dispose();fx.dispose();
       chestViews.dispose();
       for(const enemy of enemies){enemy.loot.material.dispose();enemy.beam.material.dispose();enemy.title?.material.dispose();}
       for(const texture of labels.values()) texture.dispose();

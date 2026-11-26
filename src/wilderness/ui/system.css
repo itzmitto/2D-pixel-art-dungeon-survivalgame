@@ -266,3 +266,14 @@ body:has([data-overlay-closing=true]) .system-tooltip { opacity:0; }
   background:linear-gradient(120deg,#2a1844e8,#0d0b1fee);
 }
 .tower-hud span { color:#d7b9f2; }
+
+.shadow-overview { display:flex; flex-wrap:wrap; gap:.65rem 1rem; align-items:center; margin-bottom:1rem; }
+.shadow-overview span { color:#9cdbff; }
+.shadow-overview button { margin-left:auto; }
+.shadow-list { list-style:none; padding:0; margin:0; display:grid; gap:.46rem; }
+.shadow-list li { display:grid; grid-template-columns:2.4rem 1fr minmax(7.5rem,.8fr) auto; align-items:center; gap:.5rem; padding:.45rem .6rem;
+  background:linear-gradient(110deg,#30224cb9,#130f27bb); border:1px solid #7962a48c; clip-path:var(--cut); }
+.shadow-list small { display:block; font-size:.75rem; }
+.shadow-mark { width:2.2rem; height:2.2rem; filter:drop-shadow(0 0 6px #6b7cde); }
+.shadow-available { color:#bbe8ff!important; font-weight:700; text-shadow:0 0 11px #5e8dff,0 1px 3px #101226!important; }
+@media(max-width:600px){ .shadow-list li {grid-template-columns:2.2rem 1fr auto;} .shadow-list li div:nth-of-type(2){grid-column:2;} }

@@ -1,3 +1,5 @@
+import { caveAt } from './bossCaves';
+import { ShadowArmyPanel } from './ui/ShadowArmyPanel';
 import { briarWatch, towerFloorAt, floorRemaining } from './briarWatch';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { den } from './denLayout';
@@ -21,10 +23,10 @@ const weaponLab=import.meta.env.DEV && new URLSearchParams(window.location.searc
 export default function Wilderness() {
   const canvas=useRef<HTMLCanvasElement>(null);
   const mapButton=useRef<HTMLButtonElement>(null);
-  const open=useRef<'map'|'bag'|'status'|null>(null);
-  const [panel,setPanel]=useState<'map'|'bag'|'status'|null>(null);
+  const open=useRef<'map'|'bag'|'status'|'shadows'|null>(null);
+  const [panel,setPanel]=useState<'map'|'bag'|'status'|'shadows'|null>(null);
   const [hero,setHero]=useState(newExploration);
-  const [message,setMessage]=useState({notification:'',prompt:'',cooldown:0,bossHealth:0});
+  const [message,setMessage]=useState({notification:'',prompt:'',cooldown:0,bossHealth:0,shadowAvailable:false});
   const controller=useRef<ReturnType<typeof startWilderness>|null>(null);
   const [notices,setNotices]=useState<Notice[]>([]);
   const [closing,setClosing]=useState(false);
@@ -103,7 +105,8 @@ export default function Wilderness() {
       },closeOnly=>showPanel(closeOnly||open.current==='map'?null:'map'),()=>open.current!==null,
       ()=>showPanel(open.current==='bag'?null:'bag'),
       ()=>showPanel(open.current==='status'?null:'status'),
-      (notification,prompt,cooldown,bossHealth)=>setMessage({notification,prompt,cooldown,bossHealth}),
+      ()=>showPanel(open.current==='shadows'?null:'shadows'),
+      (notification,prompt,cooldown,bossHealth,shadowAvailable)=>setMessage({notification,prompt,cooldown,bossHealth,shadowAvailable}),
       ()=>{
         dirty=true;
         setHero({...save});
@@ -132,8 +135,9 @@ export default function Wilderness() {
 
   const equip=useCallback((type:WeaponId,id:string)=>controller.current?.equip(type,id),[]);
   const floor=towerFloorAt(position.z);
-  const boss=floor?.number===5?monsters.sentinel:monsters.guardian;
-  const announcement=/^(Elite encountered|Boss encounter|Boss phase II|Briar Watch · Floor) · (.+)$/.exec(message.notification);
+  const cave=caveAt(position.z);
+  const boss=cave?monsters[cave.kind]:floor?.number===5?monsters.sentinel:monsters.guardian;
+  const announcement=/^(Elite encountered|Boss encounter|Boss phase II|Cave victory|Cave reward|Shadow extracted|Briar Watch · Floor) · (.+)$/.exec(message.notification);
   const visibleNotices=announcement
     ? [...notices,{kind:announcement[1].startsWith('Boss')?'boss':'dungeon',title:announcement[1],detail:announcement[2]} as Notice]
     : notices;
@@ -147,15 +151,17 @@ export default function Wilderness() {
       <span>{floorRemaining(floor,hero.defeated)} remaining</span>
     </aside>}
     {!!message.bossHealth&&<div className="guardian-health">
-      <strong>{boss.name}{floor?.number===5&&message.bossHealth<=boss.health*.5?' · Phase II':''}</strong>
+      <strong>{boss.name}{(cave||floor?.number===5)&&message.bossHealth<=boss.health*.5?' · Phase II':''}</strong>
       <progress className="system-meter health" aria-label={boss.name+' health'} value={message.bossHealth} max={boss.health}/>
     </div>}
     <nav className="system-nav"><button ref={mapButton} onClick={()=>showPanel(open.current==='map'?null:'map')} aria-expanded={panel==='map'}>Map · M</button>
       <button onClick={()=>showPanel(open.current==='bag'?null:'bag')} aria-expanded={panel==='bag'}>Inventory · Tab</button>
-      <button onClick={()=>showPanel(open.current==='status'?null:'status')} aria-expanded={panel==='status'}>Status · P</button></nav>
+      <button onClick={()=>showPanel(open.current==='status'?null:'status')} aria-expanded={panel==='status'}>Status · P</button>
+      <button onClick={()=>showPanel(open.current==='shadows'?null:'shadows')} aria-expanded={panel==='shadows'}>Shadows · K</button></nav>
     {error && <p className="wild-error" role="alert">{error}</p>}
     <footer>
       {clearing(position.x,position.z)<10 && <p>Ember Clearing · Campfire nearby</p>}
+      {message.shadowAvailable&&<p className="shadow-available">SHADOW AVAILABLE · F — Extract Shadow</p>}
       {message.prompt && <p>{message.prompt}</p>}
       {message.notification && !announcement && <p role="status">{message.notification}</p>}
       {saveNotice && <p role="status">{saveNotice}</p>}
@@ -163,9 +169,11 @@ export default function Wilderness() {
       <HunterHotbar hero={hero} locked={!!panel} cooldown={message.cooldown} equip={equip}/>
       <small>WASD Move · E Interact · Q Ability · R Potion · H Horse · M Atlas</small>
     </footer>
+    {panel==='shadows'&&<ShadowArmyPanel hero={hero} close={()=>showPanel(null)}
+      toggle={id=>controller.current?.toggleShadow(id)} summonAll={()=>controller.current?.summonAllShadows()}/>}
     {panel==='status' && <CharacterStatus hero={hero} close={()=>showPanel(null)} spend={stat=>controller.current?.allocate(stat)}/>}
     {panel==='map' && <WorldMap position={position} discovered={discovered}
-      opened={hero.opened} towerCleared={hero.completedDungeons.includes(briarWatch.id)} defeated={hero.defeated} waystonesActive={hero.waystones} seenChests={hero.seenChests} travel={id=>{
+      caveRuns={hero.caveRuns} opened={hero.opened} towerCleared={hero.completedDungeons.includes(briarWatch.id)} defeated={hero.defeated} waystonesActive={hero.waystones} seenChests={hero.seenChests} travel={id=>{
         const error=controller.current?.travelTo(id)??'Travel is unavailable.';
         if(!error) showPanel(null);
         return error;

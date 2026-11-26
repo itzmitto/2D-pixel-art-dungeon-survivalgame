@@ -31,7 +31,8 @@ export function startWilderness(
   uiOpen:()=>boolean,
   onInventory:()=>void,
   onStatus:()=>void,
-  onCombat:(notification:string,prompt:string,cooldown:number,bossHealth:number)=>void,
+  onShadows:()=>void,
+  onCombat:(notification:string,prompt:string,cooldown:number,bossHealth:number,shadowAvailable:boolean)=>void,
   onSaveChange:()=>void,
 ) {
   const context=canvas.getContext('webgl2',{antialias:true});
@@ -89,7 +90,7 @@ export function startWilderness(
     return true;
   }
   const nearStone=()=>waystones.find(stone=>Math.hypot(body.position.x-stone.x,body.position.z-stone.z)<3.65);
-  let blocking=false, frameDelta=0, prompt='', notification='', abilitySeconds=0,bossHealth=0;
+  let blocking=false, frameDelta=0, prompt='', notification='', abilitySeconds=0,bossHealth=0,shadowAvailable=false;
   function equip(id:WeaponId,itemId?:string){
     const best=save.items.filter(item=>item.type===id).sort((a,b)=>rarity[b.rarity].multiplier-rarity[a.rarity].multiplier)[0];
     const item=itemId?save.items.find(entry=>entry.id===itemId&&entry.type===id):best;
@@ -102,7 +103,7 @@ export function startWilderness(
     save.selectedItem=item.id;
     knight.equip(id,item.rarity);
     abilitySeconds=Math.ceil(encounters.abilityRemaining);
-    onCombat(notification,prompt,abilitySeconds,bossHealth);
+    onCombat(notification,prompt,abilitySeconds,bossHealth,shadowAvailable);
     onSaveChange();
   }
   const destination=body.position.clone();
@@ -222,18 +223,20 @@ export function startWilderness(
   resize();
   window.addEventListener('keydown',e=>{
     if(e.ctrlKey||e.altKey||e.metaKey||travel) return;
-    if(e.code==='KeyM'||e.code==='Tab'||e.code==='KeyP'||(e.code==='Escape'&&uiOpen())){
+    if(e.code==='KeyM'||e.code==='Tab'||e.code==='KeyP'||e.code==='KeyK'||(e.code==='Escape'&&uiOpen())){
       e.preventDefault();
       keys.clear();
       blocking=false;
       if(!e.repeat){
         if(e.code==='Tab') onInventory();
         else if(e.code==='KeyP') onStatus();
+        else if(e.code==='KeyK') onShadows();
         else onMapKey(e.code==='Escape');
       }
       return;
     }
     if(!uiOpen()&&!e.repeat){
+      if(e.code==='KeyF'){e.preventDefault();encounters.extractShadow();}
       if(e.code==='KeyH'){e.preventDefault();handleHorse();}
       if(e.code==='KeyQ'&&!blocking){
         e.preventDefault();
@@ -309,6 +312,7 @@ export function startWilderness(
           body.rotation.y=next.yaw;
           focus.set(next.x,body.position.y+.75,next.z);
           onPosition(next);
+          encounters.transition();
           encounters.waystoneEffect();
         }
         body.visible=travel.remaining>.64||travel.remaining<.35;
@@ -378,9 +382,9 @@ export function startWilderness(
         const stone=save.health?nearStone():undefined;
         if(stone) view.prompt=save.waystones.includes(stone.id)?'M · Travel from '+stone.name:'E · Activate '+stone.name;
         const seconds=Math.ceil(encounters.abilityRemaining);
-        if(view.prompt!==prompt||view.notification!==notification||seconds!==abilitySeconds||bossHealth!==encounters.bossHealth){
-          prompt=view.prompt; notification=view.notification; abilitySeconds=seconds; bossHealth=encounters.bossHealth;
-          onCombat(notification,prompt,abilitySeconds,bossHealth);
+        if(view.prompt!==prompt||view.notification!==notification||seconds!==abilitySeconds||bossHealth!==encounters.bossHealth||shadowAvailable!==view.shadowAvailable){
+          prompt=view.prompt; notification=view.notification; abilitySeconds=seconds; bossHealth=encounters.bossHealth;shadowAvailable=view.shadowAvailable;
+          onCombat(notification,prompt,abilitySeconds,bossHealth,shadowAvailable);
         }
       }
       destination.set(p.x,p.y+(mounted?1.57:.75),p.z);
@@ -413,6 +417,7 @@ export function startWilderness(
   canvas.addEventListener('webglcontextrestored',()=>loop.start(),{signal});
   loop.start();
   return {
+    toggleShadow:encounters.toggleShadow,summonAllShadows:encounters.summonAllShadows,
     travelTo(id:string){
       if(travel||!save.health) return 'Travel is unavailable right now.';
       if(towerFloorAt(body.position.z)||caveAt(body.position.z)) return 'Use the dungeon exit before fast travel.';
