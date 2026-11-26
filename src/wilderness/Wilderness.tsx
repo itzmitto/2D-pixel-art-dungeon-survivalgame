@@ -137,7 +137,7 @@ export default function Wilderness() {
   const floor=towerFloorAt(position.z);
   const cave=caveAt(position.z);
   const boss=cave?monsters[cave.kind]:floor?.number===5?monsters.sentinel:monsters.guardian;
-  const announcement=/^(Elite encountered|Boss encounter|Boss phase II|Cave victory|Cave reward|Shadow extracted|Briar Watch · Floor) · (.+)$/.exec(message.notification);
+  const announcement=/^(Elite encountered|Boss encounter|Boss phase II|Cave victory|Cave reward|Shadow extracted|Shadow extraction failed|Army command|Briar Watch · Floor) · (.+)$/.exec(message.notification);
   const visibleNotices=announcement
     ? [...notices,{kind:announcement[1].startsWith('Boss')?'boss':'dungeon',title:announcement[1],detail:announcement[2]} as Notice]
     : notices;
@@ -170,7 +170,9 @@ export default function Wilderness() {
       <small>WASD Move · E Interact · Q Ability · R Potion · H Horse · M Atlas</small>
     </footer>
     {panel==='shadows'&&<ShadowArmyPanel hero={hero} close={()=>showPanel(null)}
-      toggle={id=>controller.current?.toggleShadow(id)} summonAll={()=>controller.current?.summonAllShadows()}/>}
+      toggle={id=>controller.current?.toggleShadow(id)} summonAll={strongest=>controller.current?.summonAllShadows(strongest)}
+      dismissAll={()=>controller.current?.dismissAllShadows()} rename={(id,name)=>controller.current?.renameShadow(id,name)}
+      command={value=>controller.current?.shadowCommand(value)}/>}
     {panel==='status' && <CharacterStatus hero={hero} close={()=>showPanel(null)} spend={stat=>controller.current?.allocate(stat)}/>}
     {panel==='map' && <WorldMap position={position} discovered={discovered}
       caveRuns={hero.caveRuns} opened={hero.opened} towerCleared={hero.completedDungeons.includes(briarWatch.id)} defeated={hero.defeated} waystonesActive={hero.waystones} seenChests={hero.seenChests} travel={id=>{
