@@ -1,6 +1,7 @@
+import { fortress, frontierAt } from './frontier';
 import { shadowKeys } from './shadowData';
 import { bossCaves, caveAt, caveArrival, caveEntry, caveExit, caveLootLabel, caveRewardId, caveStatus, caveWalkable } from './bossCaves';
-import { briarWatch, floorRemaining, towerFloorAt, towerFloors, towerWalkable } from './briarWatch';
+import { briarWatch, floorRemaining, towerFloorAt, towerFloors, fortressFloors, towerWalkable } from './briarWatch';
 import { armorPiece, type ArmorId, type ArmorSlot } from './armor';
 import { warhorse } from './horse';
 import { waystones } from './worldSites';
@@ -74,6 +75,7 @@ export function startWilderness(
   bossObstacle=encounters.blockedByBoss;
   const loadedCave=caveAt(start.z);
   if(loadedCave) encounters.prepareCave(loadedCave,false);
+  let lastRegion=frontierAt(start.z)?.id;
   let travel:{target:Position;remaining:number;arrived:boolean}|undefined;
   function horseClear(x:number,z:number,yaw:number){
     if(inDen(z)||towerFloorAt(z)||caveAt(z)||!canWalk(x,z)) return false;
@@ -163,19 +165,22 @@ export function startWilderness(
     const p=body.position, floor=towerFloorAt(p.z), cave=caveAt(p.z);
     const doors:Door[]=[];
     if(floor){
-      doors.push({...floor.exit,target:{x:briarWatch.x,z:briarWatch.z+3.15},entering:false,label:'Leave Briar Watch',message:'Returned from Briar Watch.'});
-      if(floor.number<5){
-        const next=towerFloors[floor.number], remaining=floorRemaining(floor,save.defeated);
+      const site=floor.dungeon;
+      doors.push({...floor.exit,target:{x:site.x,z:site.z+3.15},entering:false,label:'Leave '+site.name,message:'Returned from '+site.name+'.'});
+      if(!floor.final){
+        const next=(site.id===fortress.id?fortressFloors:towerFloors)[floor.number], remaining=floorRemaining(floor,save.defeated);
         doors.push({...floor.stairs,target:next.entry,entering:true,label:'Enter floor '+next.number,
           locked:remaining>0,detail:remaining+' guardians remaining',
-          message:next.number===5&&!save.defeatedBosses.includes(briarWatch.boss)?'Boss encounter · The Hollow Sentinel':
-            'Briar Watch · Floor '+next.number+' · '+next.title});
+          message:next.final&&!save.defeatedBosses.includes(site.boss)?'Boss encounter · '+(site.id===fortress.id?'Ancient Titan':'The Hollow Sentinel'):
+            site.name+' · Floor '+next.number+' · '+next.title});
       }
     }else if(cave){
       doors.push({...caveExit(cave),target:caveArrival(cave),entering:false,label:'Leave '+cave.name,message:'Returned from '+cave.name+'.'});
     }else if(!inDen(p.z)){
       doors.push({x:briarWatch.x,z:briarWatch.z,target:towerFloors[0].entry,entering:true,label:'Enter Briar Watch',
         message:'Briar Watch · Floor 1 · '+towerFloors[0].title});
+      doors.push({x:fortress.x,z:fortress.z,target:fortressFloors[0].entry,entering:true,label:'Enter '+fortress.name,
+        message:fortress.name+' · Floor 1 · '+fortressFloors[0].title});
       for(const site of bossCaves){
         const run=save.caveRuns[site.id];
         const waiting=Boolean(run?.readyAt&&run.readyAt>Date.now()&&save.opened.includes(caveRewardId(site,run.cycle)));
@@ -351,6 +356,14 @@ export function startWilderness(
         }else{
           if(canWalk(p.x+dx,p.z)) p.x+=dx;
           if(canWalk(p.x,p.z+dz)) p.z+=dz;
+        }
+      }
+      const region=frontierAt(p.z);
+      if(region?.id!==lastRegion){
+        lastRegion=region?.id;
+        if(region&&!save.discoveredRegions.includes(region.id)){
+          save.discoveredRegions.push(region.id);
+          encounters.feedback('New region discovered · '+region.name+' · '+region.difficulty);
         }
       }
       const travelled=Math.hypot(p.x-beforeX,p.z-beforeZ);

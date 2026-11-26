@@ -16,7 +16,7 @@ export const cellsPerSide = extent * 2 / cellSize;
 export const defaultSeed = 294;
 export const saveKey = 'vonkje-wilderness-v1';
 export type Position = { x: number; z: number; yaw: number };
-export type Exploration = Hunter & { version: 1; seed: number; position: Position; discovered: number[]; waystones: string[]; seenChests: string[];
+export type Exploration = Hunter & { version: 1; seed: number; position: Position; discovered: number[]; waystones: string[]; seenChests: string[]; discoveredRegions:string[];
   caveRuns:CaveRuns;shadows:ShadowSoldier[];shadowEssences:ShadowEssence[];shadowCommand:ShadowCommand;
   armorItems:ArmorId[]; equippedArmor:EquippedArmor;
   gold: number; fangs: number; armor: number;
@@ -151,7 +151,7 @@ export function readExploration(raw: string | null): Exploration | null {
     return {version:1,seed,caveRuns,
       shadows:readShadows(Object.getOwnPropertyDescriptor(value,'shadows')?.value),
       shadowCommand:readShadowCommand(Object.getOwnPropertyDescriptor(value,'shadowCommand')?.value),
-      shadowEssences:readEssences(Object.getOwnPropertyDescriptor(value,'shadowEssences')?.value),armorItems,equippedArmor,arsenal,equipped,hotbar,items,selectedItem,slotItems,drops,opened:namedIds('opened'),seenChests:namedIds('seenChests'),
+      shadowEssences:readEssences(Object.getOwnPropertyDescriptor(value,'shadowEssences')?.value),armorItems,equippedArmor,arsenal,equipped,hotbar,items,selectedItem,slotItems,drops,opened:namedIds('opened'),discoveredRegions:namedIds('discoveredRegions'),seenChests:namedIds('seenChests'),
       waystones:namedIds('waystones').filter(id=>waystones.some(stone=>stone.id===id)),
       returns:counts('returns'),materials:counts('materials'),potions:integer('potions',0,0,100000),position:{x:position.x,z:position.z,yaw:position.yaw},discovered:[...new Set(known)],
       health:typeof savedHealth==='number'&&Number.isFinite(savedHealth)&&savedHealth>=0?Math.min(boundHealth,savedHealth):boundHealth,level,stats,
@@ -164,5 +164,5 @@ export function readExploration(raw: string | null): Exploration | null {
 }
 
 export function newExploration(): Exploration {
-  return {version:1,seed:defaultSeed,caveRuns:{},shadows:[],shadowEssences:[],shadowCommand:'Defensive',armorItems:[],equippedArmor:{},arsenal:['longsword'],items:[legacyItem('longsword')],selectedItem:'longsword',slotItems:['longsword',null,null,null,null,null,null,null,null],materials:{},potions:0,drops:{},returns:{},opened:[],equipped:'longsword',hotbar:['longsword',null,null,null,null,null,null,null,null],position:{...spawn,yaw:0},discovered:[],waystones:[],seenChests:[],health:progression.baseHealth,level:1,stats:freshStats(),statPoints:0,kills:0,armor:0,completedDungeons:[],defeatedBosses:[],xp:0,gold:0,fangs:0,defeated:[],collected:[],pending:{}};
+  return {version:1,seed:defaultSeed,caveRuns:{},shadows:[],shadowEssences:[],shadowCommand:'Defensive',armorItems:[],equippedArmor:{},arsenal:['longsword'],items:[legacyItem('longsword')],selectedItem:'longsword',slotItems:['longsword',null,null,null,null,null,null,null,null],materials:{},potions:0,drops:{},returns:{},opened:[],equipped:'longsword',hotbar:['longsword',null,null,null,null,null,null,null,null],position:{...spawn,yaw:0},discovered:[],discoveredRegions:[],waystones:[],seenChests:[],health:progression.baseHealth,level:1,stats:freshStats(),statPoints:0,kills:0,armor:0,completedDungeons:[],defeatedBosses:[],xp:0,gold:0,fangs:0,defeated:[],collected:[],pending:{}};
 }

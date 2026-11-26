@@ -1,5 +1,5 @@
 import * as T from 'three';
-import { briarWatch, towerFloorAt, towerFloors, towerWalkable, floorRemaining } from './briarWatch.ts';
+import { briarWatch, towerFloorAt, dungeonFloors, towerWalkable, floorRemaining } from './briarWatch.ts';
 import { height, randomSequence } from './layout.ts';
 import { loft, meshPart, rigidBatcher, shapedPlate } from './creatureGeometry.ts';
 
@@ -106,7 +106,7 @@ export function briarScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number
     icon.scale.setScalar(1.15);
     return icon;
   }
-  const floorViews=towerFloors.map(floor=>{
+  const floorViews=dungeonFloors.map(floor=>{
     const root=new T.Group(), places:{x:number;z:number}[]=[];
     for(let z=floor.z-16;z<=floor.z+16;z+=2) for(let x=-18;x<=18;x+=2)
       if(towerWalkable(x,z)) places.push({x,z});
@@ -135,7 +135,7 @@ export function briarScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number
     tiles.receiveShadow=true;tiles.computeBoundingSphere();trims.computeBoundingSphere();root.add(tiles,trims);
     const exit=portal(root,{x:floor.exit.x,z:floor.exit.z+.76},true);
     exit.rotation.y=Math.PI;
-    const stair=floor.number<5?portal(root,{x:floor.stairs.x,z:floor.stairs.z-1.29}):undefined;
+    const stair=!floor.final?portal(root,{x:floor.stairs.x,z:floor.stairs.z-1.29}):undefined;
     if(stair){
       for(let step=0;step<3;step++){
         const tread=meshPart(root,block,slate,0,.072+step*.065,floor.stairs.z-.42-step*.32);
@@ -149,7 +149,7 @@ export function briarScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number
     const ornaments=new T.Group();root.add(ornaments);
     for(let i=0;i<10;i++){
       const angle=i*2.399;
-      const x=Math.sin(angle)*(floor.number===5?13:10.6),z=floor.z+Math.cos(angle)*10.7;
+      const x=Math.sin(angle)*(floor.final?13:10.6),z=floor.z+Math.cos(angle)*10.7;
       if(!towerWalkable(x,z)) continue;
       if(floor.number===4){
         const stack=meshPart(ornaments,block,wood,x,.67,z);stack.scale.set(.83,1.34,.49);
@@ -161,8 +161,8 @@ export function briarScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number
       }
     }
     const altarRose=meshPart(root,ring,runic,0,.052,floor.z-.4);
-    altarRose.scale.setScalar(floor.number===5?7.7:2.2+floor.number*.4);altarRose.castShadow=false;
-    if(floor.number===5){
+    altarRose.scale.setScalar(floor.final?7.7:2.2+floor.number*.4);altarRose.castShadow=false;
+    if(floor.final){
       meshPart(root,sigil,runic,0,.061,floor.z-1.9).rotation.x=-Math.PI/2;
       root.children.at(-1)!.scale.setScalar(7.5);
     }
