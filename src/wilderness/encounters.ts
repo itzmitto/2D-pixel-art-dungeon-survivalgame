@@ -9,7 +9,7 @@ import { caveArts, isAdvancedBoss, type BossCast } from './caveArts.ts';
 import { spectralModels } from './shadowModels.ts';
 import { defaultShadowGrade } from './shadowData.ts';
 import { shadowArmy } from './shadowArmy.ts';
-import { caveAt, dragonScytheReward, caveBossId, caveBossPoint, caveRewardArmor, caveRewardId, caveRewardTier, caveTreasurePoint, type BossCave } from './bossCaves.ts';
+import { caveAt, dragonPhase, dragonPhaseTitles, dragonScytheReward, caveBossId, caveBossPoint, caveRewardArmor, caveRewardId, caveRewardTier, caveTreasurePoint, type BossCave } from './bossCaves.ts';
 import { floorRemaining, towerFloorAt, dungeonFloors } from './briarWatch.ts';
 import { hollowSentinel } from './sentinel.ts';
 import { encounterCell, eliteName, roaming, roamingEncounter, roamingKind, type EncounterMember } from './roaming.ts';
@@ -132,7 +132,7 @@ export function createEncounters(
     notification=message; noticeUntil=time+notificationsSeconds; changed();
   };
   const spectral=spectralModels(), regional=regionalModels();
-  const arts=caveArts<Enemy>(group,player,fx,canWalk,clearLine,hitPlayer,summonUndead,notify);
+  const arts=caveArts<Enemy>(group,player,fx,canWalk,clearLine,hitPlayer,summonUndead,notify,strength=>{shake=Math.max(shake,strength);});
   const shadows=shadowArmy<Enemy>(group,player,save,kind=>{
     if(kind==='ancientDragon') return dragons.makeDragon(true);
     if(isRegional(kind)) return spectral.decorate(regional.make(kind),kind);
@@ -166,7 +166,7 @@ export function createEncounters(
     affinity:T.Mesh<T.BufferGeometry,T.MeshBasicMaterial>;
     target:SpellTarget; roaming:boolean; roamGroup?:string; elite:boolean; level:number; announced:boolean; title?:T.Sprite; patrol:boolean;
     wolfRig:boolean; turn:number; wizard:boolean; barrier?:T.Mesh; ward:number;
-    spell?:'bolt'|'domain'|'shield'; wardCool:number; spellTarget?:{x:number;z:number}; slam?:{x:number;z:number}; sentinelMove?:'cleave'|'shock'|'shadow';bossCast?:BossCast;regionalCast?:RegionalCast;lastRegionalMove?:RegionalCast['move'];lastBossMove?:BossCast['move'];summonedBy?:string; shadowTarget?:string; enraged?:boolean;
+    spell?:'bolt'|'domain'|'shield'; wardCool:number; spellTarget?:{x:number;z:number}; slam?:{x:number;z:number}; sentinelMove?:'cleave'|'shock'|'shadow';bossCast?:BossCast;regionalCast?:RegionalCast;lastRegionalMove?:RegionalCast['move'];lastBossMove?:BossCast['move'];summonedBy?:string; shadowTarget?:string; enraged?:boolean;dragonRoarUntil?:number;
     posePhase:number; gait:number; anticipation:number; collapse:number; impactAge:number; retreat:number; strikes:number;
 
     id:string; kind:MonsterKind; spec:EnemySpec; home:T.Vector3; hp:number; hpBar:T.Group; fill:T.Mesh;
@@ -466,7 +466,19 @@ export function createEncounters(
     const damage=Math.round(amount*(parry?.22:enemy.ward>0?.35:1)*defense*10)/10;
     const dealt=Math.min(enemy.hp,damage);
     if(dealt<=0) return;
+    const oldPhase=enemy.kind==='ancientDragon'?dragonPhase(enemy.hp/enemy.spec.health):0;
     enemy.hp-=dealt;
+    if(enemy.hp>0&&oldPhase){
+      const stage=dragonPhase(enemy.hp/enemy.spec.health);
+      if(stage>oldPhase){
+        enemy.strikes=0;enemy.dragonRoarUntil=time+1.15;
+        enemy.cooldown=Math.max(enemy.cooldown,1.48);
+        fx.emit(enemy.root.position,stage===3?0xff4b17:0xffb55b,'ring',.71,.71,{grow:12,y:.17});
+        fx.scatter(enemy.root.position,0xff8b42,15,1.67);
+        shake=Math.max(shake,.51);
+        notify('Boss phase '+(stage===3?'III':'II')+' · '+dragonPhaseTitles[stage-1]);
+      }
+    }
     if(harvest&&save.health>0){
       if(time>=harvestUntil){harvestUntil=time+1.5;harvested=0;}
       const heal=Math.min(dealt*.05,maxHealth()-save.health,Math.max(0,Math.min(14,maxHealth()*.035)-harvested));
@@ -482,7 +494,7 @@ export function createEncounters(
     enemy.hitFlash=.22;
     impact(enemy.root.position,damage,element,heavy);
     if(enemy.hp){
-      if((enemy.kind==='sentinel'||enemy.kind==='warlord'||enemy.kind==='frostGuardian'||isAdvancedBoss(enemy.kind)||enemy.kind==='ancientTitan'||enemy.kind==='trollKing'||enemy.kind==='cursedWarlord'||enemy.kind==='venomQueen')&&!enemy.enraged&&enemy.hp<=enemy.spec.health*.5){
+      if((enemy.kind==='sentinel'||enemy.kind==='warlord'||enemy.kind==='frostGuardian'||(isAdvancedBoss(enemy.kind)&&enemy.kind!=='ancientDragon')||enemy.kind==='ancientTitan'||enemy.kind==='trollKing'||enemy.kind==='cursedWarlord'||enemy.kind==='venomQueen')&&!enemy.enraged&&enemy.hp<=enemy.spec.health*.5){
         enemy.enraged=true;
         const phaseColor=caveAt(enemy.home.z)?.color??0xcf66ff;
         fx.emit(enemy.root.position,phaseColor,'ring',1.3,.72,{grow:8.5,opacity:.92});
@@ -1017,10 +1029,13 @@ export function createEncounters(
         const previousX=p.x, previousZ=p.z;
         const shadow=enemy.cooldown===0&&!isAdvancedBoss(enemy.kind)&&!enemy.wizard&&!enemy.windup&&!enemy.charge&&gap>spec.reach
           ? shadows.guardTarget(enemy,spec.reach+.27):undefined;
-        if(enemy.statuses.halted){
+        const dragon=enemy.kind==='ancientDragon', stage=dragon?dragonPhase(enemy.hp/spec.health):1;
+        const roaring=dragon&&time<(enemy.dragonRoarUntil??0)&&!enemy.bossCast&&!arts.flying(enemy)&&!arts.breathing(enemy);
+        const approachDragon=dragon&&arts.wantsToClose(enemy,enemy.strikes,gap);
+        if(enemy.statuses.halted&&!dragon){
           enemy.windup=0; enemy.charge=0; enemy.chargeWindup=false;enemy.slam=undefined;enemy.spell=undefined;enemy.spellTarget=undefined;enemy.sentinelMove=undefined;enemy.shadowTarget=undefined;enemy.bossCast=undefined;enemy.regionalCast=undefined;
-        } else if(arts.flying(enemy)){
-          gait=.44;
+        } else if(arts.flying(enemy)||roaring||dragon&&arts.breathing(enemy)){
+          gait=0;
         } else if(shadow){
           enemy.shadowTarget=shadow;enemy.windup=spec.windup;
         } else if(enemy.charge>0){
@@ -1083,7 +1098,10 @@ export function createEncounters(
               const cast=enemy.bossCast;enemy.bossCast=undefined;enemy.lastBossMove=cast.move;
               arts.resolve(enemy,cast);
               if(cast.move==='rush'){enemy.charge=.62;enemy.chargeHit=false;}
-              if(cast.move==='air') enemy.cooldown=2.15;
+              if(dragon){
+                enemy.cooldown=cast.move==='air'||cast.move==='dive'||cast.move==='land'?2.6:
+                  cast.move==='breath'||cast.move==='inferno'?2.05:stage===3?1.33:1.61;
+              }else if(cast.move==='air') enemy.cooldown=2.15;
               else if(cast.move==='meteor') enemy.cooldown=1.8;
             }else if(enemy.sentinelMove){
               const move=enemy.sentinelMove;
@@ -1154,10 +1172,10 @@ export function createEncounters(
             fx.emit(cast.point,cast.color,sweeping(cast.move)?'arc':'ring',cast.radius,cast.duration,
               {yaw:cast.yaw,y:.21,opacity:.78});
           }
-        } else if(isAdvancedBoss(enemy.kind)&&aggro&&enemy.cooldown===0&&gap<(enemy.kind==='infernalGolem'?14:enemy.kind==='skeletonKing'?12:24)&&
+        } else if(isAdvancedBoss(enemy.kind)&&!approachDragon&&aggro&&enemy.cooldown===0&&gap<(enemy.kind==='infernalGolem'?14:enemy.kind==='skeletonKing'?12:24)&&
           clearLine(p.x,p.z,player.position.x,player.position.z)){
-          const cast=arts.start(enemy,enemy.strikes++);
-          if(cast){enemy.bossCast=cast;enemy.heading=cast.yaw;enemy.windup=cast.duration;}
+          const cast=arts.start(enemy,enemy.strikes);
+          if(cast){enemy.strikes++;enemy.bossCast=cast;enemy.heading=cast.yaw;enemy.windup=cast.duration;}
         } else if((enemy.kind==='sentinel'||enemy.kind==='warlord')&&aggro&&enemy.cooldown===0&&gap<13&&
           clearLine(p.x,p.z,player.position.x,player.position.z)){
           enemy.heading=Math.atan2(player.position.x-p.x,player.position.z-p.z);
@@ -1210,7 +1228,7 @@ export function createEncounters(
           }
         } else if(!enemy.wizard&&!isAdvancedBoss(enemy.kind)&&enemy.kind!=='sentinel'&&enemy.kind!=='warlord'&&aggro&&!enemy.retreat&&gap<spec.reach&&enemy.cooldown===0&&clearLine(p.x,p.z,player.position.x,player.position.z)){
           enemy.windup=spec.windup;
-        } else if(!aggro||gap>spec.reach-.18||enemy.retreat||enemy.kind==='assassin'||enemy.wizard){
+        } else if(!aggro||gap>(dragon?5.8:spec.reach-.18)||enemy.retreat||enemy.kind==='assassin'||enemy.wizard){
           const backAway=enemy.wizard&&aggro&&gap<7.5;
           const circle=enemy.wizard&&aggro&&gap>=7.5&&gap<spec.reach-2;
           const strafe=enemy.kind==='assassin'&&aggro&&!enemy.retreat&&gap<5&&enemy.cooldown>0;
@@ -1234,7 +1252,7 @@ export function createEncounters(
             const tryStep=(factor:number)=>{
               const angle=Math.atan2(dx,dz)+factor;
               const x=p.x+Math.sin(angle)*step,z=p.z+Math.cos(angle)*step;
-              if(!canWalk(x,z)||!spaceAround(enemy,x,z)||safe(x,z)||Math.hypot(x-player.position.x,z-player.position.z)<.9) return false;
+              if(!canWalk(x,z)||!spaceAround(enemy,x,z)||safe(x,z)||Math.hypot(x-player.position.x,z-player.position.z)<(dragon?2.45:.9)) return false;
               p.x=x;p.z=z;enemy.heading=strafe||circle||backAway?Math.atan2(player.position.x-x,player.position.z-z):angle;gait=aggro?(gap>8?1:.71):.40;
               return true;
             };
@@ -1254,10 +1272,18 @@ export function createEncounters(
         const speed=travelled/Math.max(.001,dt);
         const stride=enemy.wolfRig?Math.min(1,speed/Math.max(3.8,spec.speed)):gait;
         enemy.gait=T.MathUtils.damp(enemy.gait,stride,11,dt);
-        if(!enemy.statuses.halted){
+        const oldStep=Math.floor(enemy.posePhase/Math.PI);
+        if(!enemy.statuses.halted||dragon){
           enemy.posePhase+=enemy.wolfRig
             ? travelled*Math.PI*2/((.52+enemy.gait*1.60)*spec.scale)
             : dt*(3.1+enemy.gait*9.4);
+        }
+        if(dragon&&enemy.gait>.4&&travelled>.015&&oldStep!==Math.floor(enemy.posePhase/Math.PI)){
+          const side=oldStep%2?1:-1;
+          const foot={x:p.x+Math.cos(enemy.heading)*side*1.14,z:p.z-Math.sin(enemy.heading)*side*1.14};
+          fx.emit(foot,0xb58c77,'mist',.76,.49,{grow:2.3,y:.15,opacity:.73});
+          fx.scatter(foot,0xba8260,4,.23);
+          if(gap<15) shake=Math.max(shake,.29*(1-gap/19));
         }
         const leapDuration=enemy.kind==='infernalGolem'?.62:(enemy.kind==='sentinel'||enemy.kind==='warlord')?(enemy.enraged?.55:.48):enemy.kind==='guardian'?.65:.43;
         const sentinelWindup=enemy.sentinelMove
@@ -1266,10 +1292,11 @@ export function createEncounters(
         enemy.anticipation=T.MathUtils.damp(enemy.anticipation,
           enemy.windup>0?Math.min(1,(1-enemy.windup/currentWindup)*1.5+.22):0,enemy.windup>0?12:20,dt);
         enemy.animate({time,phase:enemy.posePhase,gait:enemy.gait,
-          windup:enemy.anticipation,
-          recovery:Math.max(0,1-enemy.impactAge/.33),hit:enemy.hitFlash/.22,
-          leap:arts.flying(enemy)?Math.max(.35,arts.altitude(enemy)/3.3):enemy.charge>0&&enemy.kind!=='guardian'?Math.sin(Math.PI*enemy.charge/leapDuration):0,
-          technique:enemy.regionalCast?.move??enemy.bossCast?.move??(enemy.impactAge<.33?(isRegional(enemy.kind)?enemy.lastRegionalMove:enemy.lastBossMove):undefined),
+          windup:roaring?Math.sin(Math.PI*((enemy.dragonRoarUntil??0)-time)/1.15):arts.breathing(enemy)?.52:enemy.anticipation,
+          stage,flight:arts.flightProgress(enemy),
+          recovery:Math.max(arts.landed(enemy),arts.breathing(enemy)?.76:0,1-enemy.impactAge/.33),hit:enemy.hitFlash/.22,
+          leap:arts.flying(enemy)?Math.sin(Math.PI*Math.min(1,arts.flightProgress(enemy))):enemy.charge>0&&enemy.kind!=='guardian'?Math.sin(Math.PI*enemy.charge/leapDuration):0,
+          technique:roaring?'roar':arts.dragonTechnique(enemy)??enemy.regionalCast?.move??enemy.bossCast?.move??(enemy.impactAge<.33?(isRegional(enemy.kind)?enemy.lastRegionalMove:enemy.lastBossMove):undefined),
           dead:0,frozen:status==='frozen',turn:enemy.turn,alert:enemy.enraged?2:aggro?1:0,distance:gap});
 
       }

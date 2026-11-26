@@ -51,6 +51,7 @@ export function caveArts<Enemy extends Actor>(
   });
   const waves:{owner:Enemy;point:Point;radius:number;front:number;strength:number}[]=[];
   const air=new Map<Enemy,{time:number;point:Point;origin:Point;move:'air'|'dive'|'land'}>();
+  const landings=new Map<Enemy,number>();
   const breaths:{owner:Enemy;origin:Point;yaw:number;range:number;angle:number;strength:number;life:number;tick:number;hit:boolean}[]=[];
   let blocking=false;
   function pulse(point:Point,color:number,radius:number){
@@ -83,7 +84,19 @@ export function caveArts<Enemy extends Actor>(
       const flight=air.get(enemy);
       return flight?Math.sin(Math.PI*T.MathUtils.clamp(flight.time/flightLength(flight.move),0,1))*(flight.move==='land'?2:3.35):0;
     },
-    flightMove(enemy:Enemy){return air.get(enemy)?.move;},
+    dragonTechnique(enemy:Enemy){
+      const flight=air.get(enemy);
+      if(flight) return flight.move;
+      if(landings.has(enemy)) return 'land';
+      const breath=breaths.find(breath=>breath.owner===enemy);
+      return breath?(breath.range===20?'inferno':'breath'):undefined;
+    },
+    breathing(enemy:Enemy){return breaths.some(breath=>breath.owner===enemy);},
+    landed(enemy:Enemy){return (landings.get(enemy)??0)/.42;},
+    wantsToClose(enemy:Enemy,sequence:number,distance:number){
+      const move=moves.ancientDragon[dragonPhase(enemy.hp/enemy.spec.health)-1][sequence%4];
+      return distance>9&&(move==='claw'||move==='tail'||move==='stomp'||move==='fury');
+    },
     flightProgress(enemy:Enemy){const flight=air.get(enemy);return flight?flight.time/flightLength(flight.move):0;},
     start(enemy:Enemy,sequence:number):BossCast|undefined{
       if(!isAdvancedBoss(enemy.kind)||air.has(enemy)) return;
@@ -260,6 +273,9 @@ export function caveArts<Enemy extends Actor>(
         const p=bone.mesh.position;
         p.y=surface(p.x,p.z)-Math.max(0,bone.life-3.8)*2.1-Math.max(0,.46-bone.life)*2.2;
       }
+      for(const [enemy,remaining] of landings){
+        if(remaining<=dt||!enemy.hp) landings.delete(enemy);else landings.set(enemy,remaining-dt);
+      }
       for(const [enemy,flight] of air){
         if(!enemy.hp){air.delete(enemy);continue;}
         const p=enemy.root.position;flight.time+=dt;
@@ -270,7 +286,7 @@ export function caveArts<Enemy extends Actor>(
           if(walk(x,z)&&clear(p.x,p.z,x,z)){p.x=x;p.z=z;}
         }
         if(progress>=1){
-          air.delete(enemy);
+          air.delete(enemy);landings.set(enemy,.42);
           const radius=flight.move==='land'?8.6:flight.move==='dive'?4.5:0;
           if(radius){
             pulse(p,colorForDragon,radius);tremor(.86);
@@ -351,7 +367,7 @@ export function caveArts<Enemy extends Actor>(
         if(field.life<=0) areas.splice(i,1);
       }
     },
-    clear(){areas.length=volleys.length=waves.length=breaths.length=0;air.clear();for(const bone of bones){bone.life=0;bone.mesh.visible=false;}},
+    clear(){areas.length=volleys.length=waves.length=breaths.length=0;air.clear();landings.clear();for(const bone of bones){bone.life=0;bone.mesh.visible=false;}},
     dispose(){blockGeometry.dispose();blockMaterial.dispose();},
   };
 }
