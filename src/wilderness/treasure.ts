@@ -18,7 +18,7 @@ export const addedChestSites:Chest[]=[
   {id:'lantern-woodline',x:143,z:94,rarity:'Uncommon',weapon:'katana',gold:12,armor:2},
   {id:'brokenfang-ledge',x:-77,z:-29,rarity:'Uncommon',weapon:'greatsword',gold:15,armor:2},
   {id:'raven-cart-stash',x:-183,z:55,rarity:'Uncommon',weapon:'staff',gold:13,armor:2},
-  {id:'standing-stones-hollow',x:-123,z:75,rarity:'Rare',weapon:'axe',gold:23,armor:3},
+  {id:'standing-stones-hollow',x:-122.7,z:77.9,rarity:'Rare',weapon:'axe',gold:23,armor:3},
   {id:'south-pine-boulder',x:-94,z:132,rarity:'Rare',weapon:'shield',gold:24,armor:3},
   {id:'hollowmouth-overlook',x:-194,z:-117,rarity:'Epic',weapon:'staff',gold:34,armor:4},
   {id:'moonwatch-deep-woods',x:106,z:-116,rarity:'Epic',weapon:'katana',gold:36,armor:4},

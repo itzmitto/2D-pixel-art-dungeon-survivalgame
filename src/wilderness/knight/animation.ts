@@ -20,8 +20,10 @@ export function createDarkKnight() {
     model.left.rotation.y=-.52;
     return [id,model] as const;
   }));
-  function equip(id:WeaponId){
+  let equippedRarity=weapon.rarity;
+  function equip(id:WeaponId,tier=weapons[id].rarity){
     weapon=weapons[id];
+    equippedRarity=tier;
     for(const part of starter) part.visible=id==='longsword';
     for(const [key,model] of models) model.right.visible=model.left.visible=key===id;
   }
@@ -39,6 +41,7 @@ export function createDarkKnight() {
 
   function update(dt: number, motion: Motion) {
     time+=dt;
+    if(weapon.id!=='longsword') models.get(weapon.id)?.update(time,equippedRarity);
     const weight=1-Math.exp(-13*dt);
     const motionWeight=T.MathUtils.clamp(motion.speed/6,0,1);
     stride=T.MathUtils.lerp(stride,motionWeight,weight);
@@ -53,7 +56,7 @@ export function createDarkKnight() {
     guard=T.MathUtils.lerp(guard,motion.blocking && attack===duration ? 1 : 0,weight);
     const fraction=attack/duration;
     const impact=poseWeapon.impactTime/poseWeapon.attackDuration;
-    const windupEnd=impact*.78, followEnd=impact+.14;
+    const windupEnd=impact*(poseWeapon.id==='katana'?.86:.78), followEnd=impact+(poseWeapon.id==='katana'?.075:.14);
     const groundStrike=casting&&poseWeapon.ability==='lightning';
     const castStrike=groundStrike ? [.26,.28,-.75,.04,-.32,.12,.31,-.46] : poseWeapon.animation.strike;
     for(let i=0;i<swing.length;i++){

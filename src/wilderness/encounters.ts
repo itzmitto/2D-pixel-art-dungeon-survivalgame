@@ -2,7 +2,7 @@ import { goblinModels } from './goblins.ts';
 import { loft, shapedPlate, type CreatureRig } from './creatureGeometry.ts';
 import { skeletonModels } from './skeletons.ts';
 import { den, inDen } from './denLayout.ts';
-import { monsters, rollDrop, type MonsterKind, type Drop } from './huntData.ts';
+import { monsters, rarityOrder, rollDrop, type MonsterKind, type Drop } from './huntData.ts';
 import { elementalRarity, instanceWeapon } from './itemInstances.ts';
 import { chestBonus, chestModels, worldChests, type Chest } from './treasure.ts';
 import { attackSpeed, earnXP, elemental, maxHunterHealth, mitigation, physical, lootBonus } from './progression.ts';
@@ -26,22 +26,23 @@ const direTerritories=[{x:-163,z:57},{x:-167,z:63},{x:137,z:-124},{x:160,z:-151}
 const packTerritories=[{x:-79,z:-24},{x:-85,z:-27},{x:98,z:96}];
 const notificationsSeconds = 3.5;
 
-function numberSprite(value:number) {
+function numberTexture(value:number) {
   const canvas=document.createElement('canvas');
-  canvas.width=64; canvas.height=48;
+  canvas.width=128; canvas.height=64;
   const context=canvas.getContext('2d');
   if(!context) return null;
-  context.font='bold 32px Georgia';
+  context.font='900 39px system-ui';
   context.textAlign='center';
   context.textBaseline='middle';
-  context.lineWidth=5;
-  context.strokeStyle='#2a1713';
-  context.fillStyle='#ffd591';
-  context.strokeText(String(value),32,24);
-  context.fillText(String(value),32,24);
+  context.lineWidth=7;
+  context.lineJoin='round';
+  context.strokeStyle='#181322';
+  context.fillStyle='#fff9ee';
+  context.strokeText(String(value),64,33,116);
+  context.fillText(String(value),64,33,116);
   const texture=new T.CanvasTexture(canvas);
   texture.colorSpace=T.SRGBColorSpace;
-  return new T.SpriteMaterial({map:texture,transparent:true,depthWrite:false});
+  return texture;
 }
 
 export function createEncounters(
@@ -63,9 +64,37 @@ export function createEncounters(
   const oldDefeats=new Set(save.defeated), collected=new Set(save.collected);
   const rand=randomSequence(save.seed ^ 0xa3615);
   const fx=createMagicEffects(group);
+  const echo=new T.Group(), echoMaterial=new T.MeshBasicMaterial({
+    color:0x7bd9bc,transparent:true,opacity:.24,depthWrite:false,blending:T.AdditiveBlending,
+  });
+  const echoParts:{source:T.Mesh;mesh:T.Mesh}[]=[];
+  const echoJoints=new Set<T.Object3D>();
+  player.traverse(source=>{
+    if(!(source instanceof T.Mesh)||!source.parent||!source.parent.name||
+      source.parent.name.endsWith('socket')||echoJoints.has(source.parent)) return;
+    echoJoints.add(source.parent);
+    const mesh=new T.Mesh(source.geometry,echoMaterial);
+    mesh.matrixAutoUpdate=false;
+    echo.add(mesh);echoParts.push({source,mesh});
+  });
+  echo.visible=false;group.add(echo);
+  let echoLife=0,shake=0,waterTime=0;
+  function leaveEcho(){
+    player.updateWorldMatrix(true,true);
+    for(const {source,mesh} of echoParts){
+      mesh.matrix.copy(source.matrixWorld);
+      mesh.matrixWorldNeedsUpdate=true;
+    }
+    echoLife=.26;
+  }
+  function splash(){
+    fx.scatter(player.position,0x89dfff,9,1.0);
+    fx.emit(player.position,0x83e5ff,'ring',1.36,.42,{grow:3.3,y:.19});
+    fx.emit(player.position,0xd1f9ff,'arc',1.08,.29,{y:.91,yaw:player.rotation.y,aspect:1.8});
+  }
   const chests:Chest[]=[...worldChests,
     {id:'den-hidden',x:20,z:350,rarity:'Rare',weapon:'katana',gold:31,armor:4},
-    {id:'den-entry-supplies',x:-4.7,z:380,rarity:'Common',weapon:'axe',gold:10,armor:1},
+    {id:'den-entry-supplies',x:-4.1,z:382,rarity:'Common',weapon:'axe',gold:10,armor:1},
     {id:'den-guardian-reliquary',x:13,z:314,rarity:'Epic',weapon:'shield',gold:38,armor:4,boss:den.boss},
     {id:'den-reward',x:0,z:311,rarity:'Legendary',weapon:'greatsword',gold:100,armor:7,boss:den.boss},
   ];
@@ -94,13 +123,13 @@ export function createEncounters(
     posePhase:number; gait:number; anticipation:number; collapse:number; impactAge:number; retreat:number; strikes:number;
 
     id:string; kind:MonsterKind; spec:typeof monsters[MonsterKind]; home:T.Vector3; hp:number; hpBar:T.Group; fill:T.Mesh;
-    statuses:ReturnType<typeof statuses>; cooldown:number; windup:number; heading:number; phase:number; hitFlash:number; charge:number; chargeWindup:boolean; chargeHit:boolean; beam:T.Mesh<T.BufferGeometry,T.MeshBasicMaterial>; loot:T.Mesh<T.BufferGeometry,T.MeshStandardMaterial>;
+    statuses:ReturnType<typeof statuses>; visualTick:number; lastVisual:ReturnType<typeof statuses>['visual']; cooldown:number; windup:number; heading:number; phase:number; hitFlash:number; charge:number; chargeWindup:boolean; chargeHit:boolean; beam:T.Mesh<T.BufferGeometry,T.MeshBasicMaterial>; loot:T.Mesh<T.BufferGeometry,T.MeshStandardMaterial>;
   };
   const affinityGeometry=new T.RingGeometry(.53,.69,19).rotateX(-Math.PI/2);
   const affinities={
     burning:new T.MeshBasicMaterial({color:0xe4894f,transparent:true,opacity:.55,depthWrite:false}),
     frozen:new T.MeshBasicMaterial({color:0xa4e9f7,transparent:true,opacity:.7,depthWrite:false}),
-    stunned:new T.MeshBasicMaterial({color:0xf7e4a0,transparent:true,opacity:.65,depthWrite:false}),
+    stunned:new T.MeshBasicMaterial({color:0x9ac5ff,transparent:true,opacity:.65,depthWrite:false}),
     slowed:new T.MeshBasicMaterial({color:0x679bcf,transparent:true,opacity:.44,depthWrite:false}),
   };
   const enemies:Enemy[]=[];
@@ -153,7 +182,7 @@ export function createEncounters(
     if(save.drops[id]) loot.material.color.set(rarity[save.drops[id].rarity].color);
     enemies.push({...actor,id,kind,spec,home,affinity,posePhase:enemies.length*.92,gait:0,anticipation:0,collapse:1,
       impactAge:3,retreat:0,strikes:0,hp:(oldDefeats.has(id)||save.defeatedBosses.includes(id))?0:spec.health,hpBar,fill,
-      statuses:statuses(spec.resistance),cooldown:0,windup:0,heading:rand()*6.28,phase:rand()*10,hitFlash:0,charge:0,chargeWindup:false,chargeHit:false,loot,beam});
+      statuses:statuses(spec.resistance),visualTick:0,lastVisual:null,cooldown:0,windup:0,heading:rand()*6.28,phase:rand()*10,hitFlash:0,charge:0,chargeWindup:false,chargeHit:false,loot,beam});
   }
 
   const sparkGeometry=new T.BufferGeometry();
@@ -165,46 +194,46 @@ export function createEncounters(
   group.add(sparks);
   const bursts=Array.from({length:36},()=>({p:new T.Vector3(),v:new T.Vector3(),life:0}));
   let sparkCursor=0;
-  const numberMaterials=new Map<number,T.SpriteMaterial>();
-  const emptyMaterial=new T.SpriteMaterial();
-  const numbers=Array.from({length:6},()=>{
-    const sprite=new T.Sprite(emptyMaterial);
-    sprite.scale.set(1.6,1.2,1);
+  const numberTextures=new Map<number,T.CanvasTexture>();
+  const numbers=Array.from({length:10},()=>{
+    const sprite=new T.Sprite(new T.SpriteMaterial({transparent:true,depthWrite:false,toneMapped:false}));
     sprite.visible=false;
+    sprite.renderOrder=5;
     group.add(sprite);
-    return {sprite,age:1,base:0};
+    return {sprite,age:1,base:0,strong:false};
   });
   let numberCursor=0;
   const magic=abilityCombat(player.position,enemies.map(enemy=>({
-    point:enemy.root.position,alive:()=>enemy.hp>0,get effects(){return enemy.statuses;},hit:damage=>hitEnemy(enemy,damage),
+    point:enemy.root.position,alive:()=>enemy.hp>0,get effects(){return enemy.statuses;},
+    hit:(damage,element,heavy)=>hitEnemy(enemy,damage,element,heavy),
   })),canWalk,clearLine,fx);
-  const slashGeometry=new T.RingGeometry(1.53,2.71,18,1,Math.PI/2-1,2).rotateX(Math.PI/2);
-  const slashMaterial=new T.MeshBasicMaterial({color:'#e3cda6',transparent:true,opacity:0,
-    side:T.DoubleSide,depthWrite:false});
-  const slash=new T.Mesh(slashGeometry,slashMaterial);
-  slash.visible=false;
-  group.add(slash);
-  let slashTime=0;
-  function impact(point:T.Vector3, damage=0){
+  function impact(point:T.Vector3, damage=0,element:Weapon['ability']=null,strong=false){
     for(let i=0;i<8;i++){
+      const vx=(rand()-.5)*6,vy=1.5+rand()*3,vz=(rand()-.5)*6,life=.32+rand()*.16;
+      if(element&&i>=2) continue;
       const spark=bursts[sparkCursor++%bursts.length];
-      spark.p.copy(point); spark.p.y+=.85;
-      spark.v.set((rand()-.5)*6,1.5+rand()*3,(rand()-.5)*6);
-      spark.life=.32+rand()*.16;
+      spark.p.copy(point);spark.p.y+=.85;
+      spark.v.set(vx,vy,vz);
+      spark.life=life;
     }
-    if(damage>0){
-      let material=numberMaterials.get(damage);
-      if(!material){
-        material=numberSprite(damage)??undefined;
-        if(material) numberMaterials.set(damage,material);
-      }
-      if(!material) return;
-      const number=numbers[numberCursor++%numbers.length];
-      number.sprite.material=material;
-      number.sprite.position.copy(point);
-      number.base=point.y+2.2;
-      number.age=0;
+    if(!damage) return;
+    fx.impact(point,element,strong);
+    let texture=numberTextures.get(damage);
+    if(!texture){
+      texture=numberTexture(damage)??undefined;
+      if(!texture) return;
+      numberTextures.set(damage,texture);
     }
+    const number=numbers[numberCursor++%numbers.length];
+    number.sprite.material.map=texture;
+    number.sprite.material.needsUpdate=true;
+    number.sprite.material.color.set(strong?0xffcf5b:element?{
+      fire:0xffa567,lightning:0xb6ceff,ice:0x9eeeff,water:0x85ddff,wind:0xaff8d4,
+    }[element]:0xffead7);
+    number.sprite.position.copy(point);
+    number.sprite.position.x+=((numberCursor%5)-2)*.15;
+    number.base=point.y+1.98;
+    number.age=0;number.strong=strong;
   }
   function clearLine(x:number,z:number,tx:number,tz:number){
     const distance=Math.hypot(x-tx,z-tz), steps=Math.ceil(distance/.75);
@@ -234,12 +263,12 @@ export function createEncounters(
     const angle=Math.atan2(q.x-p.x,q.z-p.z)+(enemy.id.charCodeAt(enemy.id.length-1)%2?1:-1)*.63;
     return {x:p.x+Math.sin(angle)*2.3,z:p.z+Math.cos(angle)*2.3};
   }
-  function hitEnemy(enemy:Enemy, amount:number){
+  function hitEnemy(enemy:Enemy, amount:number,element:Weapon['ability']=null,heavy=false){
     if(enemy.hp<=0) return;
     const damage=Math.round(amount*10)/10;
     enemy.hp=Math.max(0,enemy.hp-damage);
     enemy.hitFlash=.22;
-    impact(enemy.root.position,damage);
+    impact(enemy.root.position,damage,element,heavy);
     if(enemy.hp) return;
     enemy.collapse=0;
     enemy.loot.position.copy(enemy.root.position);
@@ -268,10 +297,13 @@ export function createEncounters(
     const shieldBlock=guard&&weapons[save.equipped].model.shield;
     if(!charge&&(shieldBlock || (guard&&save.equipped==='longsword'))){
       impact(player.position);
+      if(shieldBlock) splash();
       notify('Blocked');
       return;
     }
+    const barrierActive=magic.shield.active;
     const damage=magic.shield.absorb(Math.max(.5,Math.round((guard ? Math.ceil(enemy.spec.damage*.46) : enemy.spec.damage*(charge?1.3:1))*(1-mitigation(save.stats,save.armor))*100)/100));
+    if(barrierActive) splash();
     if(damage===0){notify('Water barrier absorbed the attack.');return;}
     save.health=Math.max(0,Math.round((save.health-damage)*100)/100);
     impact(player.position);
@@ -298,7 +330,7 @@ export function createEncounters(
     Math.hypot(player.position.x-154,player.position.z-103)<4;
   return {
     feedback:notify,
-    transition(){magic.reset();queued=undefined;rangeTimer.cancel();},
+    transition(){magic.reset();fx.clear();queued=undefined;rangeTimer.cancel();echoLife=shake=0;echo.visible=false;},
     get bossHealth(){
       const boss=enemies.find(enemy=>enemy.kind==='guardian');
       return boss&&boss.hp>0&&inDen(player.position.z)&&
@@ -307,6 +339,7 @@ export function createEncounters(
     },
     get weaponLocked(){return rangeTimer.busy || Boolean(queued) || magic.dashing;},
     get dashing(){return magic.dashing;},
+    get shake(){return shake;},
     get abilityRemaining(){return Math.max(0,(cooldowns.get(save.equipped)??0)-time);},
     attack(startAnimation:(weapon:Weapon)=>boolean){
       if(!save.health||queued||magic.dashing) return;
@@ -355,7 +388,7 @@ export function createEncounters(
           const bonus=chestBonus(chest,save.seed);
           save.potions+=bonus.potions;
           save.materials[bonus.material]=(save.materials[bonus.material]??0)+bonus.count;
-          fx.scatter(chest,Number.parseInt(rarity[chest.rarity].color.slice(1),16),chest.rarity==='Common'?5:12,.68);
+          fx.treasure(chest,Number.parseInt(rarity[chest.rarity].color.slice(1),16),rarityOrder.indexOf(chest.rarity));
           grantWeapon('chest-'+chest.id,chest.weapon,chest.rarity);
           notify('Opened '+chest.rarity+' Chest · '+weapons[chest.weapon].name+' · Armor '+save.armor+' · '+bonus.material+' × '+bonus.count);
           return;
@@ -382,11 +415,14 @@ export function createEncounters(
     },
     update(dt:number,blocking:boolean){
       time+=dt;
+      shake=Math.max(0,shake-dt*2.8);
       if(notification&&time>=noticeUntil){notification='';changed();}
       if(queued){
         queued.delay-=dt;
         if(queued.delay<=0){
           magic.cast(queued.weapon,queued.yaw);
+          shake=queued.weapon.ability==='lightning'?1:queued.weapon.ability==='fire'?.83:.56;
+          if(queued.weapon.ability==='wind') leaveEcho();
           queued=undefined;
         }
       }
@@ -394,21 +430,23 @@ export function createEncounters(
         const weapon=attackWeapon;
         if(weapon.id==='staff') magic.bolt(weapon,player.rotation.y);
         else {
-          slashTime=.23;
-          slashMaterial.color.setHex(weapon.color);
-          slash.scale.setScalar(weapon.range/2.9);
-          slash.position.copy(player.position);
-          slash.position.y+=1.15;
-          slash.rotation.y=player.rotation.y;
+          fx.slash(player.position,weapon.ability,player.rotation.y,weapon.range*.68);
           for(const enemy of enemies){
             const p=enemy.root.position;
             if(enemy.hp && Math.abs(player.position.y-p.y)<2 &&
               inArc(player.position,p,player.rotation.y,weapon.range,weapon.reachAngle) &&
-              clearLine(player.position.x,player.position.z,p.x,p.z)) hitEnemy(enemy,weaponDamage(weapon));
+              clearLine(player.position.x,player.position.z,p.x,p.z)) hitEnemy(enemy,weaponDamage(weapon),weapon.ability,rarity[weapon.rarity].multiplier>=2.5);
           }
         }
       }
       magic.update(dt);
+      waterTime-=dt;
+      if(magic.shield.active&&waterTime<=0){
+        waterTime=.16;
+        const a=time*4.8, droplet={x:player.position.x+Math.sin(a)*1.52,z:player.position.z+Math.cos(a)*1.52};
+        fx.emit(droplet,0x8ceafa,'spark',.24,.36,{y:1.15,lift:1.15,aspect:1.65});
+        fx.emit(player.position,0x438cf3,'ring',1.36,.32,{y:.11,grow:.82,opacity:.34});
+      }
 
 
       for(const enemy of enemies){
@@ -433,6 +471,24 @@ export function createEncounters(
         root.visible=active||dying;
         enemy.hpBar.visible=active&&gap<23&&(['guardian','elite'].includes(enemy.kind)||enemy.hp<spec.health||enemy.windup>0);
         const status=enemy.statuses.visual;
+        enemy.visualTick-=dt;
+        if(active&&gap<24&&status!==enemy.lastVisual&&enemy.lastVisual==='frozen'){
+          fx.scatter(p,0xadf2ff,8,spec.scale*.85,'crystal');
+        }
+        if(active&&gap<24&&status&&status!=='slowed'&&(enemy.visualTick<=0||status!==enemy.lastVisual)){
+          enemy.visualTick=.17;
+          const a=time*8+enemy.phase, spot={x:p.x+Math.sin(a)*spec.scale*.44,z:p.z+Math.cos(a)*spec.scale*.44};
+          if(status==='burning'){
+            fx.emit(spot,0xff6b28,'spark',.58,.38,{y:spec.scale*.49,lift:2.1,aspect:2.1});
+            fx.emit(spot,0xf28b5a,'mist',.51,.32,{y:spec.scale*.48,lift:1.65,opacity:.47});
+          }else if(status==='stunned'){
+            fx.lightning(spot,p,false,true);
+            fx.scatter(spot,0xb9dbff,2,spec.scale*.92);
+          }else{
+            fx.emit(spot,0x9bdcff,'crystal',.74,.36,{y:spec.scale*.33,aspect:2.9,yaw:a,opacity:.63});
+          }
+        }
+        enemy.lastVisual=status;
         enemy.affinity.visible=active&&!!status;
         if(status&&active){
           enemy.affinity.material=affinities[status];
@@ -528,9 +584,9 @@ export function createEncounters(
       chestViews.update(dt,save.defeatedBosses,save.opened,save.defeated);
       fx.update(dt);
       fx.barrier(player.position,magic.shield.active);
-      slashTime=Math.max(0,slashTime-dt);
-      slash.visible=slashTime>0;
-      slashMaterial.opacity=slashTime*1.7;
+      echoLife=Math.max(0,echoLife-dt);
+      echo.visible=echoLife>0;
+      echoMaterial.opacity=echoLife*.98;
       for(const enemy of enemies){
         enemy.hpBar.position.copy(enemy.root.position);
         enemy.hpBar.position.y+=2.23*enemy.spec.scale;
@@ -555,27 +611,31 @@ export function createEncounters(
         if(spark.life<=0) continue;
         spark.life-=dt; spark.v.y-=9*dt;
         spark.p.addScaledVector(spark.v,dt);
-        sparkPositions.set([spark.p.x,spark.p.y,spark.p.z],cursor++*3);
+        const offset=cursor++*3;
+        sparkPositions[offset]=spark.p.x;sparkPositions[offset+1]=spark.p.y;sparkPositions[offset+2]=spark.p.z;
       }
       sparkGeometry.setDrawRange(0,cursor);
       sparkGeometry.attributes.position.needsUpdate=true;
       sparks.visible=cursor>0;
       for(const number of numbers){
         number.age+=dt;
-        number.sprite.visible=number.age<.55;
-        number.sprite.position.y=number.base+number.age*1.8;
+        number.sprite.visible=number.age<.75;
+        const size=(number.strong?2.15:1.68)*(1+.30*Math.exp(-number.age*13));
+        number.sprite.scale.set(size,size*.5,1);
+        number.sprite.material.opacity=1-T.MathUtils.smoothstep(number.age,.35,.75);
+        number.sprite.position.y=number.base+1.68*Math.sqrt(number.age);
       }
     },
     dispose(){
       scene.remove(group);
       models.dispose();skeletons.dispose();goblins.dispose();
       affinityGeometry.dispose();Object.values(affinities).forEach(material=>material.dispose());
-      for(const resource of [barGeometry,backing,red,alert,lootGeometry,drawstring,lootFang,lootCoin,bagTie,boneLoot,metalLoot,lootBeamGeometry,lootMaterial,sparkGeometry,sparks.material,slashGeometry,slashMaterial]) resource.dispose();
+      for(const resource of [barGeometry,backing,red,alert,lootGeometry,drawstring,lootFang,lootCoin,bagTie,boneLoot,metalLoot,lootBeamGeometry,lootMaterial,sparkGeometry,sparks.material,echoMaterial]) resource.dispose();
       fx.dispose();
       chestViews.dispose();
       for(const enemy of enemies){enemy.loot.material.dispose();enemy.beam.material.dispose();}
-      for(const material of numberMaterials.values()){material.map?.dispose();material.dispose();}
-      emptyMaterial.dispose();
+      for(const texture of numberTextures.values()) texture.dispose();
+      for(const {sprite} of numbers) sprite.material.dispose();
     },
   };
 }

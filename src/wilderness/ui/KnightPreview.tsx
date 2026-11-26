@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import * as T from 'three';
 import { createDarkKnight } from '../knight/animation';
-import type { WeaponId } from '../weapons';
+import type { Rarity, WeaponId } from '../weapons';
 import { Glyph } from './Glyph';
 
-export function KnightPreview({weapon}:{weapon:WeaponId}){
+export function KnightPreview({weapon,tier}:{weapon:WeaponId;tier:Rarity}){
   const canvas=useRef<HTMLCanvasElement>(null);
-  const draw=useRef<((id:WeaponId)=>void)|null>(null);
+  const draw=useRef<((id:WeaponId,tier:Rarity)=>void)|null>(null);
   const [unavailable,setUnavailable]=useState(false);
   useEffect(()=>{
     if(!canvas.current) return;
@@ -25,8 +25,8 @@ export function KnightPreview({weapon}:{weapon:WeaponId}){
     scene.add(knight.root,new T.HemisphereLight(0xdcf0ff,0x3c4a63,2.8));
     const rim=new T.DirectionalLight(0x8ddaff,3.2);
     rim.position.set(-3,4,1);scene.add(rim);
-    draw.current=id=>{
-      knight.equip(id);
+    draw.current=(id,tier)=>{
+      knight.equip(id,tier);
       knight.update(.016,{speed:0,sprinting:false});
       renderer.render(scene,camera);
     };
@@ -34,7 +34,8 @@ export function KnightPreview({weapon}:{weapon:WeaponId}){
       draw.current=null;
       const geometries=new Set<T.BufferGeometry>(), materials=new Set<T.Material>();
       scene.traverse(node=>{
-        if(node instanceof T.Mesh){
+        if(node instanceof T.InstancedMesh) node.dispose();
+        if(node instanceof T.Mesh||node instanceof T.Line){
           geometries.add(node.geometry);
           for(const material of Array.isArray(node.material)?node.material:[node.material]) materials.add(material);
         }
@@ -44,7 +45,7 @@ export function KnightPreview({weapon}:{weapon:WeaponId}){
       renderer.dispose();
     };
   },[]);
-  useEffect(()=>{draw.current?.(weapon);},[weapon]);
+  useEffect(()=>{draw.current?.(weapon,tier);},[weapon,tier]);
   return <div className="knight-preview">
     {unavailable?<div className="preview-fallback" aria-label="3D preview unavailable"><Glyph kind="armor"/></div>:
       <canvas ref={canvas} width={230} height={300} aria-label="Dark Knight equipment preview"/>}

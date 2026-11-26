@@ -39,7 +39,7 @@ export function startWilderness(
   const camera=new T.PerspectiveCamera(43,1,.3,400);
   const knight=createDarkKnight();
   const body=knight.root;
-  knight.equip(save.equipped);
+  knight.equip(save.equipped,save.items.find(item=>item.id===save.selectedItem)?.rarity);
 
   scene.add(body);
   const water=terrain(scene);
@@ -65,7 +65,7 @@ export function startWilderness(
     }
     save.equipped=id;
     save.selectedItem=item.id;
-    knight.equip(id);
+    knight.equip(id,item.rarity);
     abilitySeconds=Math.ceil(encounters.abilityRemaining);
     onCombat(notification,prompt,abilitySeconds,bossHealth);
     onSaveChange();
@@ -76,6 +76,7 @@ export function startWilderness(
   const controller=new AbortController();
   const {signal}=controller;
   const keys=new Set<string>();
+  let shakePhase=0;
   let zoom=36,distance=zoom,lastReport=0,reportedX=start.x,reportedZ=start.z,reportedYaw=start.yaw;
   function resize(){
     const width=Math.max(1,canvas.clientWidth),height=Math.max(1,canvas.clientHeight);
@@ -144,6 +145,7 @@ export function startWilderness(
     scheduler:browserFrameScheduler,
     update(dt){
       frameDelta=uiOpen()?0:dt;
+      shakePhase+=frameDelta;
       if(uiOpen()||!save.health) {keys.clear(); blocking=false;}
       const x=Number(keys.has('KeyD'))-Number(keys.has('KeyA'));
       const z=Number(keys.has('KeyS'))-Number(keys.has('KeyW'));
@@ -182,6 +184,8 @@ export function startWilderness(
       focus.lerp(destination,1-Math.exp(-7*dt));
       distance=T.MathUtils.lerp(distance,zoom,1-Math.exp(-9*dt));
       camera.position.copy(focus).addScaledVector(offset,distance);
+      camera.position.x+=Math.sin(shakePhase*76)*encounters.shake*.105;
+      camera.position.y+=Math.cos(shakePhase*67)*encounters.shake*.075;
       camera.lookAt(focus);
       lastReport+=dt;
       if(lastReport>=.09&&(p.x!==reportedX||p.z!==reportedZ||Math.abs(body.rotation.y-reportedYaw)>.025)){
@@ -190,7 +194,7 @@ export function startWilderness(
     },
     render(time){
       water.value=time;
-      animateGrass(time);
+      animateGrass(time,encounters.dashing);
       animateNight(time,body.position);
       updateDen(time);
       encounters.render(frameDelta);
@@ -225,7 +229,7 @@ export function startWilderness(
     scene.traverse(object=>{
       if(object instanceof T.InstancedMesh) object.dispose();
       if(object instanceof T.DirectionalLight) object.shadow.dispose();
-      if(object instanceof T.Mesh||object instanceof T.Points){
+      if(object instanceof T.Mesh||object instanceof T.Points||object instanceof T.Line){
         geometries.add(object.geometry);
         for(const material of Array.isArray(object.material)?object.material:[object.material]) materials.add(material);
       }

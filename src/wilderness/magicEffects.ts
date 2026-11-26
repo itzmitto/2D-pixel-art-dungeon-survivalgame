@@ -4,7 +4,7 @@ import type { Ability } from './weapons.ts';
 
 export type Point={x:number;z:number};
 type Shape='spark'|'ring'|'arc'|'frost'|'scorch'|'ray'|'mist'|'crystal';
-type Options={lift?:number;grow?:number;y?:number;dx?:number;dz?:number;yaw?:number;opacity?:number;aspect?:number};
+type Options={lift?:number;grow?:number;y?:number;dx?:number;dz?:number;yaw?:number;opacity?:number;aspect?:number;limit?:number;delay?:number};
 
 function crescent(){
   const positions:number[]=[], uv:number[]=[], indices:number[]=[];
@@ -22,6 +22,7 @@ function crescent(){
   geo.setAttribute('position',new T.Float32BufferAttribute(positions,3));
   geo.setAttribute('uv',new T.Float32BufferAttribute(uv,2));
   geo.setIndex(indices);
+  geo.computeVertexNormals();
   return geo;
 }
 
@@ -105,7 +106,7 @@ export function createMagicEffects(group:T.Group) {
     mesh.renderOrder=2+index;
     group.add(mesh);
     const effect={mesh,life:0,max:1,size:1,grow:0,lift:0,dx:0,dz:0,opacity:1,aspect:1,
-      mode:0,tint:new T.Color(),shape:'spark' as Shape};
+      delay:0,limit:Infinity,mode:0,tint:new T.Color(),shape:'spark' as Shape};
     mesh.onBeforeRender=()=>{
       glow.uniforms.tint.value.copy(effect.tint);
       glow.uniforms.mode.value=effect.mode;
@@ -115,9 +116,38 @@ export function createMagicEffects(group:T.Group) {
     };
     return effect;
   }));
+  const particleMaterial=new T.ShaderMaterial({
+    vertexShader:`
+      attribute vec4 particleColor;
+      varying vec4 vColor;
+      void main(){
+        vColor=particleColor;
+        gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.);
+      }`,
+    fragmentShader:`
+      varying vec4 vColor;
+      void main(){
+        gl_FragColor=vColor;
+        #include <colorspace_fragment>
+      }`,
+    transparent:true,depthWrite:false,blending:T.AdditiveBlending,toneMapped:false,
+  });
+  function particleBatch(geometry:T.BufferGeometry){
+    const capacity=100;
+    const colors=new T.InstancedBufferAttribute(new Float32Array(capacity*4),4).setUsage(T.DynamicDrawUsage);
+    geometry.setAttribute('particleColor',colors);
+    const mesh=new T.InstancedMesh(geometry,particleMaterial,capacity);
+    mesh.count=0;mesh.frustumCulled=false;mesh.renderOrder=3;
+    mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
+    group.add(mesh);
+    return {mesh,colors};
+  }
+  const particles={spark:particleBatch(geometries.spark),crystal:particleBatch(geometries.crystal)};
+  const particleBatches=Object.values(particles);
   const scorchMaterial=new T.MeshBasicMaterial({color:0x21100d,transparent:true,depthWrite:false});
+  const scorchGeometry=new T.CircleGeometry(1,18).rotateX(-Math.PI/2);
   const scorchMarks=Array.from({length:7},()=>{
-    const mesh=new T.Mesh(new T.CircleGeometry(1,18).rotateX(-Math.PI/2),scorchMaterial.clone());
+    const mesh=new T.Mesh(scorchGeometry,scorchMaterial.clone());
     group.add(mesh);mesh.visible=false;
     return {mesh,life:0};
   });
@@ -140,17 +170,20 @@ export function createMagicEffects(group:T.Group) {
   const cursors=[0,0];
   let boltCursor=0,scorchCursor=0,time=0;
   function emit(point:Point,color:number,shape:Shape,size:number,seconds:number,options:Options={}){
-    const channel=shape==='spark'||shape==='crystal'||shape==='mist'?1:0;
+    const channel=shape==='spark'||(shape==='crystal'&&seconds<1)||shape==='mist'?1:0;
     const pool=pools[channel];
     const p=pool.find(effect=>effect.life===0)??pool[cursors[channel]++%pool.length],mesh=p.mesh;
     p.life=p.max=seconds;p.size=size;p.grow=options.grow??0;p.lift=options.lift??0;
     p.dx=options.dx??0;p.dz=options.dz??0;p.opacity=options.opacity??.76;
-    p.aspect=options.aspect??1;p.tint.setHex(color);p.mode=modes[shape];p.shape=shape;
+    p.aspect=options.aspect??1;p.delay=options.delay??0;p.limit=options.limit??Infinity;p.tint.setHex(color);p.mode=modes[shape];p.shape=shape;
     mesh.geometry=geometries[shape];
     mesh.position.set(point.x,surface(point.x,point.z)+(options.y??.09),point.z);
     mesh.scale.set(size,size*p.aspect,size);
     mesh.rotation.set(shape==='mist'?-.83:0,options.yaw??0,0);
-    mesh.visible=true;
+    mesh.visible=p.delay===0&&shape!=='spark'&&shape!=='crystal';
+    if(shape==='ring'||shape==='scorch'||shape==='frost') alignGround(mesh,point);
+    if(shape==='scorch'&&scorchCursor%2===0) scorchMark(point);
+    if(shape==='scorch') scorchCursor++;
   }
   function scatter(point:Point,color:number,count:number,height=.4,shape:'spark'|'crystal'='spark'){
     for(let i=0;i<count;i++){
@@ -159,12 +192,12 @@ export function createMagicEffects(group:T.Group) {
         {y:height,lift:.8+i%3,dx:Math.cos(a)*(2+i%3),dz:Math.sin(a)*(2+i%3),yaw:a,aspect:1.3});
     }
   }
-  function lightning(from:Point,to:Point,strike=false,small=false){
+  function lightning(from:Point,to:Point,strike=false,small=false,ground=false){
     const bolt=bolts[boltCursor++%bolts.length];
     bolt.life=bolt.max=small?.12:.31;
     bolt.line.visible=true;
-    bolt.x=from.x;bolt.z=from.z;bolt.y=surface(from.x,from.z)+(strike?10:small?1.65:.9);
-    bolt.tx=to.x;bolt.tz=to.z;bolt.ty=surface(to.x,to.z)+(strike?.09:small?.68:.92);
+    bolt.x=from.x;bolt.z=from.z;bolt.y=surface(from.x,from.z)+(strike?10:ground?.19:small?1.65:.9);
+    bolt.tx=to.x;bolt.tz=to.z;bolt.ty=surface(to.x,to.z)+(strike?.09:ground?.19:small?.68:.92);
     bolt.seed=boltCursor;
   }
   function slash(point:Point,element:Ability|null,yaw:number,size:number,power=false){
@@ -192,15 +225,19 @@ export function createMagicEffects(group:T.Group) {
       emit(offset,color,'ray',.46+i*.053,1.18+i*.12,{y:1.12+i*.13,aspect:3.7,lift:.51,yaw:a,opacity:.65});
     }
   }
+  function alignGround(mesh:T.Mesh,point:Point){
+    const dx=(surface(point.x+.6,point.z)-surface(point.x-.6,point.z))/1.2;
+    const dz=(surface(point.x,point.z+.6)-surface(point.x,point.z-.6))/1.2;
+    mesh.rotation.set(Math.atan(-dz),0,Math.atan(dx));
+  }
+  function scorchMark(point:Point){
+    const mark=scorchMarks[Math.floor(scorchCursor/2)%scorchMarks.length];
+    mark.life=1.42;mark.mesh.visible=true;
+    mark.mesh.position.set(point.x,surface(point.x,point.z)+.036,point.z);
+    mark.mesh.scale.set(1.42,1,.86);alignGround(mark.mesh,point);
+  }
   return {
     emit,scatter,lightning,slash,impact,treasure,
-    scorch(point:Point){
-      const mark=scorchMarks[scorchCursor++%scorchMarks.length];
-      mark.life=1.42;mark.mesh.visible=true;
-      mark.mesh.position.set(point.x,surface(point.x,point.z)+.036,point.z);
-      mark.mesh.scale.set(1.42,1,.86);
-      emit(point,0xea4214,'scorch',1.40,.73,{y:.045,opacity:.69});
-    },
     barrier(player:T.Vector3,active:boolean){
       barrier.visible=active;
       if(active){barrier.position.copy(player);barrier.position.y+=.99;}
@@ -209,6 +246,7 @@ export function createMagicEffects(group:T.Group) {
       for(const pool of pools) for(const p of pool){p.life=0;p.mesh.visible=false;}
       for(const b of bolts){b.life=0;b.line.visible=false;}
       for(const mark of scorchMarks){mark.life=0;mark.mesh.visible=false;}
+      for(const {mesh} of particleBatches) mesh.count=0;
       barrier.visible=false;
     },
     update(dt:number){
@@ -232,21 +270,42 @@ export function createMagicEffects(group:T.Group) {
         }
         b.vertices.needsUpdate=true;
       }
+      for(const {mesh} of particleBatches) mesh.count=0;
       for(const pool of pools) for(const p of pool){
         if(p.life<=0) continue;
-        p.life=Math.max(0,p.life-dt);p.mesh.visible=p.life>0;
+        if(p.delay>0){
+          p.delay=Math.max(0,p.delay-dt);
+          if(p.delay>0) continue;
+        }
+        p.life=Math.max(0,p.life-dt);
+        const batched=p.shape==='spark'||p.shape==='crystal';
+        p.mesh.visible=!batched&&p.life>0;
+        if(!p.life) continue;
         p.mesh.position.x+=p.dx*dt;p.mesh.position.z+=p.dz*dt;p.mesh.position.y+=p.lift*dt;
-        const size=p.size+(p.max-p.life)*p.grow;
+        const size=Math.min(p.limit,p.size+(p.max-p.life)*p.grow);
         const reveal=p.shape==='crystal'?T.MathUtils.smoothstep(p.max-p.life,0,.38):1;
         p.mesh.scale.set(size,size*p.aspect*reveal,size);
         if(p.shape==='spark') p.mesh.rotation.z+=dt*4;
+        if(p.shape==='spark'||p.shape==='crystal'){
+          const {mesh,colors}=particles[p.shape],index=mesh.count++;
+          p.mesh.updateMatrix();
+          mesh.setMatrixAt(index,p.mesh.matrix);
+          colors.setXYZW(index,p.tint.r*.78+.22,p.tint.g*.78+.22,p.tint.b*.78+.22,
+            p.opacity*T.MathUtils.smoothstep(p.life/p.max,0,.8));
+        }
+      }
+      for(const {mesh,colors} of particleBatches) if(mesh.count){
+        mesh.instanceMatrix.needsUpdate=true;
+        colors.needsUpdate=true;
       }
     },
     dispose(){
-      glow.dispose();dome.dispose();
+      glow.dispose();dome.dispose();particleMaterial.dispose();
+      for(const {mesh} of particleBatches) mesh.dispose();
       for(const {line} of bolts){line.geometry.dispose();line.material.dispose();}
       for(const geometry of new Set(Object.values(geometries))) geometry.dispose();
-      for(const {mesh} of scorchMarks){mesh.geometry.dispose();mesh.material.dispose();}
+      for(const {mesh} of scorchMarks) mesh.material.dispose();
+      scorchGeometry.dispose();
       scorchMaterial.dispose();
     },
   };

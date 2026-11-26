@@ -3,7 +3,7 @@ import { bank, clearing, extent, height, landmarkDistance, trailDistance, random
 import { obstacleGrid } from './spatial';
 
 export function meadow(scene:T.Scene, player:T.Vector3, rocks:readonly {x:number;z:number;r:number}[], seed:number) {
-  const clock={value:0};
+  const clock={value:0}, dashGust={value:0};
   const geometry=new T.BufferGeometry();
   const vertices: number[] = [], triangles: number[] = [];
   const blade = [[-.095,0,0],[.095,0,0],[-.055,.58,.07],[.055,.58,.07],[.005,1,.15]];
@@ -20,13 +20,14 @@ export function meadow(scene:T.Scene, player:T.Vector3, rocks:readonly {x:number
   const material=new T.MeshStandardMaterial({side:T.DoubleSide,roughness:.97});
   material.onBeforeCompile=s=>{
     s.uniforms.windTime=clock;
+    s.uniforms.dashGust=dashGust;
     s.uniforms.walker={value:player};
-    s.vertexShader='uniform float windTime; uniform vec3 walker; varying float bladeHeight;\n'+s.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
+    s.vertexShader='uniform float windTime; uniform float dashGust; uniform vec3 walker; varying float bladeHeight;\n'+s.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
       vec3 root=instanceMatrix[3].xyz;
       vec2 away=root.xz-walker.xz;
       float d=length(away);
       float gust=sin(root.x*.17+root.z*.14-windTime*2.2)+.35*sin(root.z*.7+windTime*3.);
-      vec2 sway=vec2(gust*.19,gust*.09)+away/max(d,.01)*(1.-smoothstep(.05,2.3,d))*.8;
+      vec2 sway=vec2(gust*.19,gust*.09)+away/max(d,.01)*(1.-smoothstep(.05,2.3+dashGust*1.9,d))*(.8+dashGust*1.1);
       transformed.xz+=vec2(dot(instanceMatrix[0].xz,sway),dot(instanceMatrix[2].xz,sway))*position.y*position.y;
       bladeHeight=position.y;`);
     s.fragmentShader='varying float bladeHeight;\n'+s.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
@@ -61,7 +62,8 @@ export function meadow(scene:T.Scene, player:T.Vector3, rocks:readonly {x:number
     scene.add(mesh);
     patches.push({mesh,x:x+span/2,z:z+span/2,capacity:count});
   }
-  return (time:number)=>{
+  return (time:number,dashing:boolean)=>{
+    dashGust.value=Math.max(dashing?1:0,dashGust.value-Math.max(0,time-clock.value)*3.4);
     clock.value=time;
     for(const {mesh,x,z,capacity} of patches) {
       const d=Math.hypot(x-player.x,z-player.z);
