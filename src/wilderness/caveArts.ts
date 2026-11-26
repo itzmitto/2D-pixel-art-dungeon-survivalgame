@@ -1,14 +1,15 @@
 import * as T from 'three';
 import type { createMagicEffects, Point } from './magicEffects.ts';
 import { loft, meshPart } from './creatureGeometry.ts';
+import { dragonPhase } from './bossCaves.ts';
 import { surface } from './layout.ts';
 
 export const advancedKinds=['skeletonKing','darkArchmage','infernalGolem','ancientDragon'] as const;
 export type AdvancedKind=typeof advancedKinds[number];
 export const isAdvancedBoss=(kind:string):kind is AdvancedKind=>advancedKinds.some(boss=>kind===boss);
 type Move='royal'|'prison'|'summon'|'death'|'barrage'|'explode'|'barrier'|'meteor'|
-  'magma'|'firewave'|'burn'|'rush'|'breath'|'tail'|'claw'|'air'|'land';
-type Actor={id:string;kind:string;hp:number;root:T.Group;heading:number;enraged?:boolean;ward:number;wardCool:number};
+  'magma'|'firewave'|'burn'|'rush'|'breath'|'tail'|'claw'|'air'|'land'|'stomp'|'dive'|'inferno'|'rings'|'fury';
+type Actor={id:string;kind:string;hp:number;spec:{health:number};root:T.Group;heading:number;enraged?:boolean;ward:number;wardCool:number};
 export type BossCast={move:Move;duration:number;yaw:number;marks:Point[]};
 type Hazard<Enemy>={owner:Enemy;point:Point;radius:number;delay:number;life:number;interval:number;tick:number;strength:number;type:'meteor'|'blast'|'burn'};
 type Volley<Enemy>={owner:Enemy;x:number;z:number;dx:number;dz:number;life:number;trail:number;strength:number};
@@ -16,14 +17,19 @@ const moves={
   skeletonKing:['royal','prison','death','summon'],
   darkArchmage:['barrage','explode','barrier','meteor'],
   infernalGolem:['magma','firewave','burn','rush'],
-  ancientDragon:['breath','tail','claw','air'],
+  ancientDragon:[
+    ['claw','tail','breath','stomp'],['air','dive','burn','land'],['inferno','rings','meteor','fury'],
+  ],
 } as const;
 const labels:Record<Move,string>={
   royal:'Royal Cleave',prison:'Bone Prison',summon:'Undead Summoning',death:'Death Wave',barrage:'Arcane Barrage',
   explode:'Shadow Explosion',barrier:'Arcane Barrier',meteor:'Meteor Strike',magma:'Magma Slam',firewave:'Fire Shockwave',
-  burn:'Burning Ground',rush:'Heavy Charge',breath:'Fire Breath',tail:'Tail Sweep',claw:'Claw Strike',air:'Aerial Fire Attack',land:'Landing Shockwave',
+  burn:'Burning Ground',rush:'Heavy Charge',breath:'Fire Breath',tail:'Tail Sweep',claw:'Claw Strike',air:'Aerial Fire Barrage',land:'Landing Shockwave',
+  stomp:'Heavy Stomp',dive:'Diving Attack',inferno:'Infernal Breath',rings:'Expanding Fire Rings',fury:'Enraged Claw Attacks',
 };
 const colors:Record<AdvancedKind,number>={skeletonKing:0x8ae9b1,darkArchmage:0xc085ff,infernalGolem:0xff8648,ancientDragon:0xffb35d};
+const colorForDragon=colors.ancientDragon;
+const flightLength=(move:'air'|'land'|'dive')=>move==='dive'?1.67:move==='air'?1.54:1.19;
 function along(origin:Point,yaw:number,distance:number){return {x:origin.x+Math.sin(yaw)*distance,z:origin.z+Math.cos(yaw)*distance};}
 const gap=(a:Point,b:Point)=>Math.hypot(a.x-b.x,a.z-b.z);
 function cone(origin:Point,target:Point,yaw:number,range:number,width:number){
@@ -34,7 +40,7 @@ export function caveArts<Enemy extends Actor>(
   group:T.Group,player:T.Group,fx:ReturnType<typeof createMagicEffects>,
   walk:(x:number,z:number)=>boolean,clear:(x:number,z:number,tx:number,tz:number)=>boolean,
   damage:(enemy:Enemy,blocking:boolean,force:boolean,strength:number)=>void,
-  summon:(enemy:Enemy)=>void,show:(text:string)=>void,
+  summon:(enemy:Enemy)=>void,show:(text:string)=>void, tremor:(strength:number)=>void=()=>{},
 ){
   const volleys:Volley<Enemy>[]=[], areas:Hazard<Enemy>[]=[];
   const blockGeometry=loft([[0,.13,-.14,.143],[.26,.19,-.18,.19],[.46,.12,-.13,.13],[1.12,.09,-.08,.096],[1.49,.02,-.02,.019]],7).rotateX(-Math.PI/2);
@@ -44,7 +50,8 @@ export function caveArts<Enemy extends Actor>(
     return {mesh,life:0};
   });
   const waves:{owner:Enemy;point:Point;radius:number;front:number;strength:number}[]=[];
-  const air=new Map<Enemy,{time:number;point:Point;fire:boolean}>();
+  const air=new Map<Enemy,{time:number;point:Point;origin:Point;move:'air'|'dive'|'land'}>();
+  const breaths:{owner:Enemy;origin:Point;yaw:number;range:number;angle:number;strength:number;life:number;tick:number;hit:boolean}[]=[];
   let blocking=false;
   function pulse(point:Point,color:number,radius:number){
     fx.emit(point,color,'ring',.89,.56,{grow:radius/.56,y:.15,opacity:.96});
@@ -74,17 +81,54 @@ export function caveArts<Enemy extends Actor>(
     flying(enemy:Enemy){return air.has(enemy);},
     altitude(enemy:Enemy){
       const flight=air.get(enemy);
-      return flight?Math.sin(Math.PI*T.MathUtils.clamp(flight.time/2.3,0,1))*3.3:0;
+      return flight?Math.sin(Math.PI*T.MathUtils.clamp(flight.time/flightLength(flight.move),0,1))*(flight.move==='land'?2:3.35):0;
     },
+    flightMove(enemy:Enemy){return air.get(enemy)?.move;},
+    flightProgress(enemy:Enemy){const flight=air.get(enemy);return flight?flight.time/flightLength(flight.move):0;},
     start(enemy:Enemy,sequence:number):BossCast|undefined{
       if(!isAdvancedBoss(enemy.kind)||air.has(enemy)) return;
       const kind=enemy.kind,p=enemy.root.position,q=player.position,color=colors[kind];
       const yaw=Math.atan2(q.x-p.x,q.z-p.z),distance=gap(p,q);
-      let move:Move=moves[kind][sequence%4];
+      const phase=kind==='ancientDragon'?dragonPhase(enemy.hp/enemy.spec.health):1;
+      let move:Move=kind==='ancientDragon'?moves.ancientDragon[phase-1][sequence%4]:moves[kind][sequence%4];
       if(kind==='darkArchmage'&&move==='barrier'&&enemy.wardCool>0) move='meteor';
       if(kind==='skeletonKing'&&distance>7&&move==='royal') move='death';
       if(kind==='infernalGolem'&&distance>9&&move==='magma') move='rush';
-      if(kind==='ancientDragon'&&distance>9&&(move==='tail'||move==='claw')) move=sequence%2?'air':'breath';
+      if(kind==='ancientDragon'){
+        if((move==='claw'||move==='tail'||move==='stomp'||move==='fury')&&distance>9.0) return;
+        const duration=move==='inferno'?1.20:move==='claw'?.92:move==='fury'?.86:move==='rings'?1.23:1.13;
+        const target={x:q.x,z:q.z};
+        let marks:Point[]=[];
+        if(move==='dive'){
+          const landing=along(p,yaw,Math.min(11,distance));
+          marks=walk(landing.x,landing.z)?[landing]:[{x:p.x,z:p.z}];
+          mark(marks[0],4.5,color,duration+flightLength('dive'));
+          for(let i=1;i<=6;i++){
+            const point=along(p,yaw,Math.min(11,distance)*i/6);
+            if(walk(point.x,point.z)) fx.emit(point,0xffce88,'ring',1.23,duration+flightLength('dive')*.6,{opacity:.57});
+          }
+        }else if(move==='air'||move==='meteor'){
+          marks=[target,along(target,yaw+Math.PI*.62,4.5),along(target,yaw-Math.PI*.62,4.5)];
+          if(move==='meteor') marks.push(along(target,yaw+Math.PI,6.4));
+          marks=marks.filter(point=>walk(point.x,point.z));
+          marks.forEach((point,i)=>mark(point,move==='air'?2.8:3.15,color,duration+.54+i*.23));
+        }else if(move==='land'||move==='stomp'||move==='rings'||move==='tail'||move==='burn'){
+          const radius=move==='land'?8.6:move==='stomp'?6.15:move==='tail'?8.1:move==='burn'?4.9:12.6;
+          const point=move==='burn'?target:{x:p.x,z:p.z};
+          marks=[point];
+          mark(point,radius,color,duration+(move==='land'?flightLength('land'):0));
+        }else{
+          const breath=move==='breath'||move==='inferno', width=breath?(move==='inferno'?.49:.37):1.04;
+          const reach=breath?(move==='inferno'?20:17):move==='fury'?7.1:6.6;
+          for(const lane of [-width,-width*.51,0,width*.51,width]) for(let i=1;i<=4;i++){
+            const point=along(p,yaw+lane,reach*i/4);
+            if(walk(point.x,point.z)) fx.emit(point,color,'ring',breath?1.16:1.42,duration,{y:.13,opacity:.66});
+          }
+          fx.emit(p,0xffa45a,'arc',reach*.69,duration,{yaw,y:.22,aspect:.12,opacity:.51});
+        }
+        show('Boss technique · '+labels[move]);
+        return {move,duration,yaw,marks};
+      }
       const duration=(move==='meteor'||move==='air'?1.36:move==='death'||move==='magma'?1.19:1.01)*(enemy.enraged?.79:1);
       const marks:Point[]=[];
       const target={x:q.x,z:q.z};
@@ -113,6 +157,46 @@ export function caveArts<Enemy extends Actor>(
       if(!isAdvancedBoss(enemy.kind)) return;
       const {move,yaw,marks}=cast,p=enemy.root.position,q=player.position,color=colors[enemy.kind];
       const target=marks[0]??q;
+      if(enemy.kind==='ancientDragon'){
+        const origin={x:p.x,z:p.z};
+        const wave=(point:Point,radius:number,strength:number,delay=0)=>{
+          waves.push({owner:enemy,point:{...point},radius,front:-radius*delay/.67,strength});
+          fx.emit(point,color,'ring',.39,.70,{grow:radius/.62,delay,y:.18,opacity:.94});
+        };
+        if(move==='air'||move==='dive'||move==='land'){
+          air.set(enemy,{time:0,point:{...(move==='dive'?target:origin)},origin,move});
+          if(move==='air') marks.forEach((point,i)=>hazard(enemy,point,2.8,.54+i*.23,'meteor',.73));
+          return;
+        }
+        if(move==='breath'||move==='inferno'){
+          const ultimate=move==='inferno';
+          breaths.push({owner:enemy,origin,yaw,range:ultimate?20:17,angle:ultimate?.49:.37,
+            strength:ultimate?1.18:.91,life:ultimate?1.15:.92,tick:0,hit:false});
+          return;
+        }
+        if(move==='meteor'){
+          marks.forEach((point,i)=>hazard(enemy,point,3.15,.54+i*.23,'meteor',1.02));
+          return;
+        }
+        if(move==='burn'){hazard(enemy,target,4.9,0,'burn',.32);return;}
+        if(move==='rings'){
+          wave(origin,12.6,1.06);wave(origin,9.5,.89,.82);tremor(.46);return;
+        }
+        if(move==='stomp'||move==='tail'){
+          const radius=move==='tail'?8.1:6.15;
+          pulse(origin,color,radius);tremor(move==='stomp'?.71:.38);
+          if(gap(origin,q)<radius&&clear(p.x,p.z,q.x,q.z)) damage(enemy,blocking,true,move==='tail'?.85:1.05);
+          if(move==='tail') fx.emit(origin,color,'arc',radius*.79,.46,{yaw:yaw+1.42,y:.88,aspect:.42});
+          return;
+        }
+        if(move==='claw'||move==='fury'){
+          const radius=move==='fury'?7.1:6.6;
+          fx.emit(p,color,'arc',radius*.74,.37,{yaw,y:1.15,aspect:1.74});
+          if(move==='fury') fx.emit(p,0xffdcaa,'arc',radius*.72,.35,{yaw:yaw-.36,y:.84,aspect:.72,delay:.12});
+          if(cone(p,q,yaw,radius,1.04)&&clear(p.x,p.z,q.x,q.z)) damage(enemy,blocking,false,move==='fury'?1.22:.87);
+          return;
+        }
+      }
       switch(move){
         case 'royal':case 'claw':case 'tail': {
           const range=move==='tail'?7.4:move==='claw'?5.25:6;
@@ -166,13 +250,6 @@ export function caveArts<Enemy extends Actor>(
           barrage(enemy,yaw,[-.30,-.18,-.06,.06,.18,.30],.64,17);
           for(let i=1;i<=6;i++) fx.emit(along(p,yaw,i*1.85),color,'mist',1.8,.45,{grow:2.7,y:.91,opacity:.67});
           break;
-        case 'air':
-          air.set(enemy,{time:0,point:{...target},fire:false});
-          for(const [i,point] of marks.entries()) if(walk(point.x,point.z)){
-            const delay=1.04+i*.18;
-            mark(point,2.48,color,delay);hazard(enemy,point,2.48,delay,'meteor',.8);
-          }
-          break;
       }
     },
     update(dt:number,isBlocking:boolean){
@@ -186,23 +263,44 @@ export function caveArts<Enemy extends Actor>(
       for(const [enemy,flight] of air){
         if(!enemy.hp){air.delete(enemy);continue;}
         const p=enemy.root.position;flight.time+=dt;
-        const d=gap(flight.point,p);
-        if(d>1&&flight.time<1.77){
-          const step=Math.min(d,dt*6.2);
-          const x=p.x+(flight.point.x-p.x)*step/d,z=p.z+(flight.point.z-p.z)*step/d;
-          if(walk(x,z)){p.x=x;p.z=z;}
+        const length=flightLength(flight.move), progress=flight.time/length;
+        if(flight.move==='dive'){
+          const dive=T.MathUtils.smoothstep(progress,.32,.93);
+          const x=T.MathUtils.lerp(flight.origin.x,flight.point.x,dive),z=T.MathUtils.lerp(flight.origin.z,flight.point.z,dive);
+          if(walk(x,z)&&clear(p.x,p.z,x,z)){p.x=x;p.z=z;}
         }
-        if(flight.time>=1.62&&!flight.fire){
-          flight.fire=true;show('Boss technique · Landing Shockwave');
-          mark(p,8.7,colors.ancientDragon,.70);
+        if(progress>=1){
+          air.delete(enemy);
+          const radius=flight.move==='land'?8.6:flight.move==='dive'?4.5:0;
+          if(radius){
+            pulse(p,colorForDragon,radius);tremor(.86);
+            fx.emit(p,0xe5ad80,'mist',2.14,.51,{grow:6.1,y:.23});
+            if(gap(p,player.position)<radius&&clear(p.x,p.z,player.position.x,player.position.z)) damage(enemy,blocking,true,1.10);
+          }
         }
-        if(flight.time>=2.3){
-          air.delete(enemy);this.resolve(enemy,{move:'land',duration:.7,yaw:enemy.heading,marks:[]});
+      }
+      for(let i=breaths.length-1;i>=0;i--){
+        const fire=breaths[i], {owner,origin,yaw,range,angle}=fire;
+        fire.life-=dt;fire.tick-=dt;
+        if(!owner.hp||fire.life<=0){breaths.splice(i,1);continue;}
+        if(fire.tick>0) continue;
+        fire.tick=.15;
+        for(let lane=-1;lane<=1;lane++) for(let row=1;row<=4;row++){
+          const direction=yaw+lane*angle*.72, point=along(origin,direction,range*row/4);
+          if(!walk(point.x,point.z)) continue;
+          fx.emit(point,row===1?0xffe39c:0xff5a27,'mist',1.54+row*.33,.32,{y:1.9-row*.27,grow:2.4,
+            dx:Math.sin(direction)*3.3,dz:Math.cos(direction)*3.3,opacity:.83});
+          if(lane===0) fx.emit(point,0xffa641,'arc',2.7,.23,{yaw:direction,y:1.66-row*.21,aspect:.54,opacity:.67});
+        }
+        const q=player.position;
+        if(!fire.hit&&cone(origin,q,yaw,range,angle)&&clear(origin.x,origin.z,q.x,q.z)){
+          fire.hit=true;damage(owner,blocking,false,fire.strength);
         }
       }
       for(let i=waves.length-1;i>=0;i--){
         const wave=waves[i],previous=wave.front,d=gap(wave.point,player.position);
-        wave.front+=wave.radius*dt/.55;
+        wave.front+=wave.radius*dt/(wave.owner.kind==='ancientDragon'?.67:.55);
+        if(wave.front<0) continue;
         if(wave.owner.hp>0&&d<wave.front+.45&&d>=Math.max(0,previous-.56)&&clear(wave.point.x,wave.point.z,player.position.x,player.position.z)){
           damage(wave.owner,false,true,wave.strength);waves.splice(i,1);
         }else if(!wave.owner.hp||wave.front>wave.radius+.66) waves.splice(i,1);
@@ -253,7 +351,7 @@ export function caveArts<Enemy extends Actor>(
         if(field.life<=0) areas.splice(i,1);
       }
     },
-    clear(){areas.length=volleys.length=waves.length=0;air.clear();for(const bone of bones){bone.life=0;bone.mesh.visible=false;}},
+    clear(){areas.length=volleys.length=waves.length=breaths.length=0;air.clear();for(const bone of bones){bone.life=0;bone.mesh.visible=false;}},
     dispose(){blockGeometry.dispose();blockMaterial.dispose();},
   };
 }

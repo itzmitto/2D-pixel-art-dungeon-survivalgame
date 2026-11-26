@@ -69,3 +69,7 @@ export function dragonScytheReward(seed:number,cycle:number,received:boolean){
   const roll=Math.imul(seed^Math.imul(cycle,0x9e3779b1)^0x6719,0x85ebca6b);
   return ((roll^(roll>>>16))>>>0)/0x1_0000_0000<voidReaperDropChance;
 }
+
+
+export const dragonPhase=(fraction:number)=>fraction<=.30?3:fraction<=.65?2:1;
+export const dragonPhaseTitles=['Dragon’s Wrath','Burning Skies','Infernal Awakening'] as const;

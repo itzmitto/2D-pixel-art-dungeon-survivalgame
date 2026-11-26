@@ -3,7 +3,9 @@ import * as T from 'three';
 import { rarity, weapons, type Rarity, type WeaponId } from './weapons.ts';
 
 export function weaponModel(id:Exclude<WeaponId,'longsword'>) {
-  if(id==='scythe') return voidReaperModel();
+  return id==='scythe'?voidReaperModel():elementalModel(id);
+}
+function elementalModel(id:Exclude<WeaponId,'longsword'|'scythe'>){
   const right=new T.Group(), left=new T.Group();
   const steel=new T.MeshStandardMaterial({color:'#cad6e5',metalness:.72,roughness:.25});
   const iron=new T.MeshStandardMaterial({color:'#343b54',metalness:.7,roughness:.36});
