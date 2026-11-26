@@ -1,8 +1,8 @@
 export const aurelia={id:'aurelia',name:'Aurelia Capital',kind:'capital',x:-27,z:-36,cx:-27,cz:-60,halfWidth:26,halfDepth:24,elevation:1.9} as const;
 export const aureliaPlaces=[
   {id:'aurelia-tree',name:'Golden Tree',kind:'capitalService',x:-27,z:-59},
-  {id:'merchant',name:'Mira · Merchant',kind:'capitalService',x:-40,z:-51.3},
-  {id:'smith',name:'Doran · Blacksmith',kind:'capitalService',x:-13.2,z:-53},
+  {id:'merchant',name:'Mira · Merchant',kind:'capitalService',x:-37.8,z:-51.3},
+  {id:'smith',name:'Doran · Blacksmith',kind:'capitalService',x:-13.2,z:-45},
   {id:'guild',name:'Hunter Guild',kind:'capitalService',x:-27,z:-72},
 ] as const;
 export type AureliaService='merchant'|'smith'|'guild';
