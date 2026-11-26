@@ -27,9 +27,9 @@ export const caveBossId=(cave:BossCave,cycle:number)=>'cave-'+cave.id+'-'+cycle;
 export const caveRewardId=(cave:BossCave,cycle:number)=>'reward-'+cave.id+'-'+cycle;
 export function caveStatus(cave:BossCave,runs:CaveRuns,opened:readonly string[],now=Date.now()){
   const run=runs[cave.id];
-  if(!run?.readyAt) return 'Encounter available';
+  if(!run?.readyAt) return 'Boss available';
   const seconds=Math.max(0,Math.ceil((run.readyAt-now)/1000));
   const time=Math.floor(seconds/60)+':'+String(seconds%60).padStart(2,'0');
-  if(!opened.includes(caveRewardId(cave,run.cycle))) return 'Reward waiting'+(seconds?' · Respawn in '+time:'');
-  return seconds?'Respawn in '+time:'Encounter available';
+  if(!opened.includes(caveRewardId(cave,run.cycle))) return 'Boss defeated · Reward chest available'+(seconds?' · Respawn in '+time:'');
+  return seconds?'Reward claimed · Boss respawning in '+time:'Boss available · Previous reward claimed';
 }

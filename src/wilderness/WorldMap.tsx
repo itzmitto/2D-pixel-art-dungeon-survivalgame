@@ -35,13 +35,14 @@ const symbols={
   gate:'M-4 5v-5a4 4 0 1 1 8 0v5M-6 5H6M0-1v4',
   chest:'M-5 5v-8l2-2h6l2 2v8z M-5 0H5 M0 0v2',
   bossCave:'M-7 5-4-2 0-6 4-2 7 5H3V2L0-1-3 2v3zM0 2v3',
+  explore:'M-5 5H5M-3 3-4 0 0-6 4 0 3 3H-3zM0-3v5',
   encounter:'M0-6 6 0 0 6-6 0ZM-2 0h4M0-2v4',
   boss:'M-5-5-3 1 0 5 3 1 5-5M-4-2 0-4 4-2M-2 1l2 2 2-2',
 };
 const descriptions:Record<keyof typeof symbols,string>={
   ruin:'Ancient ruin',bridge:'River crossing',campfire:'Safe campfire',camp:'Abandoned camp',
   waystone:'Waystone',orcCamp:'Orc encampment',briar:'Tower dungeon',ritual:'Wizard encounter · Veil Hierophant',
-  chest:'Discovered treasure',cave:'Cave landmark',tower:'Tower landmark · interior closed',gate:'Dungeon gate',boss:'Boss arena',bossCave:'Boss cave',encounter:'Active encounter',
+  chest:'Discovered treasure',cave:'Cave landmark',tower:'Tower landmark · interior closed',gate:'Dungeon gate',boss:'Boss arena',bossCave:'Boss cave',encounter:'Active encounter',explore:'Exploration site',
 };
 const AtlasTerrain=memo(function AtlasTerrain({roads}:{roads:boolean}){
   const texture=useMemo(terrainTexture,[]);
@@ -121,6 +122,7 @@ function filterFor(kind:MarkerKind):MapFilter|undefined{
     case 'ruin':return 'ruin';
     case 'campfire':return 'safe';
     case 'encounter':return 'encounter';
+    default:return undefined;
   }
 }
 
@@ -214,7 +216,7 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
   const pins:Pin[]=[
     ...landmarks.map(site=>({...site,id:site.name})),
     ...waystones.map(site=>({...site,kind:'waystone' as const})),
-    ...worldChests.map(chest=>({id:chest.id,name:chest.rarity+' Treasure Chest',x:chest.x,z:chest.z,kind:'chest' as const,
+    ...worldChests.map(chest=>({id:chest.id,name:chest.title??chest.rarity+' Treasure Chest',x:chest.x,z:chest.z,kind:'chest' as const,
       tier:chest.rarity,claimed:opened.includes(chest.id)})),
     ...getEncounters().map(marker=>({id:marker.id,name:marker.permanent?'Gravefang':marker.elite?'Elite encounter':'Enemy group',
       x:marker.x,z:marker.z,kind:marker.permanent?'boss' as const:'encounter' as const,group:marker})),

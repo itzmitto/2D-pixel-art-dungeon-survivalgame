@@ -24,3 +24,21 @@ export const ritualGrounds={name:'Forgotten Ritual Grounds',x:139,z:-63,kind:'ri
     {id:'ritual-elite',kind:'ritualElite',x:139,z:-68},
   ],
 } as const;
+
+export const explorationSites=[
+  {id:'ashen-procession',name:'Ashen Procession',x:-73,z:-57,style:'statues',dx:3.1,dz:2.5},
+  {id:'mossveil-wagon',name:'Mossveil Wagon',x:-150,z:97,style:'wagon',dx:2.8,dz:2.15},
+  {id:'gloamcap-hollow',name:'Gloamcap Hollow',x:84,z:97,style:'mushrooms',dx:2.57,dz:1.6},
+  {id:'broken-reliquary',name:'Broken Reliquary',x:127,z:-134,style:'ruin',dx:2.7,dz:2.2},
+  {id:'pilgrim-graves',name:'Pilgrim Graves',x:-136,z:-139,style:'graves',dx:2.66,dz:2.38},
+  {id:'lost-forester-camp',name:'Lost Forester Camp',x:128,z:146,style:'camp',dx:2.7,dz:2.3},
+  {id:'thornhide-armory',name:'Thornhide Armory',x:124,z:63.4,style:'rack',dx:2.7,dz:1.72},
+  {id:'veil-pilgrim',name:'Veil Pilgrim Stones',x:147.8,z:-55,style:'crystals',dx:2.52,dz:1.78},
+  {id:'rime-forecamp',name:'Rime Forecamp',x:161,z:175,style:'camp',dx:2.72,dz:2.03},
+  {id:'gravespur-cairn',name:'Gravespur Cairn',x:198,z:-175,style:'graves',dx:-2.9,dz:2.05},
+] as const;
+export const explorationTrails=[
+  [[-120,-40],[-104,-48],[-88,-53],[-73,-57]],
+  [[141,119],[137,128],[133,138],[128,146]],
+  [[-164,106],[-157,102],[-150,97]],
+] as const;

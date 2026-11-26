@@ -48,7 +48,7 @@ export function shadowArmy<Enemy extends Hostile>(
     const body=new T.IcosahedronGeometry(1,0).scale(beast?.35:.36,beast?.43:.81,beast?.97:.27)
       .translate(0,beast?1.35:1.15,0);
     const head=new T.OctahedronGeometry(1).scale(.27,.32,beast?.44:.27).translate(0,beast?1.70:2.06,beast?1.0:.08);
-    const parts=[body,head];
+    const parts:T.BufferGeometry[]=[body,head];
     for(const side of [-1,1]){
       for(const z of beast?[-.62,.61]:[.03])
         parts.push(new T.BoxGeometry(.16,beast?1.12:1.16,.18).translate(side*.26,.59,z));
@@ -73,11 +73,12 @@ export function shadowArmy<Enemy extends Hostile>(
   const tint=new T.Color(), warmRigLimit=18;
   const stamp=new T.Object3D();
   let time=0,lastPrune=0;
-  function spot(index:number,radius=2.6){
+  function spot(index:number,radius=2.55+Math.sqrt(index)*.85){
     const p=player.position;
     for(let i=0;i<12;i++){
       const angle=i*2.399+index*2.399+player.rotation.y+Math.PI;
-      const x=p.x+Math.sin(angle)*radius,z=p.z+Math.cos(angle)*radius;
+      const ring=Math.max(1.75,radius-i*.32);
+      const x=p.x+Math.sin(angle)*ring,z=p.z+Math.cos(angle)*ring;
       if(canWalk(x,z)&&clear(p.x,p.z,x,z)) return {x,z};
     }
     return {x:p.x,z:p.z};
@@ -123,7 +124,7 @@ export function shadowArmy<Enemy extends Hostile>(
   function summon(record:ShadowSoldier){
     if(record.active||record.readyAt>Date.now()||!save.health||active.size>=shadowCapacity(save.level)) return false;
     if(!record.health) record.health=shadowStats(record).health;
-    record.active=true;raise(record);
+    record.active=true;raise(record,undefined,active.size<10);
     return true;
   }
   return {

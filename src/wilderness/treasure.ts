@@ -1,14 +1,14 @@
 import { briarWatch, towerFloors } from './briarWatch.ts';
 import { armorSlots, type ArmorId } from './armor.ts';
 import { den } from './denLayout.ts';
-import { orcCamp, ritualGrounds } from './worldSites.ts';
+import { explorationSites, orcCamp, ritualGrounds } from './worldSites.ts';
 import * as T from 'three';
 import { surface, randomSequence } from './layout.ts';
 import { loft, shapedPlate, joint, meshPart, rigidBatcher } from './creatureGeometry.ts';
 import { rarity, type Rarity, type WeaponId } from './weapons.ts';
 import { rarityOrder } from './huntData.ts';
 
-export type Chest={id:string;x:number;z:number;rarity:Rarity;weapon:WeaponId;gold:number;armor:number;boss?:string;guardian?:string;guardians?:readonly string[];armorPiece?:ArmorId};
+export type Chest={id:string;title?:string;x:number;z:number;rarity:Rarity;weapon:WeaponId;gold:number;armor:number;boss?:string;guardian?:string;guardians?:readonly string[];armorPiece?:ArmorId};
 export const worldChests:Chest[]=[
   {id:'ember-cache',x:-52,z:3,rarity:'Common',weapon:'shield',gold:8,armor:1},
   {id:'raven-cache',x:-189,z:62,rarity:'Uncommon',weapon:'axe',gold:14,armor:2},
@@ -41,6 +41,25 @@ export const addedChestSites:Chest[]=[
   {id:'hollowmouth-overlook',x:-194,z:-117,rarity:'Epic',weapon:'staff',gold:34,armor:4},
   {id:'moonwatch-deep-woods',x:106,z:-116,rarity:'Epic',weapon:'katana',gold:36,armor:4},
 ];
+const expeditionLoot=[
+  ['Uncommon','axe',18,2],
+  ['Common','shield',11,1],
+  ['Rare','staff',35,4],
+  ['Rare','greatsword',42,4],
+  ['Epic','katana',58,5],
+  ['Uncommon','shield',22,2],
+  ['Epic','axe',87,6],
+  ['Epic','staff',104,6],
+  ['Rare','katana',54,4],
+  ['Legendary','greatsword',120,7],
+] as const;
+for(const [i,site] of explorationSites.entries()){
+  const [rarity,weapon,gold,armor]=expeditionLoot[i];
+  const guardians=site.id==='thornhide-armory'?orcCamp.guards.map(guard=>guard.id)
+    :site.id==='veil-pilgrim'?ritualGrounds.guards.map(guard=>guard.id):site.id==='gravespur-cairn'?['elite-gravefang']:undefined;
+  addedChestSites.push({id:'cache-'+site.id,title:site.name+' Cache',x:site.x+site.dx,z:site.z+site.dz,
+    rarity,weapon,gold,armor,guardians});
+}
 worldChests.push(...addedChestSites,{id:'thornhide-war-chest',...orcCamp.chest,rarity:'Epic',weapon:'axe',gold:87,armor:6,
   guardians:orcCamp.guards.map(guard=>guard.id),armorPiece:'blacksteel-gauntlets'},
   {id:'veil-reliquary',...ritualGrounds.chest,rarity:'Epic',weapon:'staff',gold:126,armor:7,

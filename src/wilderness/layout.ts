@@ -1,6 +1,6 @@
 import { bossCaves, caveAt } from './bossCaves.ts';
 import { briarWatch, towerFloorAt } from './briarWatch.ts';
-import { orcApproach, orcCamp, ritualGrounds } from './worldSites.ts';
+import { orcApproach, orcCamp, ritualGrounds, explorationSites, explorationTrails } from './worldSites.ts';
 import { inDen } from './denLayout.ts';
 export const extent = 240;
 export const spawn = { x: -43, z: 4 };
@@ -19,6 +19,7 @@ export const landmarks = [
   orcCamp,
   ritualGrounds,
   briarWatch,
+  ...explorationSites.map(site=>({...site,kind:'explore' as const})),
   ...bossCaves.map(cave=>({...cave,kind:'bossCave' as const})),
   { name: 'Southwater Crossing', x: 32, z: 107, kind: 'bridge' },
 ] as const;
@@ -47,6 +48,7 @@ export const branchTrails = [
   [[-110,99],[-117,85]],
   [[154,99],[154,107]],
   orcApproach,
+  ...explorationTrails,
 ] as const;
 export function trailDistance(x: number,z: number,trails:readonly (readonly (readonly [number,number])[])[]=branchTrails) {
   let distance=Math.min(Math.abs(z-path(x)),Math.abs(z-southPath(x)));
