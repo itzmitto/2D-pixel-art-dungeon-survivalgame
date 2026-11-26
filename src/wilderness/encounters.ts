@@ -1,3 +1,5 @@
+import { encounterCell, eliteName, roaming, roamingEncounter, roamingKind, type EncounterMember } from './roaming.ts';
+import { waystones } from './worldSites.ts';
 import { armorPiece, type ArmorId } from './armor.ts';
 import { wizardModels } from './wizards.ts';
 import { arcaneCombat } from './arcaneCombat.ts';
@@ -14,7 +16,7 @@ import { attackSpeed, effectiveStats, earnXP, elemental, maxHunterHealth, mitiga
 import * as T from 'three';
 import { inArc, swingTimer, wolfLoot } from './combatRules.ts';
 import type { Exploration } from './exploration.ts';
-import { randomSequence, spawn, surface } from './layout.ts';
+import { randomSequence, spawn, surface, trailDistance, landmarks } from './layout.ts';
 import { wolfModels } from './wolves.ts';
 import { abilityAnimationSeconds, elementalIds, weaponDamage, weapons, rarity, type Weapon, type WeaponId } from './weapons.ts';
 import { createMagicEffects } from './magicEffects.ts';
@@ -121,13 +123,16 @@ export function createEncounters(
   const metalLoot=new T.MeshStandardMaterial({color:0xc9a044,roughness:.44,metalness:.61});
   const lootBeamGeometry=new T.CylinderGeometry(.028,.10,1.25,6,1,true);
   const lootMaterial=new T.MeshStandardMaterial({color:'#bd9868',emissive:'#916024',emissiveIntensity:.7,roughness:.36});
+  type EnemySpec={ [K in keyof typeof monsters.wild]: typeof monsters.wild[K] extends number ? number :
+    typeof monsters.wild[K] extends string ? string : typeof monsters.wild[K] };
   type Enemy = CreatureRig & {
     affinity:T.Mesh<T.BufferGeometry,T.MeshBasicMaterial>;
+    target:SpellTarget; roaming:boolean; elite:boolean; level:number; announced:boolean; title?:T.Sprite; patrol:boolean;
     wolfRig:boolean; turn:number; wizard:boolean; barrier?:T.Mesh; ward:number;
     spell?:'bolt'|'domain'|'shield'; wardCool:number; spellTarget?:{x:number;z:number}; slam?:{x:number;z:number};
     posePhase:number; gait:number; anticipation:number; collapse:number; impactAge:number; retreat:number; strikes:number;
 
-    id:string; kind:MonsterKind; spec:typeof monsters[MonsterKind]; home:T.Vector3; hp:number; hpBar:T.Group; fill:T.Mesh;
+    id:string; kind:MonsterKind; spec:EnemySpec; home:T.Vector3; hp:number; hpBar:T.Group; fill:T.Mesh;
     statuses:ReturnType<typeof statuses>; visualTick:number; lastVisual:ReturnType<typeof statuses>['visual']; cooldown:number; windup:number; heading:number; phase:number; hitFlash:number; charge:number; chargeWindup:boolean; chargeHit:boolean; beam:T.Mesh<T.BufferGeometry,T.MeshBasicMaterial>; loot:T.Mesh<T.BufferGeometry,T.MeshStandardMaterial>;
   };
   const affinityGeometry=new T.RingGeometry(.53,.69,19).rotateX(-Math.PI/2);
@@ -137,7 +142,29 @@ export function createEncounters(
     stunned:new T.MeshBasicMaterial({color:0x9ac5ff,transparent:true,opacity:.65,depthWrite:false}),
     slowed:new T.MeshBasicMaterial({color:0x679bcf,transparent:true,opacity:.44,depthWrite:false}),
   };
+  const eliteAura=new T.MeshBasicMaterial({color:0xd060ff,transparent:true,opacity:.62,depthWrite:false});
   const enemies:Enemy[]=[];
+  type SpellTarget=Parameters<typeof abilityCombat>[1][number];
+  const targets:SpellTarget[]=[];
+  const rigPool=new Map<MonsterKind,(CreatureRig&{barrier?:T.Mesh})[]>();
+  const spawnCooldown=new Map<string,number>();
+  const pendingRoam=new Map(Object.entries(save.pending).filter(([id])=>roamingKind(id)));
+  const frustum=new T.Frustum(), projection=new T.Matrix4(), sphere=new T.Sphere(new T.Vector3(),3.15);
+  let spawnClock=0;
+  const levelNotice=new T.SpriteMaterial({color:0xffffff,depthWrite:false,transparent:true});
+  const labels=new Map<string,T.CanvasTexture>();
+  function titleTexture(text:string){
+    let texture=labels.get(text);
+    if(texture) return texture;
+    const label=document.createElement('canvas');label.width=384;label.height=48;
+    const context=label.getContext('2d');
+    if(!context) return null;
+    context.font='bold 24px system-ui';context.textAlign='center';context.textBaseline='middle';
+    context.strokeStyle='#22142a';context.lineWidth=5;context.strokeText(text,192,24,372);
+    context.fillStyle='#f1baff';context.fillText(text,192,24,372);
+    texture=new T.CanvasTexture(label);texture.colorSpace=T.SRGBColorSpace;labels.set(text,texture);
+    return texture;
+  }
   const spawns=[
     ...territories.map((center,i)=>({center,id:'wolf-'+i,kind:'wild' as const})),
     ...packTerritories.map((center,i)=>({center,id:'wolf-pack-'+i,kind:'wild' as const})),
@@ -150,17 +177,33 @@ export function createEncounters(
     ...ritualGrounds.guards.map(entry=>({center:entry,id:entry.id,kind:entry.kind})),
   ];
   for(const {center,id,kind} of spawns){
-    const spec=monsters[kind];
     const candidates=Array.from({length:30},()=>{
       const a=rand()*Math.PI*2,r=2+rand()*9;
       return {x:center.x+Math.cos(a)*r,z:center.z+Math.sin(a)*r};
     });
     const orc=kind==='brute'||kind==='assassin';
-    const wizard=kind==='wizard'||kind==='ritualElite';
     const spot=id.startsWith('den-')||id.startsWith('ritual-')||orc ? (canWalk(center.x,center.z) ? center : undefined) : candidates.find(({x,z})=>!safe(x,z)&&canWalk(x,z)&&enemies.every(enemy=>Math.hypot(enemy.home.x-x,enemy.home.z-z)>4));
     if(!spot) continue;
-    const wizardRig=wizard?wizards.make(kind==='ritualElite'):undefined;
-    const actor=wizardRig??(kind==='skeleton'?skeletons.make():kind==='goblin'?goblins.make():kind==='brute'||kind==='assassin'?orcs.make(kind==='brute'):models.make(kind==='wizard'||kind==='ritualElite'?'wild':kind));
+    createEnemy(id,kind,spot);
+  }
+  function createEnemy(id:string,kind:MonsterKind,spot:{x:number;z:number},member?:EncounterMember){
+    const orc=kind==='brute'||kind==='assassin', wizard=kind==='wizard'||kind==='ritualElite';
+    const base=monsters[kind], level=member?.level??base.level;
+    const elite=member?.elite??(kind==='elite'||kind==='ritualElite');
+    const threat=member?1+Math.max(0,level-base.level)*.115:1;
+    const spec:EnemySpec={...base,
+      name:member?.elite?eliteName(kind,base.name):base.name,
+      scale:base.scale*(member?.elite?1.19:1),
+      health:Math.round(base.health*threat*(member?.elite?2.45:1)),
+      damage:base.damage*threat*(member?.elite?1.34:1),
+      xp:Math.round(base.xp*threat*(member?.elite?2.17:1)),
+      gold:Math.round(base.gold*threat*(member?.elite?1.85:1)),
+    };
+    const actor:CreatureRig&{barrier?:T.Mesh}=rigPool.get(kind)?.pop()??(
+      wizard?wizards.make(kind==='ritualElite'):kind==='skeleton'?skeletons.make():kind==='goblin'?goblins.make():
+      orc?orcs.make(kind==='brute'):models.make(kind==='wizard'||kind==='ritualElite'?'wild':kind));
+    if(actor.barrier) actor.barrier.visible=false;
+    actor.root.visible=false;
     actor.root.scale.setScalar(spec.scale);
     const home=new T.Vector3(spot.x,surface(spot.x,spot.z),spot.z);
     actor.root.position.copy(home);
@@ -190,9 +233,22 @@ export function createEncounters(
       opacity:.36,depthWrite:false,side:T.DoubleSide}));
     beam.visible=false;group.add(beam);
     if(save.drops[id]) loot.material.color.set(rarity[save.drops[id].rarity].color);
-    enemies.push({...actor,id,kind,spec,home,affinity,wizard,barrier:wizardRig?.barrier,ward:0,wardCool:0,wolfRig:!wizard&&!orc&&kind!=='skeleton'&&kind!=='goblin',turn:0,posePhase:enemies.length*.92,gait:0,anticipation:0,collapse:1,
+    const enemy:Enemy={...actor,id,kind,spec,home,affinity,wizard,barrier:actor.barrier,
+      roaming:Boolean(roamingKind(id)),elite,level,announced:false,patrol:!!member&&trailDistance(spot.x,spot.z)<5,
+      target:{point:actor.root.position,alive:()=>enemy.hp>0,get effects(){return enemy.statuses;},
+        hit:(damage,element,heavy)=>hitEnemy(enemy,damage,element,heavy)},ward:0,wardCool:0,wolfRig:!wizard&&!orc&&kind!=='skeleton'&&kind!=='goblin',turn:0,posePhase:enemies.length*.92,gait:0,anticipation:0,collapse:1,
       impactAge:3,retreat:0,strikes:0,hp:(oldDefeats.has(id)||save.defeatedBosses.includes(id))?0:spec.health,hpBar,fill,
-      statuses:statuses(spec.resistance),visualTick:0,lastVisual:null,cooldown:0,windup:0,heading:rand()*6.28,phase:rand()*10,hitFlash:0,charge:0,chargeWindup:false,chargeHit:false,loot,beam});
+      statuses:statuses(spec.resistance),visualTick:0,lastVisual:null,cooldown:0,windup:0,heading:rand()*6.28,phase:rand()*10,hitFlash:0,charge:0,chargeWindup:false,chargeHit:false,loot,beam};
+    if(elite){
+      const texture=titleTexture('ELITE · '+spec.name+' · Lv '+level);
+      if(texture){
+        const material=levelNotice.clone();material.map=texture;
+        enemy.title=new T.Sprite(material);enemy.title.scale.set(4.05,.49,1);
+        enemy.title.visible=false;group.add(enemy.title);
+      }
+    }
+    targets.push(enemy.target);enemies.push(enemy);
+    return enemy;
   }
 
   const sparkGeometry=new T.BufferGeometry();
@@ -213,10 +269,73 @@ export function createEncounters(
     return {sprite,age:1,base:0,strong:false};
   });
   let numberCursor=0;
-  const magic=abilityCombat(player.position,enemies.map(enemy=>({
-    point:enemy.root.position,alive:()=>enemy.hp>0,get effects(){return enemy.statuses;},
-    hit:(damage,element,heavy)=>hitEnemy(enemy,damage,element,heavy),
-  })),canWalk,clearLine,fx);
+  const magic=abilityCombat(player.position,targets,canWalk,clearLine,fx);
+  function visibleAt(x:number,z:number){
+    sphere.center.set(x,surface(x,z)+1.2,z);
+    return frustum.intersectsSphere(sphere);
+  }
+  function removeRoamer(index:number){
+    const enemy=enemies[index];
+    if(enemy.loot.visible&&save.pending[enemy.id]) pendingRoam.set(enemy.id,save.pending[enemy.id]);
+    group.remove(enemy.root,enemy.affinity,enemy.hpBar,enemy.loot,enemy.beam);
+    if(enemy.title){group.remove(enemy.title);enemy.title.material.dispose();}
+    enemy.loot.material.dispose();enemy.beam.material.dispose();
+    const pool=rigPool.get(enemy.kind)??[];
+    if(pool.length<4){pool.push({root:enemy.root,animate:enemy.animate,barrier:enemy.barrier});rigPool.set(enemy.kind,pool);}
+    enemy.hp=0;
+    targets.splice(targets.indexOf(enemy.target),1);
+    enemies.splice(index,1);
+  }
+  function populate(){
+    camera.updateMatrixWorld();
+    frustum.setFromProjectionMatrix(projection.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse));
+    const p=player.position;
+    for(let i=enemies.length-1;i>=0;i--){
+      const enemy=enemies[i],spot=enemy.hp?enemy.root.position:enemy.loot.position;
+      if(!enemy.roaming) continue;
+      const distance=Math.hypot(spot.x-p.x,spot.z-p.z);
+      if(!enemy.hp&&!enemy.loot.visible&&enemy.collapse>=1||distance>roaming.despawnDistance||
+         distance>roaming.activeDistance+11&&!visibleAt(spot.x,spot.z)) removeRoamer(i);
+    }
+    if(inDen(p.z)||!save.health) return;
+    const now=Date.now();
+    for(const [cell,until] of spawnCooldown) if(now>=until) spawnCooldown.delete(cell);
+    for(const [id,spot] of pendingRoam){
+      const kind=roamingKind(id);
+      if(kind&&Math.hypot(p.x-spot.x,p.z-spot.z)<roaming.activeDistance){
+        createEnemy(id,kind,spot);pendingRoam.delete(id);
+      }
+    }
+    const living=enemies.filter(enemy=>enemy.hp>0&&Math.hypot(enemy.home.x-p.x,enemy.home.z-p.z)<64);
+    const total=enemies.filter(enemy=>enemy.roaming&&enemy.hp>0).length;
+    const room=Math.min(roaming.nearbyLimit-living.length,roaming.totalLimit-total);
+    if(room<2) return;
+    const valid=(x:number,z:number)=>!safe(x,z)&&!visibleAt(x,z)&&canWalk(x,z)&&
+      Math.hypot(x-p.x,z-p.z)>roaming.minSpawnDistance&&
+      !waystones.some(site=>Math.hypot(x-site.x,z-site.z)<12)&&
+      !landmarks.some(site=>Math.hypot(x-site.x,z-site.z)<(site.kind==='orcCamp'||site.kind==='ritual'?15:7))&&
+      !spawnCooldown.has(encounterCell(x,z));
+    for(let i=0;i<38;i++){
+      const a=Math.random()*Math.PI*2,r=34+Math.random()*23;
+      const site={x:p.x+Math.cos(a)*r,z:p.z+Math.sin(a)*r};
+      if(!valid(site.x,site.z)||living.some(enemy=>Math.hypot(enemy.home.x-site.x,enemy.home.z-site.z)<13)) continue;
+      const members=roamingEncounter(site.x,site.z,Math.random).slice(0,room);
+      const placements=[] as {x:number;z:number}[];
+      for(const member of members){
+        let spot:{x:number;z:number}|undefined;
+        for(let j=0;j<18;j++){
+          const heading=Math.random()*Math.PI*2,radius=placements.length?2+Math.random()*7:0;
+          const x=site.x+Math.cos(heading)*radius,z=site.z+Math.sin(heading)*radius;
+          if(valid(x,z)&&placements.every(other=>Math.hypot(x-other.x,z-other.z)>2.42)){spot={x,z};break;}
+        }
+        if(!spot) continue;
+        placements.push(spot);
+        const id='roam-'+member.kind.toLowerCase()+'-'+crypto.randomUUID();
+        createEnemy(id,member.kind,spot,member);
+      }
+      if(placements.length) break;
+    }
+  }
   function impact(point:T.Vector3, damage=0,element:Weapon['ability']=null,strong=false){
     for(let i=0;i<8;i++){
       const vx=(rand()-.5)*6,vy=1.5+rand()*3,vz=(rand()-.5)*6,life=.32+rand()*.16;
@@ -287,11 +406,12 @@ export function createEncounters(
     enemy.loot.visible=true;
     save.pending[enemy.id]={x:enemy.loot.position.x,z:enemy.loot.position.z};
     const guaranteed=/^wolf-[0-4]$/.test(enemy.id)&&!collected.has(enemy.id)?elementalIds[Number(enemy.id.slice(-1))]:undefined;
-    save.drops[enemy.id]=rollDrop(enemy.kind,rand,lootBonus(effectiveStats(save)),guaranteed&&!save.arsenal.includes(guaranteed)?guaranteed:undefined);
-    const piece=enemyArmor(enemy.kind,enemy.id,save.seed,save.kills,save.level,save.armorItems);
+    if(enemy.roaming) spawnCooldown.set(encounterCell(enemy.home.x,enemy.home.z),Date.now()+30_000+Math.random()*30_000);
+    save.drops[enemy.id]=rollDrop(enemy.kind,rand,lootBonus(effectiveStats(save)),guaranteed&&!save.arsenal.includes(guaranteed)?guaranteed:undefined,enemy.roaming?{level:enemy.level,elite:enemy.elite,gold:enemy.spec.gold}:undefined);
+    const piece=enemyArmor(enemy.elite&&enemy.roaming?'elite':enemy.kind,enemy.id,save.seed,save.kills,save.level,save.armorItems);
     if(piece) save.drops[enemy.id].armorPiece=piece;
     enemy.loot.material.color.set(rarity[save.drops[enemy.id].rarity].color);
-    if(enemy.spec.respawn&&!enemy.id.startsWith('den-')) save.returns[enemy.id]=Date.now()+enemy.spec.respawn*1000;
+    if(!enemy.roaming&&enemy.spec.respawn&&!enemy.id.startsWith('den-')) save.returns[enemy.id]=Date.now()+30_000+Math.floor(rand()*30_000);
     oldDefeats.add(enemy.id);
     save.defeated=[...oldDefeats];
     save.kills++;
@@ -300,7 +420,7 @@ export function createEncounters(
       if(!save.defeatedBosses.includes(enemy.id)) save.defeatedBosses.push(enemy.id);
       if(!save.completedDungeons.includes(den.id)) save.completedDungeons.push(den.id);
     }
-    const reward=enemyXpReward(enemy.kind);
+    const reward=enemyXpReward(enemy.kind,enemy.spec.xp);
     earnXP(save,reward);
     notify((boss?den.name+' cleared':enemy.spec.name+' defeated')+' · +'+reward+' XP');
 
@@ -385,7 +505,7 @@ export function createEncounters(
       fx.emit(point,0x805eff,'ring',.43,.48,{grow:6.4,y:.19,delay:.07});
       fx.scatter(point,0x91e7ff,15,.98);
     },
-    transition(){arcane.clear();combatUntil=0;knockback.set(0,0);magic.reset();fx.clear();queued=undefined;rangeTimer.cancel();echoLife=shake=0;echo.visible=false;},
+    transition(){spawnClock=0;arcane.clear();combatUntil=0;knockback.set(0,0);magic.reset();fx.clear();queued=undefined;rangeTimer.cancel();echoLife=shake=0;echo.visible=false;},
     get bossHealth(){
       const boss=enemies.find(enemy=>enemy.kind==='guardian');
       return boss&&boss.hp>0&&inDen(player.position.z)&&
@@ -421,7 +541,9 @@ export function createEncounters(
       const loot=lootNearby();
       if(loot){
         loot.loot.visible=false;
-        collected.add(loot.id);
+        if(loot.roaming){
+          oldDefeats.delete(loot.id);save.defeated=[...oldDefeats];
+        }else collected.add(loot.id);
         save.collected=[...collected];
         delete save.pending[loot.id];
         const drop=save.drops[loot.id]??{gold:wolfLoot.gold,material:loot.spec.material,rarity:'Common',
@@ -474,6 +596,8 @@ export function createEncounters(
     },
     update(dt:number,blocking:boolean){
       time+=dt;
+      spawnClock-=dt;
+      if(spawnClock<=0){spawnClock=.42;populate();}
       if(save.health&&knockback.lengthSq()>.04){
         const {x,z}=player.position, dx=knockback.x*dt,dz=knockback.y*dt;
         if(canWalk(x+dx,z)) player.position.x+=dx;
@@ -529,7 +653,8 @@ export function createEncounters(
         enemy.retreat=Math.max(0,enemy.retreat-dt);
         const returnAt=save.returns[enemy.id];
         if(!enemy.hp&&!enemy.loot.visible&&returnAt&&Date.now()>=returnAt&&
-          Math.hypot(player.position.x-enemy.home.x,player.position.z-enemy.home.z)>18){
+          Math.hypot(player.position.x-enemy.home.x,player.position.z-enemy.home.z)>roaming.minSpawnDistance&&
+          !visibleAt(enemy.home.x,enemy.home.z)){
           enemy.hp=spec.health;enemy.statuses=statuses(spec.resistance);enemy.cooldown=enemy.windup=0;
           p.copy(enemy.home);enemy.collapse=1;enemy.gait=0;enemy.anticipation=0;oldDefeats.delete(enemy.id);collected.delete(enemy.id);
           save.defeated=[...oldDefeats];save.collected=[...collected];delete save.returns[enemy.id];changed();
@@ -539,8 +664,17 @@ export function createEncounters(
           if(canWalk(p.x,p.z+dz)) p.z+=dz;
         });
         const gap=Math.hypot(player.position.x-p.x,player.position.z-p.z);
-        const active=gap<nearDistance&&enemy.hp>0;
+        const active=gap<(enemy.roaming?roaming.activeDistance:nearDistance)&&enemy.hp>0;
+        if(enemy.title){
+          enemy.title.visible=active&&gap<27;
+          if(enemy.title.visible) enemy.title.position.set(p.x,p.y+2.58*spec.scale,p.z);
+          if(active&&gap<21&&!enemy.announced){
+            enemy.announced=true;
+            notify('Elite encountered · '+spec.name+' · Lv '+enemy.level);
+          }
+        }
         const dying=!enemy.hp&&enemy.collapse<1&&gap<nearDistance;
+        if(!enemy.hp&&!dying) enemy.collapse=1;
         root.visible=active||dying;
         enemy.hpBar.visible=active&&gap<23&&(['guardian','elite','ritualElite'].includes(enemy.kind)||enemy.hp<spec.health||enemy.windup>0);
         const status=enemy.statuses.visual;
@@ -562,7 +696,12 @@ export function createEncounters(
           }
         }
         enemy.lastVisual=status;
-        enemy.affinity.visible=active&&!!status;
+        enemy.affinity.visible=active&&(!!status||enemy.elite);
+        if(active&&enemy.elite&&!status){
+          enemy.affinity.material=eliteAura;
+          enemy.affinity.position.set(p.x,surface(p.x,p.z)+.12,p.z);
+          enemy.affinity.scale.setScalar(spec.scale*(1.47+.19*Math.sin(time*4)));
+        }
         if(status&&active){
           enemy.affinity.material=affinities[status];
           enemy.affinity.position.set(p.x,surface(p.x,p.z)+(status==='stunned' ? spec.scale*1.67 : .06),p.z);
@@ -677,13 +816,14 @@ export function createEncounters(
           const circle=enemy.wizard&&aggro&&gap>=7.5&&gap<spec.reach-2;
           const strafe=enemy.kind==='assassin'&&aggro&&!enemy.retreat&&gap<5&&enemy.cooldown>0;
           const side=enemy.id.endsWith('north')||enemy.id.endsWith('west')?-1:1;
+          const patrolPhase=time*.26+enemy.phase;
           const goal = strafe||circle ? {
             x:p.x+side*(p.z-player.position.z),z:p.z-side*(p.x-player.position.x),
           } : backAway||enemy.retreat && aggro ? {
             x:p.x+(p.x-player.position.x)*3,z:p.z+(p.z-player.position.z)*3,
           } : aggro ? packGoal(enemy,gap) : homeGap>8 ? enemy.home : {
-            x:enemy.home.x+Math.sin(time*.31+enemy.phase)*5,
-            z:enemy.home.z+Math.cos(time*.26+enemy.phase)*5,
+            x:enemy.home.x+Math.sin(patrolPhase)*(enemy.patrol?9.5:5),
+            z:enemy.home.z+Math.cos(patrolPhase)*(enemy.patrol?2.1:5),
           };
           const dx=goal.x-p.x,dz=goal.z-p.z,remaining=Math.hypot(dx,dz);
           if(remaining>.35){
@@ -778,7 +918,9 @@ export function createEncounters(
       for(const resource of [barGeometry,backing,red,alert,lootGeometry,drawstring,lootFang,lootCoin,bagTie,boneLoot,metalLoot,lootBeamGeometry,lootMaterial,sparkGeometry,sparks.material,echoMaterial]) resource.dispose();
       fx.dispose();
       chestViews.dispose();
-      for(const enemy of enemies){enemy.loot.material.dispose();enemy.beam.material.dispose();}
+      for(const enemy of enemies){enemy.loot.material.dispose();enemy.beam.material.dispose();enemy.title?.material.dispose();}
+      for(const texture of labels.values()) texture.dispose();
+      levelNotice.dispose();eliteAura.dispose();
       for(const texture of numberTextures.values()) texture.dispose();
       for(const {sprite} of numbers) sprite.material.dispose();
     },

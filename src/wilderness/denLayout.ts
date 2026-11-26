@@ -17,6 +17,6 @@ export const den = {
     {id:'den-guardian',kind:'guardian',x:0,z:315},
   ],
 } as const;
-export const inDen=(z:number)=>z>280;
+export const inDen=(z:number)=>z>280 && z<410;
 export const denWalkable=(x:number,z:number)=>den.chambers.some(room=>
   Math.abs(x-room.x)<room.w/2&&Math.abs(z-room.z)<room.d/2);

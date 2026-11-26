@@ -1,3 +1,4 @@
+import { briarWatch, towerFloors } from './briarWatch.ts';
 import { armorSlots, type ArmorId } from './armor.ts';
 import { den } from './denLayout.ts';
 import { orcCamp, ritualGrounds } from './worldSites.ts';
@@ -21,6 +22,14 @@ export const denChests:Chest[]=[
     {id:'den-guardian-reliquary',x:13,z:314,rarity:'Epic',weapon:'shield',gold:38,armor:4,boss:den.boss},
     {id:'den-reward',x:0,z:311,rarity:'Legendary',weapon:'greatsword',gold:100,armor:7,boss:den.boss},
   ];
+export const towerChests:Chest[]=[
+  {id:'briar-cloister',x:-8,z:towerFloors[1].z-12,rarity:'Rare',weapon:'axe',gold:46,armor:4,
+    guardians:towerFloors[1].guards.map(guard=>guard.id)},
+  {id:'briar-library',x:12,z:towerFloors[3].z-8,rarity:'Epic',weapon:'staff',gold:78,armor:6,
+    guardians:towerFloors[3].guards.map(guard=>guard.id),armorPiece:'blacksteel-cape'},
+  {id:'briar-sentinel-reward',x:0,z:towerFloors[4].z-10.4,rarity:'Legendary',weapon:'katana',gold:230,armor:9,
+    boss:briarWatch.boss,armorPiece:'abyssal-chestplate'},
+];
 export const addedChestSites:Chest[]=[
   {id:'ember-north-grove',x:-59,z:-16,rarity:'Common',weapon:'staff',gold:7,armor:1},
   {id:'southwater-bank',x:59,z:113,rarity:'Common',weapon:'shield',gold:9,armor:1},
@@ -42,7 +51,7 @@ export function chestBonus(chest:Chest,seed:number){
   for(const char of chest.id) key=Math.imul(key^char.charCodeAt(0),16777619);
   const random=randomSequence(key),tier=rarityOrder.indexOf(chest.rarity);
   const extras=['Iron','Bones','Goblin Hide','Magic Crystal'];
-  return {material:extras[Math.floor(random()*(tier<2?2:extras.length))],
+  return {material:chest.id==='briar-sentinel-reward'?'Magic Crystal':extras[Math.floor(random()*(tier<2?2:extras.length))],
     count:1+Math.floor(random()*(tier+1)),potions:1+Math.floor(tier/2),
     armorPiece:chest.armorPiece??(`${tier<2?'iron':tier<4?'blacksteel':'abyssal'}-${armorSlots[(key>>>0)%armorSlots.length]}` as ArmorId)};
 }
