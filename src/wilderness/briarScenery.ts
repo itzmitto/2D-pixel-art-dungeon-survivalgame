@@ -94,7 +94,15 @@ export function briarScenery(scene:T.Scene,obstacles:{x:number;z:number;r:number
   function portal(root:T.Group,point:{x:number;z:number},exit=false){
     meshPart(root,arch,mortar,point.x,0,point.z).scale.set(.72,.78,.91);
     meshPart(root,arch,obsidian,point.x,.06,point.z+.17).scale.set(.58,.72,.73);
-    const icon=meshPart(root,sigil,exit?openedRune:runic,point.x,1.53,point.z+.28);
+    meshPart(root,arch,wood,point.x,.07,point.z+.24).scale.set(.54,.68,.61);
+    for(const side of [-1,1]){
+      const hinge=meshPart(root,block,bronze,point.x+side*.34,1.08,point.z+.38);
+      hinge.scale.set(.34,.066,.09);
+      meshPart(root,hook,bronze,point.x+side*.12,.88,point.z+.44).scale.setScalar(.60);
+      const seam=meshPart(root,block,mortar,point.x+side*.20,.84,point.z+.36);
+      seam.scale.set(.024,1.43,.043);
+    }
+    const icon=meshPart(root,sigil,exit?openedRune:runic,point.x,1.53,point.z+.48);
     icon.scale.setScalar(1.15);
     return icon;
   }

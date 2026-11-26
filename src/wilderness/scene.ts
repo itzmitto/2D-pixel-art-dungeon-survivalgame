@@ -1,3 +1,4 @@
+import { bossCaves, caveAt, caveEntry, caveExit, caveRewardId, caveStatus, caveWalkable } from './bossCaves';
 import { briarWatch, floorRemaining, towerFloorAt, towerFloors, towerWalkable } from './briarWatch';
 import { armorPiece, type ArmorId, type ArmorSlot } from './armor';
 import { warhorse } from './horse';
@@ -54,11 +55,11 @@ export function startWilderness(
     mounted=false;summoning=0;horse.root.visible=false;
   }
   const water=terrain(scene);
-  const {obstacles,rocks,fireY,animateCamp,animateRitual,tower}=scenery(scene,save.seed);
+  const {obstacles,rocks,fireY,animateCamp,animateRitual,tower,caves}=scenery(scene,save.seed);
   const stones=waystoneModels(scene);
   obstacles.push(...waystones.map(({x,z})=>({x,z,r:.95})));
   const nearby = obstacleGrid(obstacles);
-  const canWalk = (x:number,z:number) => towerFloorAt(z) ? towerWalkable(x,z) : inDen(z) ? denWalkable(x,z) : walkable(x,z,nearby(x,z));
+  const canWalk = (x:number,z:number) => caveAt(z)?caveWalkable(x,z):towerFloorAt(z) ? towerWalkable(x,z) : inDen(z) ? denWalkable(x,z) : walkable(x,z,nearby(x,z));
   const updateDen=denScenery(scene);
   const start = canWalk(save.position.x,save.position.z) ? save.position : {...spawn,yaw:0};
   body.position.set(start.x,surface(start.x,start.z),start.z);
@@ -67,9 +68,11 @@ export function startWilderness(
   const grass=meadow(scene,body.position,rocks,save.seed);
   const animateNight=atmosphere(scene,fireY);
   const encounters=createEncounters(scene,camera,body,save,canWalk,onSaveChange);
+  const loadedCave=caveAt(start.z);
+  if(loadedCave) encounters.prepareCave(loadedCave,false);
   let travel:{target:Position;remaining:number;arrived:boolean}|undefined;
   function horseClear(x:number,z:number,yaw:number){
-    if(inDen(z)||towerFloorAt(z)||!canWalk(x,z)) return false;
+    if(inDen(z)||towerFloorAt(z)||caveAt(z)||!canWalk(x,z)) return false;
     const a=Math.sin(yaw),b=Math.cos(yaw),y=surface(x,z);
     for(const [forward,side] of [[1.23,0],[-1.15,0],[.28,.54],[.28,-.54],[-.72,.54],[-.72,-.54]]){
       const xx=x+a*forward+b*side,zz=z+b*forward-a*side;
@@ -113,7 +116,7 @@ export function startWilderness(
   let shakePhase=0;
   let zoom=36,distance=zoom,lastReport=0,reportedX=start.x,reportedZ=start.z,reportedYaw=start.yaw;
   function handleHorse(){
-    if(!save.health||inDen(body.position.z)||towerFloorAt(body.position.z)) return;
+    if(!save.health||inDen(body.position.z)||towerFloorAt(body.position.z)||caveAt(body.position.z)) return;
     const p=body.position,yaw=body.rotation.y;
     if(mounted){
       for(const angle of [yaw+Math.PI/2,yaw-Math.PI/2,yaw+Math.PI,yaw]){
@@ -148,6 +151,66 @@ export function startWilderness(
       return;
     }
     encounters.feedback('Move onto open ground to summon your warhorse.');
+  }
+  type Door={x:number;z:number;target:{x:number;z:number};entering:boolean;label:string;message:string;locked?:boolean;detail?:string};
+  const mouse=new T.Vector2(), ray=new T.Raycaster(), box=new T.Box3();
+  function nearbyDoor(pointer?:PointerEvent):Door|undefined{
+    if(!save.health) return;
+    const p=body.position, floor=towerFloorAt(p.z), cave=caveAt(p.z);
+    const doors:Door[]=[];
+    if(floor){
+      doors.push({...floor.exit,target:{x:briarWatch.x,z:briarWatch.z+3.15},entering:false,label:'Leave Briar Watch',message:'Returned from Briar Watch.'});
+      if(floor.number<5){
+        const next=towerFloors[floor.number], remaining=floorRemaining(floor,save.defeated);
+        doors.push({...floor.stairs,target:next.entry,entering:true,label:'Enter floor '+next.number,
+          locked:remaining>0,detail:remaining+' guardians remaining',
+          message:next.number===5&&!save.defeatedBosses.includes(briarWatch.boss)?'Boss encounter · The Hollow Sentinel':
+            'Briar Watch · Floor '+next.number+' · '+next.title});
+      }
+    }else if(cave){
+      doors.push({...caveExit(cave),target:{x:cave.x,z:cave.z+3.1},entering:false,label:'Leave '+cave.name,message:'Returned from '+cave.name+'.'});
+    }else if(!inDen(p.z)){
+      doors.push({x:briarWatch.x,z:briarWatch.z,target:towerFloors[0].entry,entering:true,label:'Enter Briar Watch',
+        message:'Briar Watch · Floor 1 · '+towerFloors[0].title});
+      for(const site of bossCaves){
+        const run=save.caveRuns[site.id];
+        const waiting=Boolean(run?.readyAt&&run.readyAt>Date.now()&&save.opened.includes(caveRewardId(site,run.cycle)));
+        const openReward=Boolean(run?.readyAt&&!save.opened.includes(caveRewardId(site,run.cycle)));
+        doors.push({x:site.x,z:site.z,target:caveEntry(site),entering:true,label:'Enter '+site.name,locked:waiting,
+          detail:caveStatus(site,save.caveRuns,save.opened),
+          message:openReward?'Cave reward · '+site.name:'Boss encounter · '+site.boss+' · Lv '+site.level+
+            ' · Recommended '+site.recommended+' · Rank '+site.rank+' · '+site.rarity+' reward'});
+      }
+    }
+    if(pointer){
+      const rect=canvas.getBoundingClientRect();
+      mouse.set((pointer.clientX-rect.left)/rect.width*2-1,-(pointer.clientY-rect.top)/rect.height*2+1);
+      camera.updateMatrixWorld();
+      ray.setFromCamera(mouse,camera);
+    }
+    return doors.find(door=>{
+      if(Math.hypot(p.x-door.x,p.z-door.z)>(floor||cave?2.8:3.65)) return false;
+      if(!pointer) return true;
+      const y=surface(door.x,door.z), width=caveAt(door.target.z)?2.0:1.62;
+      box.min.set(door.x-width,y-.35,door.z-2.9);
+      box.max.set(door.x+width,y+3.7,door.z+1.6);
+      return ray.ray.intersectsBox(box);
+    });
+  }
+  function enterDoor(door:Door){
+    if(door.locked){encounters.feedback(door.detail??'Door sealed');return;}
+    dismissHorse();
+    const p=body.position, target=door.target;
+    p.set(target.x,surface(target.x,target.z),target.z);
+    body.rotation.y=door.entering?Math.PI:0;
+    focus.set(p.x,p.y+.75,p.z);camera.position.copy(focus).addScaledVector(offset,distance);camera.lookAt(focus);
+    encounters.transition();
+    const cave=caveAt(target.z);
+    if(cave) encounters.prepareCave(cave);
+    encounters.waystoneEffect(p,cave?.kind==='warlord'?0xffb169:0xa298ff);
+    keys.clear();blocking=false;
+    onPosition({x:p.x,z:p.z,yaw:body.rotation.y});
+    encounters.feedback(door.message);
   }
   function resize(){
     const width=Math.max(1,canvas.clientWidth),height=Math.max(1,canvas.clientHeight);
@@ -188,26 +251,11 @@ export function startWilderness(
       const p=body.position;
       const atGate=!inDen(p.z)&&Math.hypot(p.x-den.gate.x,p.z-den.gate.z)<3.4;
       const atExit=inDen(p.z)&&Math.hypot(p.x-den.exit.x,p.z-den.exit.z)<2.8;
-      const currentFloor=towerFloorAt(p.z);
-      const atTower=!currentFloor&&!inDen(p.z)&&Math.hypot(p.x-briarWatch.x,p.z-briarWatch.z)<3.4;
-      const atTowerExit=currentFloor&&Math.hypot(p.x-currentFloor.exit.x,p.z-currentFloor.exit.z)<2.6;
-      const atStair=currentFloor&&currentFloor.number<5&&Math.hypot(p.x-currentFloor.stairs.x,p.z-currentFloor.stairs.z)<2.65;
+      const door=nearbyDoor();
+      if(door){enterDoor(door);return;}
       const wasInside=inDen(p.z);
       const stone=save.health?nearStone():undefined;
-      if(save.health&&(atTower||atTowerExit||atStair)){
-        if(atStair&&currentFloor&&floorRemaining(currentFloor,save.defeated)>0){
-          encounters.feedback('Defeat the remaining guardians to unlock the next floor.');
-          return;
-        }
-        dismissHorse();
-        const next=atTower?towerFloors[0]:atStair&&currentFloor?towerFloors[currentFloor.number]:undefined;
-        const point=next?.entry??{x:briarWatch.x,z:briarWatch.z+3.15};
-        p.set(point.x,surface(point.x,point.z),point.z);body.rotation.y=next?Math.PI:0;
-        focus.set(p.x,p.y+.75,p.z);
-        encounters.transition();keys.clear();blocking=false;
-        if(next?.number===5&&!save.defeatedBosses.includes(briarWatch.boss)) encounters.feedback('Boss encounter · The Hollow Sentinel');
-        else encounters.feedback(next?'Briar Watch · Floor '+next.number+' · '+next.title:'Returned from Briar Watch.');
-      } else if(save.health&&(atGate||atExit)){
+      if(save.health&&(atGate||atExit)){
         dismissHorse();
         const point=atGate?den.entry:{x:den.gate.x,z:den.gate.z+3.9};
         p.set(point.x,surface(point.x,point.z),point.z);
@@ -235,7 +283,12 @@ export function startWilderness(
   window.addEventListener('pointercancel',()=>{blocking=false;},{signal});
   canvas.addEventListener('contextmenu',e=>e.preventDefault(),{signal});
   canvas.addEventListener('pointerdown',e=>{
-    if(!e.isPrimary||uiOpen()||travel||mounted) return;
+    if(!e.isPrimary||uiOpen()||travel) return;
+    if(e.button===0){
+      const door=nearbyDoor(e);
+      if(door){enterDoor(door);return;}
+    }
+    if(mounted) return;
     if(e.button===2) blocking=true;
     if(e.button===0&&!blocking) encounters.attack(knight.playAttack);
   },{signal});
@@ -268,7 +321,7 @@ export function startWilderness(
       const z=Number(keys.has('KeyS'))-Number(keys.has('KeyW'));
       const length=encounters.dashing?0:Math.hypot(x,z);
       const sprinting=keys.has('ShiftLeft')||keys.has('ShiftRight');
-      const speed=(mounted?(sprinting?17.8:10.8):blocking?3:sprinting?12:6)*moveSpeed(effectiveStats(save));
+      const speed=(mounted?(sprinting?17.8:10.8):blocking?3:sprinting?12:6)*moveSpeed(effectiveStats(save))*encounters.movementFactor;
       const previousYaw=body.rotation.y;
       let heading=previousYaw;
       if(length&&mounted){
@@ -320,17 +373,8 @@ export function startWilderness(
           view.prompt='E · Enter Hollow Fang Den · Rank E · Suggested level 5';
         if(save.health&&Math.hypot(p.x-den.exit.x,p.z-den.exit.z)<2.8)
           view.prompt='E · Return to Blackwater Wilds';
-        const floor=towerFloorAt(p.z);
-        if(save.health){
-          if(!floor&&Math.hypot(p.x-briarWatch.x,p.z-briarWatch.z)<3.4)
-            view.prompt='E · Enter Briar Watch';
-          if(floor&&Math.hypot(p.x-floor.exit.x,p.z-floor.exit.z)<2.6)
-            view.prompt='E · Leave Briar Watch';
-          if(floor&&floor.number<5&&Math.hypot(p.x-floor.stairs.x,p.z-floor.stairs.z)<2.65){
-            const left=floorRemaining(floor,save.defeated);
-            view.prompt=left?'Stairway sealed · '+left+' remaining':'E · Ascend to floor '+(floor.number+1);
-          }
-        }
+        const door=nearbyDoor();
+        if(door) view.prompt=door.locked?'Door sealed · '+door.detail:'E or click · '+door.label;
         const stone=save.health?nearStone():undefined;
         if(stone) view.prompt=save.waystones.includes(stone.id)?'M · Travel from '+stone.name:'E · Activate '+stone.name;
         const seconds=Math.ceil(encounters.abilityRemaining);
@@ -352,6 +396,7 @@ export function startWilderness(
       }
     },
     render(time){
+      caves.update(time,body.position);
       tower.update(time,body.position,save.defeated);
       water.value=time;
       grass.update(time,encounters.dashing,encounters.grassInfluences);
@@ -370,7 +415,7 @@ export function startWilderness(
   return {
     travelTo(id:string){
       if(travel||!save.health) return 'Travel is unavailable right now.';
-      if(towerFloorAt(body.position.z)) return 'Leave Briar Watch through the exit before fast travel.';
+      if(towerFloorAt(body.position.z)||caveAt(body.position.z)) return 'Use the dungeon exit before fast travel.';
       if(inDen(body.position.z)&&body.position.z<330)
         return 'Waystone travel is unavailable in the Fang Guardian arena.';
       if(encounters.inCombat) return 'Leave combat before using a Waystone.';
@@ -414,7 +459,7 @@ export function startWilderness(
       onSaveChange();
     },
     dispose(){
-    loop.stop(); controller.abort(); observer.disconnect(); encounters.dispose();stones.dispose();grass.dispose();tower.dispose();horse.dispose();knight.disposeArmor();
+    loop.stop(); controller.abort(); observer.disconnect(); encounters.dispose();stones.dispose();grass.dispose();tower.dispose();caves.dispose();horse.dispose();knight.disposeArmor();
     const geometries=new Set<T.BufferGeometry>(),materials=new Set<T.Material>();
     scene.traverse(object=>{
       if(object instanceof T.InstancedMesh) object.dispose();

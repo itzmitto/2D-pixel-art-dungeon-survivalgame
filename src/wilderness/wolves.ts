@@ -106,6 +106,17 @@ export function wolfModels(){
   const iris=own(loft([[-.018,.034,-.016,.017],[0,.052,-.026,.026],[.022,.026,-.013,.013]],10));
   const pupilGeo=own(loft([[0,.008,-.017,.017],[.012,.012,-.021,.021]],8));
   const crown=own(loft([[-.07,.096,-.077,.066],[.03,.12,-.073,.095],[.25,.079,-.056,.066],[.45,.035,-.026,.034],[.59,.003,-.003,.006]],7).rotateX(-Math.PI/2));
+  const spectralCoat=own(new T.MeshStandardMaterial({color:0x121322,roughness:.72,emissive:0x071027,emissiveIntensity:.31}));
+  spectralCoat.onBeforeCompile=shader=>{
+    shader.fragmentShader=shader.fragmentShader.replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
+      float spectralRim=pow(1.-max(0.,dot(normalize(vViewPosition),normal)),3.7);
+      totalEmissiveRadiance+=vec3(.019,.11,.31)*spectralRim*.66;`);
+  };
+  const spectralBlue=own(new T.MeshBasicMaterial({color:0x62caff,toneMapped:false}));
+  const spectralLines=[-1,1].map(side=>({
+    muzzle:own(pathRidge([[side*.143,.089,.29],[side*.154,.020,.43],[side*.121,-.018,.61],[side*.089,-.04,.76]],.010)),
+    ribs:own(pathRidge([[side*.325,1.37,.70],[side*.374,1.46,.41],[side*.302,1.34,.08],[side*.282,1.28,-.22]],.009)),
+  }));
   const batcher=rigidBatcher(true);
 
   function forms(kind:Morph){
@@ -176,7 +187,7 @@ export function wolfModels(){
     vein:own(pathRidge([[side*.205,1.87,.68],[side*.272,1.78,.82],[side*.329,1.64,.88],[side*.348,1.41,.81]],.012)),
   }));
   return {
-    make(kind:Morph='wild'):CreatureRig{
+    make(kind:Morph='wild',spectral=false):CreatureRig{
       const g=geometries[kind],wild=kind==='wild', boss=kind==='guardian', strong=wild?1:boss?1.55:1.27;
       const root=new T.Group(),frame=joint(root);
       const coatDetail=joint(frame);
@@ -245,9 +256,23 @@ export function wolfModels(){
         }
         return {top,knee,foot,a,b,front,side,z,y};
       });
+      if(spectral){
+        root.traverse(node=>{
+          if(node instanceof T.Mesh) node.material=node.material===g.irisMaterial?spectralBlue:spectralCoat;
+        });
+        for(const [index,marks] of spectralLines.entries()){
+          meshPart(skull,marks.muzzle,spectralBlue);
+          meshPart(frame,marks.ribs,spectralBlue);
+          for(let i=0;i<4;i++){
+            const side=index===0?-1:1;
+            const wisp=meshPart(frame,crown,spectralCoat,side*(.11+i*.035),1.76-i*.039,.38-i*.26);
+            wisp.rotation.set(-.81,side*.19,-side*.41);wisp.scale.set(.72,.85-i*.10,.88);
+          }
+        }
+      }
       const brush=joint(frame,0,1.40,-1.04),tip=joint(brush,0,-.078,-.72);
-      meshPart(brush,g.tail,hide);meshPart(brush,g.tailCoat,hide);
-      meshPart(tip,g.brush,hide);meshPart(tip,g.brushCoat,hide);
+      meshPart(brush,g.tail,spectral?spectralCoat:hide);meshPart(brush,g.tailCoat,spectral?spectralCoat:hide);
+      meshPart(tip,g.brush,spectral?spectralCoat:hide);meshPart(tip,g.brushCoat,spectral?spectralCoat:hide);
       batcher.bake(root);
       return {root,animate(p){
         const gait=p.gait, turn=p.turn??0, alert=p.alert??0;

@@ -1,3 +1,4 @@
+import { caveAt } from './bossCaves.ts';
 import { briarWatch, towerFloorAt } from './briarWatch.ts';
 import { inDen } from './denLayout.ts';
 export const regions=[
@@ -11,4 +12,4 @@ export const regions=[
   {id:'shadowspire',name:'Shadowspire Monolith',difficulty:'Levels 150–200+',state:'Planned',detail:'A future endgame region.'},
 ] as const;
 export type RegionId=typeof regions[number]['id'];
-export const regionLabel=(z:number)=>towerFloorAt(z)?briarWatch.name:inDen(z)?'Hollow Fang Den':'Velren Forest';
+export const regionLabel=(z:number)=>caveAt(z)?.name??(towerFloorAt(z)?briarWatch.name:inDen(z)?'Hollow Fang Den':'Velren Forest');
