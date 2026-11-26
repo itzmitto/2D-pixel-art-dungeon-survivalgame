@@ -16,6 +16,8 @@ export const monsters={
     awareness:40,leash:48,recovery:1.4,windup:.85,reach:3.2,xp:210,resistance:bossResistance,gold:45,material:'Magic Crystal',respawn:0},
 } as const;
 export type MonsterKind=keyof typeof monsters;
+export const enemyXpMultiplier=10;
+export const enemyXpReward=(kind:MonsterKind)=>enemyXpMultiplier*(monsters[kind].xp+(kind==='guardian'?160:0));
 export type Drop={gold:number;material:string;weapon?:WeaponId;rarity:Rarity;potion?:number;armor?:number};
 export const rarityOrder=['Common','Uncommon','Rare','Epic','Legendary','Mythic'] as const;
 const weights=[56,27,12,4,.9,.1] as const;

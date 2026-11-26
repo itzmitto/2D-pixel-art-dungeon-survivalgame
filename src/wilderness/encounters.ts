@@ -2,7 +2,7 @@ import { goblinModels } from './goblins.ts';
 import { loft, shapedPlate, type CreatureRig } from './creatureGeometry.ts';
 import { skeletonModels } from './skeletons.ts';
 import { den, inDen } from './denLayout.ts';
-import { monsters, rarityOrder, rollDrop, type MonsterKind, type Drop } from './huntData.ts';
+import { enemyXpReward, monsters, rarityOrder, rollDrop, type MonsterKind, type Drop } from './huntData.ts';
 import { elementalRarity, instanceWeapon } from './itemInstances.ts';
 import { chestBonus, chestModels, worldChests, type Chest } from './treasure.ts';
 import { attackSpeed, earnXP, elemental, maxHunterHealth, mitigation, physical, lootBonus } from './progression.ts';
@@ -286,7 +286,7 @@ export function createEncounters(
       if(!save.defeatedBosses.includes(enemy.id)) save.defeatedBosses.push(enemy.id);
       if(!save.completedDungeons.includes(den.id)) save.completedDungeons.push(den.id);
     }
-    const reward=enemy.spec.xp+(boss?160:0);
+    const reward=enemyXpReward(enemy.kind);
     const levelUp=earnXP(save,reward);
     notify((boss?den.name+' cleared':enemy.spec.name+' defeated')+' · +'+reward+' XP'+(levelUp?' · '+levelUp:''));
 
