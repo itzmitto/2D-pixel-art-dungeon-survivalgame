@@ -34,3 +34,5 @@
 .atlas-waystations button { text-align:left; font-size:.78rem!important; }
 .atlas-selection button { margin-top:.38rem; }
 .atlas-travel-error { color:#ffd0a4!important; }
+.atlas-pin.bossCave circle { fill:#352540; stroke:#a9c2e6; }
+.atlas-pin.bossCave path { stroke:#e4c5ff; }

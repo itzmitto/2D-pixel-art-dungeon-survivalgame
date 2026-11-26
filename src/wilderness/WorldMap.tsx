@@ -1,7 +1,8 @@
+import { bossCaves, caveAt, caveExit, caveRewardId, caveStatus, type CaveRuns } from './bossCaves';
 import { briarWatch, floorRemaining, towerFloorAt } from './briarWatch';
 import { waystones } from './worldSites';
 import { denChests, towerChests, worldChests } from './treasure';
-import { memo, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { memo, useId, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { branchTrails, bridges, extent, hills, landmarks, path, river, southPath } from './layout';
 import { den, inDen } from './denLayout';
 import { cellAt, cellsPerSide, cellSize, type Position } from './exploration';
@@ -32,12 +33,13 @@ const symbols={
   tower:'M-4 5v-8l-1-1v-2h2v2h2v-2h2v2h2v-2h2v2l-1 1v8zM0 0v2',
   gate:'M-4 5v-5a4 4 0 1 1 8 0v5M-6 5H6M0-1v4',
   chest:'M-5 5v-8l2-2h6l2 2v8z M-5 0H5 M0 0v2',
+  bossCave:'M-7 5-4-2 0-6 4-2 7 5H3V2L0-1-3 2v3zM0 2v3',
   boss:'M-5-5-3 1 0 5 3 1 5-5M-4-2 0-4 4-2M-2 1l2 2 2-2',
 };
 const descriptions:Record<keyof typeof symbols,string>={
   ruin:'Ancient ruin',bridge:'River crossing',campfire:'Safe campfire',camp:'Abandoned camp',
   waystone:'Waystone',orcCamp:'Orc encampment',briar:'Tower dungeon',ritual:'Wizard encounter · Veil Hierophant',
-  chest:'Discovered treasure',cave:'Cave landmark',tower:'Tower landmark · interior closed',gate:'Dungeon gate',boss:'Boss arena',
+  chest:'Discovered treasure',cave:'Cave landmark',tower:'Tower landmark · interior closed',gate:'Dungeon gate',boss:'Boss arena',bossCave:'Boss cave',
 };
 const AtlasTerrain=memo(function AtlasTerrain(){
   const texture=useMemo(terrainTexture,[]);
@@ -98,8 +100,8 @@ function PlayerMark({position,scale=1}:{position:Position;scale?:number}){
   </g>;
 }
 
-export function WorldMap({position,discovered,cleared,bossDefeated,opened,waystonesActive,seenChests,towerCleared,defeated,travel,close}:{
-  position:Position;discovered:number[];cleared:boolean;bossDefeated:boolean;opened:readonly string[];towerCleared:boolean;defeated:readonly string[];waystonesActive:readonly string[];seenChests:readonly string[];travel:(id:string)=>string;close:()=>void;
+export function WorldMap({position,discovered,cleared,bossDefeated,opened,waystonesActive,seenChests,towerCleared,defeated,caveRuns,travel,close}:{
+  position:Position;discovered:number[];cleared:boolean;bossDefeated:boolean;opened:readonly string[];towerCleared:boolean;caveRuns:CaveRuns;defeated:readonly string[];waystonesActive:readonly string[];seenChests:readonly string[];travel:(id:string)=>string;close:()=>void;
 }){
   const mask=useId();
   const [region,setRegion]=useState<RegionId>('velren');
@@ -115,6 +117,26 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
     const x=current.size===span?position.x:current.x,z=current.size===span?position.z:current.z;
     return {size,x:bound(x,size/2),z:bound(z,size/2)};
   });
+  const [clock,setClock]=useState(Date.now);
+  useEffect(()=>{const timer=window.setInterval(()=>setClock(Date.now()),1000);return ()=>window.clearInterval(timer);},[]);
+  const cave=caveAt(position.z);
+  if(cave){
+    const exit=caveExit(cave), run=caveRuns[cave.id];
+    return <SystemPanel title={cave.name} section={'Boss cave · Rank '+cave.rank} close={close} style="atlas-panel atlas-den">
+      <div className="atlas-den-meta">{cave.boss} · Lv {cave.level} · Recommended {cave.recommended} · {cave.rarity}</div>
+      <p>{caveStatus(cave,caveRuns,opened,clock)}</p>
+      <svg viewBox={`-23 ${cave.arena-23} 46 46`} role="img" aria-label={cave.name+' map'}>
+        <ellipse cx="0" cy={cave.arena} rx={cave.kind==='warlord'?17:18} ry={cave.kind==='warlord'?19:19.7}
+          fill={cave.kind==='warlord'?'#6e5256':'#405d76'} stroke="#c9a978" strokeWidth=".35"/>
+        <circle cx={exit.x} cy={exit.z} r="1.1" fill="#95e5ee"><title>Exit to Velren Forest</title></circle>
+        <g className="atlas-pin" transform={`translate(0 ${cave.arena-(run?.readyAt?10:7)}) scale(.32)`}>
+          <title>{run?.readyAt?(opened.includes(caveRewardId(cave,run.cycle))?'Reward claimed':'Reward chest'):cave.boss}</title>
+          <path d={run?.readyAt?symbols.chest:symbols.boss}/>
+        </g>
+        <PlayerMark position={position} scale={.22}/>
+      </svg>
+    </SystemPanel>;
+  }
   const floor=towerFloorAt(position.z);
   if(floor) return <SystemPanel title={briarWatch.name} section={'Tower dungeon · Floor '+floor.number} close={close} style="atlas-panel atlas-den">
     <div className="atlas-den-meta">{floor.title} · {floorRemaining(floor,defeated)} remaining</div>
@@ -171,6 +193,12 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
   const charted=pins.filter(item=>seen.has(cellAt(item.x,item.z))||
     (item.kind==='waystone'&&waystonesActive.includes(item.id)));
   const selected=charted.find(item=>item.id===selection);
+  const selectedCave=bossCaves.find(cave=>cave.name===selected?.name);
+  const caveCaption=(name:string)=>{
+    const cave=bossCaves.find(site=>site.name===name);
+    return cave?cave.boss+' · Lv '+cave.level+' · Recommended '+cave.recommended+' · Rank '+cave.rank+
+      ' · '+caveStatus(cave,caveRuns,opened,clock):'Boss cave';
+  };
   const caption=(kind:keyof typeof symbols)=>kind==='gate'
     ? 'Rank '+den.rank+' · Level '+den.level+' · '+(cleared?'Cleared':'Uncleared')+(bossDefeated?' · Fang Guardian defeated':'')
     : kind==='briar'?'Five floors · '+(towerCleared?'Completed':'The Hollow Sentinel awaits'):descriptions[kind];
@@ -205,9 +233,9 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
             {charted.map(item=><g
               key={item.id} className={'atlas-pin '+item.kind+(item.id===selection?' selected':'')+
                 (item.kind==='waystone'&&waystonesActive.includes(item.id)?' unlocked':'')} role="button" tabIndex={0}
-              aria-label={item.name+' · '+caption(item.kind)} onClick={()=>{setRegion('velren');select(item.id);}} onKeyDown={event=>activate(event,item.id)}
+              aria-label={item.name+' · '+(item.kind==='bossCave'?caveCaption(item.name):caption(item.kind))} onClick={()=>{setRegion('velren');select(item.id);}} onKeyDown={event=>activate(event,item.id)}
               transform={`translate(${item.x} ${item.z})`}>
-              <title>{item.name} · {caption(item.kind)}</title><circle r={item.kind==='gate'?7:5.6} />
+              <title>{item.name} · {(item.kind==='bossCave'?caveCaption(item.name):caption(item.kind))}</title><circle r={item.kind==='gate'?7:5.6} />
               <path d={symbols[item.kind]} />
               {(item.id===selection||item.kind!=='chest'&&item.kind!=='waystone')&&<text y={item.kind==='gate'?16:-9} textAnchor="middle">{item.name}{item.kind==='gate'&&cleared?' ✓':''}</text>}
             </g>)}
@@ -242,7 +270,9 @@ export function WorldMap({position,discovered,cleared,bossDefeated,opened,waysto
         <div className="atlas-selection" aria-live="polite">
           <span className="system-kicker">{selected?'Discovered location':selectedRegion.state==='Planned'?'Unsurveyed region':'Charted region'}</span>
           <strong>{selected?.name??selectedRegion.name}</strong>
-          <p>{selected?caption(selected.kind):selectedRegion.detail}</p>
+          <p>{selectedCave?caveCaption(selectedCave.name):selected?caption(selected.kind):selectedRegion.detail}</p>
+          {selectedCave&&<p>{selectedCave.rarity} rewards{caveRuns[selectedCave.id]?.readyAt||
+            opened.some(id=>id.startsWith('reward-'+selectedCave.id+'-'))?' · Boss defeated before':''}</p>}
           {selected?.kind==='waystone'&&(waystonesActive.includes(selected.id)
             ? <button onClick={()=>reportTravel(travel(selected.id))}>Travel here · Free</button>
             : <p>Activate this stone in person with E.</p>)}

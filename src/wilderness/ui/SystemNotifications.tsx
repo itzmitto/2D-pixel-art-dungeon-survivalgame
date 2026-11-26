@@ -1,3 +1,4 @@
+import { bossCaves } from '../bossCaves';
 import { briarWatch, floorRemaining, towerFloors } from '../briarWatch';
 import { armorPiece } from '../armor';
 import type { Exploration } from '../exploration';
@@ -29,12 +30,12 @@ export function noticesBetween(before:ReturnType<typeof observe>,hero:Exploratio
   }
   for(const boss of hero.defeatedBosses){
     if(before.bosses.has(boss)) continue;
-    notices.push({kind:'boss',title:'Boss Defeated',detail:boss===briarWatch.boss?monsters.sentinel.name:monsters.guardian.name});
+    notices.push({kind:'boss',title:'Boss Defeated',detail:bossCaves.find(cave=>cave.id===boss)?.boss??(boss===briarWatch.boss?monsters.sentinel.name:monsters.guardian.name)});
   }
   for(const dungeon of hero.completedDungeons){
     if(before.dungeons.has(dungeon)) continue;
     notices.push({kind:'dungeon',title:dungeon===briarWatch.id?'Tower Completed':'Dungeon Cleared',
-      detail:dungeon===briarWatch.id?briarWatch.name:den.name});
+      detail:bossCaves.find(cave=>cave.id===dungeon)?.name??(dungeon===briarWatch.id?briarWatch.name:den.name)});
   }
   for(const [i,floor] of towerFloors.slice(0,-1).entries()){
     if(before.floors[i]>0&&floorRemaining(floor,hero.defeated)===0)
