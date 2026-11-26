@@ -1,17 +1,19 @@
 import * as T from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { CreatureRig } from './creatureGeometry.ts';
 import type { Exploration } from './exploration.ts';
 import { surface } from './layout.ts';
 import type { createMagicEffects, Point } from './magicEffects.ts';
-import { grantShadowXp, shadowCapacity, shadowName, shadowStats, shadowTuning, type ShadowKind, type ShadowSoldier } from './shadowData.ts';
+import { cleanShadowName, grantShadowXp, shadowCapacity, shadowName, shadowStats, shadowTuning, shadowProfiles, shadowRank,
+  shadowStrength, shadowCommands, type ShadowCommand, type ShadowGrade, type ShadowKind, type ShadowSoldier } from './shadowData.ts';
 
-type Hostile={id:string;hp:number;root:T.Group};
+type Hostile={id:string;hp:number;root:T.Group;hitFlash:number};
 type Companion={
   record:ShadowSoldier;rig:CreatureRig;target?:Hostile;phase:number;gait:number;
-  bite:number;windup:number;recovery:number;hurt:number;seek:number;rise:number;
+  bite:number;windup:number;recovery:number;hurt:number;seek:number;rise:number;strikes:number;
 };
 
-export function shadowArmy(
+export function shadowArmy<Enemy extends Hostile>(
   group:T.Group,player:T.Group,save:Exploration,
   rigFor:(kind:ShadowKind)=>CreatureRig,
   canWalk:(x:number,z:number)=>boolean,
@@ -41,6 +43,33 @@ export function shadowArmy(
   const moteMaterial=new T.MeshBasicMaterial({color:0x222545,toneMapped:false});
   const motes=new T.InstancedMesh(moteGeometry,moteMaterial,64);
   motes.count=0;motes.frustumCulled=false;motes.instanceMatrix.setUsage(T.DynamicDrawUsage);group.add(motes);
+  const proxyMaterial=new T.MeshBasicMaterial({color:0xffffff,toneMapped:false});
+  function proxyGeometry(beast:boolean,caster=false){
+    const body=new T.IcosahedronGeometry(1,0).scale(beast?.35:.36,beast?.43:.81,beast?.97:.27)
+      .translate(0,beast?1.35:1.15,0);
+    const head=new T.OctahedronGeometry(1).scale(.27,.32,beast?.44:.27).translate(0,beast?1.70:2.06,beast?1.0:.08);
+    const parts=[body,head];
+    for(const side of [-1,1]){
+      for(const z of beast?[-.62,.61]:[.03])
+        parts.push(new T.BoxGeometry(.16,beast?1.12:1.16,.18).translate(side*.26,.59,z));
+      if(!beast) parts.push(new T.BoxGeometry(.17,.76,.21).rotateZ(side*.22).translate(side*.41,1.4,.01));
+    }
+    if(caster) parts.push(new T.BoxGeometry(.083,2.65,.08).translate(.51,1.47,.14));
+    if(beast) parts.push(new T.OctahedronGeometry(.39).scale(.51,.67,1.7).translate(0,1.42,-1.16));
+    const geometry=mergeGeometries(parts)!;
+    parts.forEach(part=>part.dispose());
+    return geometry;
+  }
+  const proxies=[proxyGeometry(true),proxyGeometry(false),proxyGeometry(false,true)].map(geometry=>{
+    const mesh=new T.InstancedMesh(geometry,proxyMaterial,shadowTuning.limits.SSS);
+    mesh.count=0;mesh.frustumCulled=false;mesh.castShadow=false;mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
+    group.add(mesh);return mesh;
+  });
+  const projectiles:{state:Companion;target:Hostile;point:Point;life:number;trail:number;radius:number}[]=[];
+  const spatialKey=(x:number,z:number,size:number)=>Math.floor(x/size)*4096+Math.floor(z/size);
+  const nearbyHostiles=new Map<number,Enemy[]>(), nearbyAllies=new Map<number,Companion[]>();
+  let nextIndex=0;
+  const tint=new T.Color(), warmRigLimit=18;
   const stamp=new T.Object3D();
   let time=0,lastPrune=0;
   function spot(index:number,radius=2.6){
@@ -61,14 +90,14 @@ export function shadowArmy(
   function raise(record:ShadowSoldier,point?:Point,visual=true){
     const kind=record.kind;
     const rig=pool.get(kind)?.pop()??rigFor(kind);
-    rig.root.name=shadowName(kind);
-    rig.root.scale.setScalar(kind==='dire'?1.28:.97);
+    rig.root.name=record.name;
+    rig.root.scale.setScalar(kind==='guardian'?1.59:record.grade==='boss'?1.38:kind==='dire'||kind==='elite'?1.23:1);
     rig.root.visible=true;group.add(rig.root);
-    const state:Companion={record,rig,phase:0,gait:0,bite:.2,windup:0,recovery:0,hurt:0,seek:0,rise:visual?.73:0};
+    const state:Companion={record,rig,phase:0,gait:0,bite:.2,windup:0,recovery:0,hurt:0,seek:0,rise:visual?.73:0,strikes:0};
     active.set(record.id,state);
     setDown(state,point??spot(active.size),visual);
     if(visual){
-      fx.emit(rig.root.position,0x77bcff,'ring',.65,.75,{grow:2.68,opacity:.92});
+      fx.emit(rig.root.position,shadowProfiles[kind].color,'ring',.65,.75,{grow:2.68,opacity:.92});
       fx.emit(rig.root.position,0x3262d9,'ray',.61,.67,{y:1.12,aspect:3.5});
       fx.scatter(rig.root.position,0x78baff,8,.48);
     }
@@ -87,7 +116,7 @@ export function shadowArmy(
   }
   function available(){
     const p=player.position, now=Date.now();
-    return save.shadowEssences.find(essence=>essence.expiresAt>now&&Math.hypot(essence.x-p.x,essence.z-p.z)<3.5&&
+    return save.shadowEssences.find(essence=>essence.expiresAt>now&&!save.shadows.some(record=>record.id===essence.id||essence.grade==='boss'&&record.kind===essence.kind)&&Math.hypot(essence.x-p.x,essence.z-p.z)<3.5&&
       clear(p.x,p.z,essence.x,essence.z));
   }
   function summon(record:ShadowSoldier){
@@ -98,9 +127,11 @@ export function shadowArmy(
   }
   return {
     available,
-    remember(id:string,kind:ShadowKind,level:number,baseHealth:number,baseDamage:number,point:Point){
+    remember(id:string,kind:ShadowKind,grade:ShadowGrade,level:number,baseHealth:number,baseDamage:number,point:Point){
+      if(save.shadows.some(record=>record.id===id||grade==='boss'&&record.kind===kind)||
+        save.shadowEssences.some(essence=>essence.id===id)) return;
       save.shadowEssences=save.shadowEssences.filter(essence=>essence.expiresAt>Date.now()).slice(-95);
-      save.shadowEssences.push({id,kind,level,baseHealth,baseDamage,x:point.x,z:point.z,expiresAt:Date.now()+shadowTuning.essenceMs});
+      save.shadowEssences.push({id,kind,grade,attempts:0,level,baseHealth,baseDamage,x:point.x,z:point.z,expiresAt:Date.now()+shadowTuning.essenceMs});
       fx.emit(point,0x478aff,'ring',.72,1.70,{grow:.19,opacity:.69});
     },
     extract(){
@@ -108,13 +139,22 @@ export function shadowArmy(
       const essence=available();
       if(!essence) return;
       if(active.size>=shadowCapacity(save.level)){notify('Shadow capacity reached · Dismiss a shadow with K');return;}
-      if(save.shadows.some(record=>record.id===essence.id)) return;
-      save.shadowEssences=save.shadowEssences.filter(item=>item.id!==essence.id);
-      const record:ShadowSoldier={id:essence.id,kind:essence.kind,level:essence.level,originLevel:essence.level,xp:0,
-        baseHealth:essence.baseHealth,baseDamage:essence.baseDamage,active:true,health:shadowStats(essence).health,readyAt:0};
+      essence.attempts++;
+      if(Math.random()>=shadowTuning.extraction[essence.grade]){
+        const remaining=shadowTuning.attempts[essence.grade]-essence.attempts;
+        if(!remaining) save.shadowEssences=save.shadowEssences.filter(item=>item!==essence);
+        fx.emit(essence,0x745ea9,'ring',.89,.43,{grow:1.45});
+        notify('Shadow extraction failed · '+(remaining?remaining+' attempts remaining':'Essence dispersed'));
+        return;
+      }
+      save.shadowEssences=save.shadowEssences.filter(item=>item!==essence);
+      if(essence.grade==='boss') save.shadowEssences=save.shadowEssences.filter(item=>item.kind!==essence.kind);
+      const record:ShadowSoldier={id:essence.id,kind:essence.kind,grade:essence.grade,name:shadowName(essence.kind),
+        level:essence.level,originLevel:essence.level,xp:0,baseHealth:essence.baseHealth,baseDamage:essence.baseDamage,
+        active:true,health:shadowStats(essence).health,readyAt:0};
       save.shadows=[...save.shadows,record];
       raise(record,essence);
-      notify('Shadow extracted · '+shadowName(record.kind));
+      notify('Shadow extracted · '+record.name);
     },
     toggle(id:string){
       const state=active.get(id);
@@ -122,15 +162,34 @@ export function shadowArmy(
       const record=save.shadows.find(shadow=>shadow.id===id);
       if(record&&summon(record)) changed();
     },
-    summonAll(){
+    rename(id:string,name:string){
+      const record=save.shadows.find(item=>item.id===id);
+      if(!record) return;
+      record.name=cleanShadowName(name)||shadowName(record.kind);changed();
+    },
+    command(command?:ShadowCommand){
+      save.shadowCommand=command??shadowCommands[(shadowCommands.indexOf(save.shadowCommand)+1)%shadowCommands.length];
+      for(const state of active.values()){state.target=undefined;state.windup=0;state.seek=0;}
+      projectiles.length=0;
+      notify('Army command · '+save.shadowCommand);
+    },
+    dismissAll(){
+      if(!active.size) return;
+      for(const state of active.values()) dismiss(state);
+      projectiles.length=0;changed();
+    },
+    summonAll(strongest=false){
       let added=0;
-      for(const record of save.shadows){
+      const records=strongest?[...save.shadows].sort((a,b)=>shadowStrength(b)-shadowStrength(a)):save.shadows;
+      if(strongest) for(const state of active.values()) dismiss(state);
+      for(const record of records){
         if(active.size>=shadowCapacity(save.level)) break;
         if(summon(record)) added++;
       }
-      if(added) changed();
+      if(added||strongest) changed();
     },
     transition(){
+      projectiles.length=0;
       let i=0;
       for(const shadow of active.values()){
         shadow.rise=0;setDown(shadow,spot(i++));
@@ -157,77 +216,164 @@ export function shadowArmy(
         state.record.readyAt=Date.now()+shadowTuning.recoveryMs;
         fx.emit(p,0x5373cc,'mist',1.1,.37,{y:.6,grow:1.2});
         dismiss(state);
-        notify('Shadow recovering · '+shadowName(state.record.kind));
+        notify('Shadow recovering · '+state.record.name);
       }else changed();
     },
     guardPoint(id:string){return active.get(id)?.rig.root.position;},
     award(enemyId:string,xp:number){
       const participants=participation.get(enemyId);
       if(!participants) return;
-      for(const record of save.shadows) if(participants.has(record.id)) grantShadowXp(record,Math.max(3,Math.round(xp*.63)));
+      const promoted:string[]=[];
+      for(const record of save.shadows) if(participants.has(record.id)){
+        const before=shadowRank(record.level);
+        grantShadowXp(record,Math.max(3,Math.round(xp*.63)));
+        const rank=shadowRank(record.level);
+        if(rank!==before) promoted.push(record.name+' → '+rank);
+      }
       participation.delete(enemyId);
+      return promoted;
     },
     forget(enemyId:string){participation.delete(enemyId);},
-    update(dt:number,enemies:readonly Hostile[],strike:(enemy:Hostile,damage:number)=>void){
+    update(dt:number,enemies:readonly Enemy[],strike:(enemy:Enemy,damage:number,frost?:boolean)=>void){
       time+=dt;
       if(time-lastPrune>2.5){
         lastPrune=time;
         const now=Date.now();
         save.shadowEssences=save.shadowEssences.filter(essence=>essence.expiresAt>now);
       }
-      let index=0;
-      const leader=player.position;
+      const leader=player.position, aggressive=save.shadowCommand==='Aggressive';
+      const reach=aggressive?27:13.2, fighting=save.shadowCommand!=='Follow';
+      function around(x:number,z:number,radius:number,visit:(enemy:Enemy)=>void){
+        const x0=Math.floor((x-radius)/8),x1=Math.floor((x+radius)/8);
+        const z0=Math.floor((z-radius)/8),z1=Math.floor((z+radius)/8);
+        for(let xx=x0;xx<=x1;xx++) for(let zz=z0;zz<=z1;zz++)
+          for(const enemy of nearbyHostiles.get(xx*4096+zz)??[]) if(enemy.hp>0) visit(enemy);
+      }
+      if(time>=nextIndex){
+        nextIndex=time+.14;
+        nearbyHostiles.clear();
+        for(const enemy of enemies){
+          const {x,z}=enemy.root.position;
+          if(enemy.hp<=0||Math.hypot(x-leader.x,z-leader.z)>34) continue;
+          const key=spatialKey(x,z,8), cell=nearbyHostiles.get(key);
+          if(cell) cell.push(enemy);else nearbyHostiles.set(key,[enemy]);
+        }
+      }
+      nearbyAllies.clear();
       for(const state of active.values()){
-        const {rig,record}=state,p=rig.root.position;
-        const n=index++;
+        const {x,z}=state.rig.root.position,key=spatialKey(x,z,2.5),cell=nearbyAllies.get(key);
+        if(cell) cell.push(state);else nearbyAllies.set(key,[state]);
+      }
+      function deal(state:Companion,enemy:Enemy,damage:number,frost=false){
+        if(enemy.hp<=0||!state.record.active) return;
+        const participants=participation.get(enemy.id)??new Set<string>();
+        participants.add(state.record.id);participation.set(enemy.id,participants);
+        strike(enemy,damage,frost);
+      }
+      function burst(state:Companion,point:Point,radius:number,damage:number,exclude?:Hostile,frost=false){
+        let victims=0;
+        around(point.x,point.z,radius,enemy=>{
+          const q=enemy.root.position;
+          if(victims>=4||enemy===exclude||Math.hypot(q.x-point.x,q.z-point.z)>radius||!clear(point.x,point.z,q.x,q.z)) return;
+          victims++;deal(state,enemy,damage,frost);
+        });
+      }
+      for(let i=projectiles.length-1;i>=0;i--){
+        const bolt=projectiles[i], q=bolt.target.root.position;
+        bolt.life-=dt;bolt.trail-=dt;
+        const dx=q.x-bolt.point.x,dz=q.z-bolt.point.z, gap=Math.hypot(dx,dz);
+        const velocity=20, step=Math.min(gap,dt*velocity);
+        const p=bolt.point, x=p.x+dx/(gap||1)*step,z=p.z+dz/(gap||1)*step;
+        if(bolt.life<=0||!bolt.target.hp||!bolt.state.record.active||!canWalk(x,z)||!fighting){
+          projectiles.splice(i,1);continue;
+        }
+        p.x=x;p.z=z;
+        const frost=bolt.state.record.kind==='frostGuardian', color=shadowProfiles[bolt.state.record.kind].color;
+        if(bolt.trail<=0){
+          bolt.trail=.09;
+          fx.emit(p,color,'crystal',.53,.19,{y:1.13,aspect:.85,opacity:.83});
+        }
+        if(gap<=step+.65){
+          const damage=shadowStats(bolt.state.record).damage;
+          deal(bolt.state,bolt.target as Enemy,damage,frost);
+          if(bolt.radius){
+            fx.emit(q,color,frost?'frost':'ring',bolt.radius,.57,{opacity:.65});
+            burst(bolt.state,q,bolt.radius,damage*.48,bolt.target,frost);
+          }
+          projectiles.splice(i,1);
+        }
+      }
+      let index=0, full=0;
+      for(const state of active.values()){
+        const {rig,record}=state,p=rig.root.position,n=index++, profile=shadowProfiles[record.kind];
         if(!save.health){rig.root.visible=false;continue;}
-        rig.root.visible=true;
         state.rise=Math.max(0,state.rise-dt);
         state.seek-=dt;state.bite=Math.max(0,state.bite-dt);
         state.hurt=Math.max(0,state.hurt-dt);state.recovery=Math.max(0,state.recovery-dt);
         const distance=Math.hypot(p.x-leader.x,p.z-leader.z);
-        if(distance>31) setDown(state,spot(n));
+        if(distance>reach+11) setDown(state,spot(n));
         if(state.seek<=0&&!state.windup){
-          state.seek=.31+(n%7)*.035;
-          let best=17;
+          state.seek=.32+(n%11)*.042;
+          let best=reach;
           state.target=undefined;
-          for(const enemy of enemies){
-            const q=enemy.root.position;
-            if(enemy.hp<=0||Math.hypot(q.x-leader.x,q.z-leader.z)>16.3) continue;
-            const d=Math.hypot(q.x-p.x,q.z-p.z);
-            if(d<best&&clear(p.x,p.z,q.x,q.z)){state.target=enemy;best=d;}
-          }
+          if(fighting) around(p.x,p.z,reach,enemy=>{
+            const q=enemy.root.position,d=Math.hypot(q.x-p.x,q.z-p.z);
+            if(d>=best||Math.hypot(q.x-leader.x,q.z-leader.z)>reach||
+              (!aggressive&&enemy.hitFlash<=0&&Math.hypot(q.x-leader.x,q.z-leader.z)>8.3)||!clear(p.x,p.z,q.x,q.z)) return;
+            state.target=enemy;best=d;
+          });
         }
         const target=state.target;
+        const ranged=profile.style==='spell'||profile.style==='frost';
+        const charge=profile.style==='dash'||profile.style==='charge';
         if(state.windup>0){
           state.windup=Math.max(0,state.windup-dt);
           if(!state.windup){
-            state.bite=record.kind==='dire'?1.03:.91;state.recovery=.28;
-            if(target&&target.hp>0&&Math.hypot(target.root.position.x-p.x,target.root.position.z-p.z)<2.32&&
+            state.bite=profile.cooldown;state.recovery=.31;
+            if(fighting&&target&&target.hp>0&&Math.hypot(target.root.position.x-p.x,target.root.position.z-p.z)<profile.range+.45&&
               clear(p.x,p.z,target.root.position.x,target.root.position.z)){
-              const participants=participation.get(target.id)??new Set<string>();
-              participants.add(record.id);participation.set(target.id,participants);
-              strike(target,shadowStats(record).damage);
-              fx.scatter(target.root.position,0x4c92ef,3,.58);
+              const damage=shadowStats(record).damage,q=target.root.position;
+              state.strikes++;
+              if(ranged){
+                if(projectiles.length<18) projectiles.push({state,target,point:{x:p.x,z:p.z},trail:0,life:1.1,
+                  radius:state.strikes%3===0?3.4:0});
+              }else{
+                const yaw=Math.atan2(q.x-p.x,q.z-p.z);
+                if(charge){
+                  const gap=Math.hypot(q.x-p.x,q.z-p.z),step=Math.max(0,gap-1.45);
+                  const x=p.x+Math.sin(yaw)*step,z=p.z+Math.cos(yaw)*step;
+                  if(canWalk(x,z)&&clear(p.x,p.z,x,z)){p.x=x;p.z=z;}
+                }
+                deal(state,target as Enemy,damage);
+                if(profile.style==='slam'&&state.strikes%2===0){
+                  fx.emit(p,profile.color,'ring',1.42,.46,{grow:5.1,opacity:.73});
+                  burst(state,p,3.55,damage*.53,target);
+                }else if(profile.style!=='bite') fx.emit(p,profile.color,'arc',1.16,.25,{yaw,y:.92,aspect:.72});
+                if(n<28) fx.scatter(q,profile.color,3,.64);
+              }
             }
           }
         }
-        const angle=n*2.399+player.rotation.y, radius=2.35+Math.floor(n/6)*.74;
+        const angle=n*2.399+player.rotation.y+Math.PI, radius=2.45+Math.sqrt(n)*.86;
         const goal=target?.hp?target.root.position:{x:leader.x+Math.sin(angle)*radius,z:leader.z+Math.cos(angle)*radius};
-        const dx=goal.x-p.x,dz=goal.z-p.z,gap=Math.hypot(dx,dz);
-        const yaw=Math.atan2(dx,dz);
+        const dx=goal.x-p.x,dz=goal.z-p.z,gap=Math.hypot(dx,dz), yaw=Math.atan2(dx,dz);
         let speed=0;
-        if(!state.rise&&target?.hp&&gap<1.94&&!state.bite&&!state.windup&&clear(p.x,p.z,goal.x,goal.z)) state.windup=.29;
-        if(!state.rise&&!state.windup&&gap>(target?.hp?1.52:.62)){
-          const step=Math.min(gap,(distance>10?11:target?.hp?6.7:5.5)*dt);
-          for(const offset of [0,.54,-.54,1.08,-1.08]){
+        const desired=target?.hp?Math.max(1.42,profile.range-(ranged?1.5:.62)):.69;
+        if(!state.rise&&target?.hp&&gap<profile.range&&!state.bite&&!state.windup&&clear(p.x,p.z,goal.x,goal.z)) state.windup=profile.windup;
+        if(!state.rise&&!state.windup&&gap>desired){
+          const step=Math.min(gap,(distance>11?11:target?.hp?6.7:5.5)*dt);
+          for(const offset of [0,.61,-.61,1.20,-1.20]){
             const a=yaw+offset,x=p.x+Math.sin(a)*step,z=p.z+Math.cos(a)*step;
             if(!canWalk(x,z)||Math.hypot(x-leader.x,z-leader.z)<.78) continue;
             let crowded=false;
-            for(const other of active.values()){
-              if(other===state) continue;
-              const q=other.rig.root.position;
-              if(Math.hypot(x-q.x,z-q.z)<.93&&Math.hypot(p.x-q.x,p.z-q.z)>=Math.hypot(x-q.x,z-q.z)){crowded=true;break;}
+            const ix=Math.floor(x/2.5),iz=Math.floor(z/2.5);
+            for(let xx=ix-1;xx<=ix+1&&!crowded;xx++) for(let zz=iz-1;zz<=iz+1&&!crowded;zz++){
+              for(const other of nearbyAllies.get(xx*4096+zz)??[]){
+                if(other===state) continue;
+                const q=other.rig.root.position, separation=(record.grade==='boss'||other.record.grade==='boss')?1.31:1.01;
+                const next=Math.hypot(x-q.x,z-q.z);
+                if(next<separation&&Math.hypot(p.x-q.x,p.z-q.z)>=next){crowded=true;break;}
+              }
             }
             if(crowded) continue;
             p.x=x;p.z=z;speed=step/Math.max(dt,.001);break;
@@ -242,11 +388,19 @@ export function shadowArmy(
         p.y=surface(p.x,p.z)-.94*T.MathUtils.smoothstep(state.rise,0,.73);
         state.gait=T.MathUtils.damp(state.gait,Math.min(1,speed/7),12,dt);
         state.phase+=speed*dt*2.8;
-        rig.animate({time,phase:state.phase,gait:state.gait,windup:state.windup>0?.45+(.29-state.windup)*1.6:0,
-          recovery:state.recovery/.28,hit:state.hurt/.28,leap:0,dead:0,frozen:false,alert:target?.hp?1:0,distance});
+        const detailed=state.rise>0||distance<17&&(record.grade==='boss'||full<warmRigLimit);
+        rig.root.visible=detailed;
+        if(detailed){
+          full++;
+          if(distance<8||n%2===Math.floor(time*30)%2||state.windup>0)
+            rig.animate({time,phase:state.phase,gait:state.gait,windup:state.windup>0?.32+(1-state.windup/profile.windup)*.67:0,
+              recovery:state.recovery/.31,hit:state.hurt/.28,leap:charge?state.recovery/.31*.76:0,dead:0,frozen:false,
+              alert:target?.hp?1:0,distance});
+        }
       }
     },
     render(){
+      for(const mesh of proxies) mesh.count=0;
       smoke.count=motes.count=0;smokeMaterial.uniforms.clock.value=time;
       const emit=(p:Point,y:number,phase:number,scale:number)=>{
         if(smoke.count===64) return;
@@ -259,7 +413,14 @@ export function shadowArmy(
       };
       const p=player.position;
       for(const state of active.values()){
-        const q=state.rig.root.position;
+        const q=state.rig.root.position, kind=state.record.kind, profile=shadowProfiles[kind];
+        if(save.health&&!state.rig.root.visible){
+          const mesh=proxies[profile.category==='Beast'||kind==='guardian'?0:profile.category==='Caster'||kind==='frostGuardian'?2:1];
+          stamp.position.copy(q);stamp.rotation.set(0,state.rig.root.rotation.y,0);stamp.scale.copy(state.rig.root.scale);stamp.updateMatrix();
+          const i=mesh.count++;
+          mesh.setMatrixAt(i,stamp.matrix);
+          tint.setHex(profile.color).multiplyScalar(.21);mesh.setColorAt(i,tint);
+        }
         if(!save.health||Math.hypot(p.x-q.x,p.z-q.z)>24) continue;
         for(let i=0;i<(state.rise>0?7:2);i++){
           const phase=(time*.52+i*.379+state.phase*.07)%1;
@@ -272,10 +433,15 @@ export function shadowArmy(
         const phase=(time*.63+(essence.x+240)*.14)%1;
         emit(essence,surface(essence.x,essence.z)+.23+phase*.64,phase,.77*Math.sin(phase*Math.PI));
       }
+      for(const mesh of proxies) if(mesh.count){
+        mesh.instanceMatrix.needsUpdate=true;
+        if(mesh.instanceColor) mesh.instanceColor.needsUpdate=true;
+      }
       if(smoke.count) smoke.instanceMatrix.needsUpdate=true;
       if(motes.count) motes.instanceMatrix.needsUpdate=true;
     },
     dispose(){
+      for(const mesh of proxies){mesh.geometry.dispose();mesh.dispose();}proxyMaterial.dispose();
       smoke.dispose();motes.dispose();smokeGeometry.dispose();moteGeometry.dispose();smokeMaterial.dispose();moteMaterial.dispose();
     },
   };
